@@ -1,0 +1,30 @@
+* text=auto
+
+# Unity text assets should stay text for readable diffs.
+*.cs text diff=csharp
+*.shader text
+*.cginc text
+*.hlsl text
+*.compute text
+*.mat text
+*.anim text
+*.controller text
+*.prefab text
+*.unity text
+*.asset text
+*.meta text
+*.asmdef text
+*.json text
+
+# Common binary assets.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.tga binary
+*.psd binary
+*.fbx binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.mp4 binary
+*.mov binary
