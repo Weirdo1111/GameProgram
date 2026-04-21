@@ -4,50 +4,253 @@ using UnityEngine;
 
 public class Test : MonoBehaviour
 {
-    [Header("Generated Game")]
-    [SerializeField] private int targetCount = 10;
-    [SerializeField] private int enemyCount = 5;
-
-    private readonly Dictionary<string, Material> materials = new Dictionary<string, Material>();
+    [Header("One Bullet Vertical Slice")]
+    [SerializeField] private int startLevel = 1;
 
     private void Awake()
     {
-        if (FindObjectOfType<FpsGameController>() != null)
+        if (FindObjectOfType<OneBulletGameController>() != null)
         {
             return;
         }
 
-        Physics.gravity = new Vector3(0f, -18f, 0f);
-        Physics.defaultSolverIterations = 8;
-        Physics.defaultSolverVelocityIterations = 2;
-        Time.fixedDeltaTime = 1f / 60f;
+        name = "One Bullet Bootstrap";
         Application.targetFrameRate = 120;
+        Time.fixedDeltaTime = 1f / 60f;
+        Physics.gravity = new Vector3(0f, -20f, 0f);
 
+        OneBulletGameController controller = gameObject.AddComponent<OneBulletGameController>();
+        controller.firstLevel = Mathf.Clamp(startLevel - 1, 0, 4);
+    }
+}
+
+public class OneBulletGameController : MonoBehaviour
+{
+    public static OneBulletGameController Instance { get; private set; }
+
+    public int firstLevel;
+    public OneBulletController bullet;
+    public BulletCameraController cameraController;
+    public readonly List<OneBulletEnemy> enemies = new List<OneBulletEnemy>();
+    public readonly List<Transform> coverNodes = new List<Transform>();
+
+    private const float MinX = -24f;
+    private const float MaxX = 24f;
+    private const float MinY = 0.8f;
+    private const float MaxY = 11.5f;
+    private const float MinZ = -29f;
+    private const float MaxZ = 35f;
+
+    private readonly Dictionary<string, Material> materials = new Dictionary<string, Material>();
+    private GameObject levelRoot;
+    private GameObject worldRoot;
+    private Camera mainCamera;
+    private GameState state;
+    private int levelIndex;
+    private int attempts;
+    private int killedEnemies;
+    private float levelTimer;
+    private float flightLimit = 42f;
+    private string statusText;
+
+    private enum GameState
+    {
+        Ready,
+        Flying,
+        Won,
+        Lost,
+        Complete
+    }
+
+    private void Awake()
+    {
+        Instance = this;
+    }
+
+    private void Start()
+    {
         CreateMaterials();
+        ConfigureCamera();
+        BuildPersistentObjects();
+        LoadLevel(Mathf.Clamp(firstLevel, 0, 4));
+    }
 
-        FpsGameController controller = gameObject.AddComponent<FpsGameController>();
-        controller.totalEnemies = enemyCount;
-        controller.totalTargets = targetCount;
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            RestartLevel();
+            return;
+        }
 
-        BuildArena();
-        BuildLighting();
-        BuildPlayer(controller);
-        BuildTargets();
-        BuildEnemies();
-        BuildPhysicsProps();
+        if (state == GameState.Ready && (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0)))
+        {
+            LaunchBullet();
+        }
+        else if (state == GameState.Won && (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0)))
+        {
+            LoadLevel(levelIndex + 1);
+        }
+        else if ((state == GameState.Lost || state == GameState.Complete) && (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0)))
+        {
+            RestartLevel();
+        }
+
+        if (state == GameState.Flying)
+        {
+            levelTimer += Time.deltaTime;
+            if (levelTimer >= flightLimit)
+            {
+                FailLevel("Signal lost: flight time expired.");
+            }
+        }
+    }
+
+    public bool IsFlying
+    {
+        get { return state == GameState.Flying; }
+    }
+
+    public bool IsInsideBounds(Vector3 position)
+    {
+        return position.x >= MinX && position.x <= MaxX &&
+               position.y >= MinY && position.y <= MaxY &&
+               position.z >= MinZ && position.z <= MaxZ;
+    }
+
+    public Vector3 ClampToArena(Vector3 position)
+    {
+        position.x = Mathf.Clamp(position.x, MinX + 1.2f, MaxX - 1.2f);
+        position.y = Mathf.Clamp(position.y, 1.2f, MaxY - 1.2f);
+        position.z = Mathf.Clamp(position.z, MinZ + 1.2f, MaxZ - 1.2f);
+        return position;
+    }
+
+    public Material GetMaterial(string key)
+    {
+        return materials[key];
+    }
+
+    public void RegisterEnemy(OneBulletEnemy enemy)
+    {
+        enemies.Add(enemy);
+        enemy.coverNodes = coverNodes;
+    }
+
+    public void RegisterCoverNode(Vector3 position)
+    {
+        GameObject node = new GameObject("Cover Node");
+        node.transform.SetParent(levelRoot.transform, false);
+        node.transform.position = position;
+        coverNodes.Add(node.transform);
+    }
+
+    public void NotifyEnemyKilled(OneBulletEnemy enemy)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        killedEnemies++;
+        if (killedEnemies >= enemies.Count && state == GameState.Flying)
+        {
+            WinLevel();
+        }
+    }
+
+    public void FailLevel(string reason)
+    {
+        if (state != GameState.Flying)
+        {
+            return;
+        }
+
+        state = GameState.Lost;
+        statusText = reason;
+        if (bullet != null)
+        {
+            bullet.StopFlight();
+        }
+    }
+
+    private void LaunchBullet()
+    {
+        attempts++;
+        levelTimer = 0f;
+        killedEnemies = 0;
+        statusText = "Neural link active. Guide the round.";
+        state = GameState.Flying;
+        bullet.Launch();
+    }
+
+    private void RestartLevel()
+    {
+        LoadLevel(levelIndex);
+    }
+
+    private void WinLevel()
+    {
+        if (levelIndex >= 4)
+        {
+            state = GameState.Complete;
+            statusText = "Vertical slice cleared. All five arenas completed.";
+        }
+        else
+        {
+            state = GameState.Won;
+            statusText = "Area clear. Space or click to continue.";
+        }
+
+        if (bullet != null)
+        {
+            bullet.StopFlight();
+        }
+    }
+
+    private void LoadLevel(int index)
+    {
+        if (index > 4)
+        {
+            index = 4;
+        }
+
+        levelIndex = index;
+        killedEnemies = 0;
+        levelTimer = 0f;
+        statusText = "Space or click to launch the one bullet.";
+        state = GameState.Ready;
+        enemies.Clear();
+        coverNodes.Clear();
+
+        if (levelRoot != null)
+        {
+            Destroy(levelRoot);
+        }
+
+        levelRoot = new GameObject("Level " + (levelIndex + 1));
+        levelRoot.transform.SetParent(worldRoot.transform, false);
+
+        BuildArenaShell();
+        BuildLevelContent(levelIndex);
+
+        Vector3 startPosition = new Vector3(0f, 2.7f, -24f);
+        bullet.ResetBullet(startPosition, Vector3.forward);
+        cameraController.SetOverview(startPosition + new Vector3(0f, 0.7f, 8f));
     }
 
     private void CreateMaterials()
     {
-        materials["floor"] = MakeMaterial("Floor Concrete", new Color(0.24f, 0.27f, 0.28f), 0.1f, 0.55f);
-        materials["wall"] = MakeMaterial("Warm Wall", new Color(0.47f, 0.43f, 0.35f), 0.05f, 0.4f);
-        materials["accent"] = MakeMaterial("Hazard Yellow", new Color(1f, 0.73f, 0.16f), 0.05f, 0.35f);
-        materials["crate"] = MakeMaterial("Crate Steel", new Color(0.34f, 0.26f, 0.18f), 0.15f, 0.6f);
-        materials["target"] = MakeMaterial("Target Blue", new Color(0.12f, 0.64f, 0.95f), 0.15f, 0.35f);
-        materials["enemy"] = MakeMaterial("Enemy Red", new Color(0.95f, 0.18f, 0.13f), 0.05f, 0.35f);
-        materials["gun"] = MakeMaterial("Gun Graphite", new Color(0.04f, 0.045f, 0.05f), 0.45f, 0.22f);
-        materials["muzzle"] = MakeMaterial("Muzzle Brass", new Color(0.95f, 0.69f, 0.22f), 0.3f, 0.25f);
-        materials["light"] = MakeEmissiveMaterial("Neon Lime", new Color(0.5f, 1f, 0.36f), 1.5f);
+        materials["floor"] = MakeMaterial("Mat Floor Graphite", new Color(0.08f, 0.1f, 0.11f), 0.05f, 0.58f);
+        materials["wall"] = MakeMaterial("Mat Wall Charcoal", new Color(0.17f, 0.19f, 0.21f), 0.1f, 0.48f);
+        materials["danger"] = MakeMaterial("Mat Collision Red", new Color(0.95f, 0.16f, 0.14f), 0.05f, 0.38f);
+        materials["cover"] = MakeMaterial("Mat Cover Slate", new Color(0.29f, 0.35f, 0.38f), 0.18f, 0.45f);
+        materials["lane"] = MakeEmissiveMaterial("Mat Route Cyan", new Color(0.1f, 0.78f, 1f), 1.7f);
+        materials["bullet"] = MakeEmissiveMaterial("Mat Bullet Gold", new Color(1f, 0.82f, 0.22f), 2.4f);
+        materials["enemy"] = MakeMaterial("Mat Enemy Idle", new Color(0.72f, 0.78f, 0.82f), 0.08f, 0.44f);
+        materials["enemyAlert"] = MakeEmissiveMaterial("Mat Enemy Alert", new Color(1f, 0.37f, 0.12f), 1.35f);
+        materials["enemyDead"] = MakeMaterial("Mat Enemy Down", new Color(0.1f, 0.1f, 0.1f), 0.05f, 0.2f);
+        materials["coverNode"] = MakeEmissiveMaterial("Mat Cover Node", new Color(0.45f, 1f, 0.36f), 1.2f);
     }
 
     private Material MakeMaterial(string materialName, Color color, float metallic, float smoothness)
@@ -68,708 +271,209 @@ public class Test : MonoBehaviour
         return material;
     }
 
-    private void BuildArena()
+    private void ConfigureCamera()
     {
-        CreateStaticBox("Concrete Floor", new Vector3(0f, -0.5f, 0f), new Vector3(70f, 1f, 70f), materials["floor"]);
-        CreateStaticBox("North Wall", new Vector3(0f, 3f, 35f), new Vector3(70f, 7f, 1f), materials["wall"]);
-        CreateStaticBox("South Wall", new Vector3(0f, 3f, -35f), new Vector3(70f, 7f, 1f), materials["wall"]);
-        CreateStaticBox("East Wall", new Vector3(35f, 3f, 0f), new Vector3(1f, 7f, 70f), materials["wall"]);
-        CreateStaticBox("West Wall", new Vector3(-35f, 3f, 0f), new Vector3(1f, 7f, 70f), materials["wall"]);
-
-        CreateStaticBox("Low Cover A", new Vector3(-9f, 0.75f, 8f), new Vector3(8f, 1.5f, 2f), materials["crate"]);
-        CreateStaticBox("Low Cover B", new Vector3(12f, 0.75f, -7f), new Vector3(9f, 1.5f, 2f), materials["crate"]);
-        CreateStaticBox("Mid Cover", new Vector3(0f, 1.1f, -15f), new Vector3(4f, 2.2f, 5f), materials["crate"]);
-        CreateStaticBox("Ramp", new Vector3(-20f, 0.45f, -12f), new Vector3(9f, 0.9f, 5f), materials["accent"])
-            .transform.rotation = Quaternion.Euler(0f, 25f, -10f);
-
-        for (int i = -2; i <= 2; i++)
-        {
-            CreateStaticBox("Neon Floor Strip", new Vector3(i * 9f, 0.02f, 0f), new Vector3(5f, 0.05f, 0.25f), materials["light"]);
-        }
-    }
-
-    private void BuildLighting()
-    {
-        Light existingSun = FindObjectOfType<Light>();
-        if (existingSun != null)
-        {
-            existingSun.name = "Arena Sun";
-            existingSun.type = LightType.Directional;
-            existingSun.intensity = 1.25f;
-            existingSun.color = new Color(1f, 0.93f, 0.78f);
-            existingSun.transform.rotation = Quaternion.Euler(48f, -35f, 0f);
-        }
-
-        RenderSettings.fog = true;
-        RenderSettings.fogColor = new Color(0.11f, 0.14f, 0.15f);
-        RenderSettings.fogDensity = 0.012f;
-        RenderSettings.ambientIntensity = 0.65f;
-
-        CreatePointLight("Green Fill Light", new Vector3(0f, 8f, 0f), new Color(0.35f, 1f, 0.5f), 2.1f, 24f);
-        CreatePointLight("Warm Back Light", new Vector3(-18f, 7f, 20f), new Color(1f, 0.55f, 0.25f), 1.4f, 22f);
-    }
-
-    private void BuildPlayer(FpsGameController controller)
-    {
-        GameObject player = new GameObject("Physics FPS Player");
-        player.transform.position = new Vector3(0f, 2f, -23f);
-
-        CapsuleCollider capsule = player.AddComponent<CapsuleCollider>();
-        capsule.height = 1.8f;
-        capsule.radius = 0.38f;
-        capsule.center = Vector3.zero;
-        PhysicMaterial playerMaterial = new PhysicMaterial("Player Low Friction");
-        playerMaterial.dynamicFriction = 0f;
-        playerMaterial.staticFriction = 0f;
-        playerMaterial.frictionCombine = PhysicMaterialCombine.Minimum;
-        capsule.material = playerMaterial;
-
-        Rigidbody body = player.AddComponent<Rigidbody>();
-        body.mass = 80f;
-        body.drag = 0f;
-        body.angularDrag = 0.05f;
-        body.interpolation = RigidbodyInterpolation.Interpolate;
-        body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-        body.constraints = RigidbodyConstraints.FreezeRotation;
-
-        GameObject pivot = new GameObject("Camera Pivot");
-        pivot.transform.SetParent(player.transform, false);
-        pivot.transform.localPosition = new Vector3(0f, 0.55f, 0f);
-
-        Camera camera = Camera.main;
-        if (camera == null)
+        mainCamera = Camera.main;
+        if (mainCamera == null)
         {
             GameObject cameraObject = new GameObject("Main Camera");
             cameraObject.tag = "MainCamera";
-            camera = cameraObject.AddComponent<Camera>();
+            mainCamera = cameraObject.AddComponent<Camera>();
             cameraObject.AddComponent<AudioListener>();
         }
 
-        camera.name = "FPS Camera";
-        camera.transform.SetParent(pivot.transform, false);
-        camera.transform.localPosition = Vector3.zero;
-        camera.transform.localRotation = Quaternion.identity;
-        camera.fieldOfView = 76f;
-        camera.nearClipPlane = 0.04f;
-        camera.farClipPlane = 200f;
-        camera.clearFlags = CameraClearFlags.Skybox;
-
-        Transform muzzle = CreateWeaponModel(camera.transform);
-
-        FpsPlayerController playerController = player.AddComponent<FpsPlayerController>();
-        playerController.viewCamera = camera;
-        playerController.cameraPivot = pivot.transform;
-
-        PlayerHealth playerHealth = player.AddComponent<PlayerHealth>();
-        playerHealth.maxHealth = 100f;
-        playerHealth.respawnPoint = player.transform.position;
-
-        FpsWeapon weapon = player.AddComponent<FpsWeapon>();
-        weapon.viewCamera = camera;
-        weapon.muzzle = muzzle;
-        weapon.ownerBody = body;
-
-        controller.player = playerController;
-        controller.weapon = weapon;
-        controller.playerHealth = playerHealth;
+        mainCamera.name = "One Bullet Camera";
+        mainCamera.fieldOfView = 67f;
+        mainCamera.nearClipPlane = 0.08f;
+        mainCamera.farClipPlane = 170f;
+        mainCamera.clearFlags = CameraClearFlags.Skybox;
     }
 
-    private Transform CreateWeaponModel(Transform cameraTransform)
+    private void BuildPersistentObjects()
     {
-        GameObject rig = new GameObject("Simple Rifle");
-        rig.transform.SetParent(cameraTransform, false);
-        rig.transform.localPosition = new Vector3(0.32f, -0.31f, 0.58f);
-        rig.transform.localRotation = Quaternion.Euler(0f, -2f, 0f);
+        worldRoot = new GameObject("One Bullet Runtime");
 
-        CreateWeaponPart("Receiver", rig.transform, new Vector3(0f, 0f, 0f), new Vector3(0.34f, 0.18f, 0.55f), materials["gun"]);
-        CreateWeaponPart("Barrel", rig.transform, new Vector3(0f, 0.02f, 0.46f), new Vector3(0.12f, 0.12f, 0.56f), materials["muzzle"]);
-        CreateWeaponPart("Grip", rig.transform, new Vector3(0f, -0.2f, -0.08f), new Vector3(0.16f, 0.32f, 0.14f), materials["gun"]);
-        CreateWeaponPart("Sight", rig.transform, new Vector3(0f, 0.15f, 0.04f), new Vector3(0.12f, 0.08f, 0.16f), materials["muzzle"]);
+        GameObject bulletObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        bulletObject.name = "Guided One Bullet";
+        bulletObject.transform.SetParent(worldRoot.transform, false);
+        bulletObject.transform.localScale = Vector3.one * 0.52f;
+        bulletObject.GetComponent<Renderer>().sharedMaterial = materials["bullet"];
+        Destroy(bulletObject.GetComponent<Collider>());
 
-        GameObject muzzle = new GameObject("Muzzle");
-        muzzle.transform.SetParent(rig.transform, false);
-        muzzle.transform.localPosition = new Vector3(0f, 0.02f, 0.8f);
-        return muzzle.transform;
+        Light bulletLight = bulletObject.AddComponent<Light>();
+        bulletLight.color = new Color(1f, 0.78f, 0.22f);
+        bulletLight.intensity = 2.4f;
+        bulletLight.range = 6f;
+
+        TrailRenderer trail = bulletObject.AddComponent<TrailRenderer>();
+        trail.time = 1.25f;
+        trail.startWidth = 0.3f;
+        trail.endWidth = 0.02f;
+        trail.numCapVertices = 5;
+        trail.material = materials["bullet"];
+
+        bullet = bulletObject.AddComponent<OneBulletController>();
+        bullet.game = this;
+        bullet.trail = trail;
+
+        cameraController = mainCamera.gameObject.AddComponent<BulletCameraController>();
+        cameraController.target = bullet.transform;
+        cameraController.bullet = bullet;
     }
 
-    private void CreateWeaponPart(string partName, Transform parent, Vector3 localPosition, Vector3 localScale, Material material)
+    private void BuildArenaShell()
     {
-        GameObject part = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        part.name = partName;
-        part.transform.SetParent(parent, false);
-        part.transform.localPosition = localPosition;
-        part.transform.localScale = localScale;
-        part.GetComponent<Renderer>().sharedMaterial = material;
-        Destroy(part.GetComponent<Collider>());
-    }
+        RenderSettings.fog = true;
+        RenderSettings.fogColor = new Color(0.04f, 0.055f, 0.06f);
+        RenderSettings.fogDensity = 0.013f;
+        RenderSettings.ambientIntensity = 0.58f;
 
-    private void BuildTargets()
-    {
-        for (int i = 0; i < targetCount; i++)
+        Light sun = FindObjectOfType<Light>();
+        if (sun != null)
         {
-            float x = Mathf.Lerp(-23f, 23f, i / Mathf.Max(1f, targetCount - 1f));
-            float z = 12f + Mathf.Sin(i * 1.7f) * 9f;
-            GameObject target = GameObject.CreatePrimitive(i % 2 == 0 ? PrimitiveType.Capsule : PrimitiveType.Cube);
-            target.name = "Physics Target";
-            target.transform.position = new Vector3(x, 1.35f, z);
-            target.transform.localScale = i % 2 == 0 ? new Vector3(1.2f, 1.2f, 1.2f) : new Vector3(1.5f, 1.5f, 0.45f);
-            target.GetComponent<Renderer>().sharedMaterial = materials["target"];
+            sun.name = "Tactical Sun";
+            sun.type = LightType.Directional;
+            sun.color = new Color(0.9f, 0.96f, 1f);
+            sun.intensity = 1.05f;
+            sun.transform.rotation = Quaternion.Euler(52f, -35f, 0f);
+        }
 
-            Rigidbody body = target.AddComponent<Rigidbody>();
-            body.mass = 18f;
-            body.interpolation = RigidbodyInterpolation.Interpolate;
-            body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        CreateHazardBox("Floor", new Vector3(0f, 0f, 3f), new Vector3(52f, 0.55f, 70f), materials["floor"]);
+        CreateHazardBox("Ceiling Limit", new Vector3(0f, 12.2f, 3f), new Vector3(52f, 0.35f, 70f), materials["wall"]);
+        CreateHazardBox("Left Boundary", new Vector3(MinX - 0.5f, 6f, 3f), new Vector3(1f, 12f, 70f), materials["wall"]);
+        CreateHazardBox("Right Boundary", new Vector3(MaxX + 0.5f, 6f, 3f), new Vector3(1f, 12f, 70f), materials["wall"]);
+        CreateHazardBox("Back Boundary", new Vector3(0f, 6f, MinZ - 0.5f), new Vector3(52f, 12f, 1f), materials["wall"]);
+        CreateHazardBox("Far Boundary", new Vector3(0f, 6f, MaxZ + 0.5f), new Vector3(52f, 12f, 1f), materials["wall"]);
 
-            FpsDamageable damageable = target.AddComponent<FpsDamageable>();
-            damageable.maxHealth = 60f;
-            damageable.scoreValue = 100;
-            damageable.destroyDelay = 2.25f;
+        CreateBox("Launch Rail", new Vector3(0f, 0.32f, -24f), new Vector3(7f, 0.1f, 1.6f), materials["lane"], false);
+        CreatePointLight("Launch Glow", new Vector3(0f, 3.5f, -24f), new Color(0.1f, 0.75f, 1f), 2.2f, 12f);
+        CreatePointLight("Mid Arena Glow", new Vector3(0f, 9f, 4f), new Color(0.55f, 1f, 0.65f), 1.4f, 24f);
+    }
+
+    private void BuildLevelContent(int index)
+    {
+        switch (index)
+        {
+            case 0:
+                flightLimit = 28f;
+                SpawnEnemy("Static Target A", OneBulletEnemy.EnemyKind.Static, new Vector3(-5f, 2.1f, 8f));
+                SpawnEnemy("Static Target B", OneBulletEnemy.EnemyKind.Static, new Vector3(6f, 2.1f, 20f));
+                CreateBox("Aim Lane", new Vector3(0f, 0.45f, 8f), new Vector3(2f, 0.12f, 42f), materials["lane"], false);
+                break;
+            case 1:
+                flightLimit = 34f;
+                CreateGate(0f, -2f, 5f);
+                CreateGate(0f, 12f, -6f);
+                SpawnEnemy("Static Target A", OneBulletEnemy.EnemyKind.Static, new Vector3(-8f, 2.1f, 7f));
+                SpawnEnemy("Static Target B", OneBulletEnemy.EnemyKind.Static, new Vector3(8f, 4.2f, 16f));
+                SpawnEnemy("Static Target C", OneBulletEnemy.EnemyKind.Static, new Vector3(0f, 2.1f, 27f));
+                break;
+            case 2:
+                flightLimit = 38f;
+                CreateGate(-4f, -1f, -6f);
+                CreateHazardBox("Center Splitter", new Vector3(0f, 3f, 13f), new Vector3(2.8f, 5.4f, 10f), materials["danger"]);
+                SpawnEnemy("Training Target", OneBulletEnemy.EnemyKind.Static, new Vector3(0f, 2.1f, 5f));
+                SpawnEnemy("Reactive Target A", OneBulletEnemy.EnemyKind.Dodger, new Vector3(-9f, 2.1f, 20f));
+                SpawnEnemy("Reactive Target B", OneBulletEnemy.EnemyKind.Dodger, new Vector3(9f, 2.1f, 25f));
+                break;
+            case 3:
+                flightLimit = 42f;
+                CreateCoverBlock(new Vector3(-8f, 2.4f, 12f), new Vector3(3f, 4.8f, 4f));
+                CreateCoverBlock(new Vector3(9f, 2.4f, 19f), new Vector3(4f, 4.8f, 3f));
+                CreateHazardBox("Low Ceiling Slab", new Vector3(0f, 7.7f, 8f), new Vector3(18f, 1f, 5f), materials["danger"]);
+                SpawnEnemy("Static Target", OneBulletEnemy.EnemyKind.Static, new Vector3(0f, 2.1f, 5f));
+                SpawnEnemy("Dodger A", OneBulletEnemy.EnemyKind.Dodger, new Vector3(-13f, 2.1f, 22f));
+                SpawnEnemy("Dodger B", OneBulletEnemy.EnemyKind.Dodger, new Vector3(13f, 2.1f, 26f));
+                SpawnEnemy("Cover Seeker", OneBulletEnemy.EnemyKind.Cover, new Vector3(0f, 2.1f, 30f));
+                break;
+            default:
+                flightLimit = 46f;
+                CreateGate(0f, -3f, 4f);
+                CreateGate(0f, 10f, -5f);
+                CreateCoverBlock(new Vector3(-11f, 2.3f, 16f), new Vector3(3.2f, 4.6f, 4.2f));
+                CreateCoverBlock(new Vector3(11f, 2.3f, 22f), new Vector3(3.2f, 4.6f, 4.2f));
+                CreateHazardBox("Final Needle A", new Vector3(-4f, 4.5f, 27f), new Vector3(2f, 8f, 2f), materials["danger"]);
+                CreateHazardBox("Final Needle B", new Vector3(4f, 4.5f, 27f), new Vector3(2f, 8f, 2f), materials["danger"]);
+                SpawnEnemy("Opening Target", OneBulletEnemy.EnemyKind.Static, new Vector3(-7f, 2.1f, 7f));
+                SpawnEnemy("Dodger A", OneBulletEnemy.EnemyKind.Dodger, new Vector3(8f, 2.1f, 14f));
+                SpawnEnemy("Cover Seeker A", OneBulletEnemy.EnemyKind.Cover, new Vector3(-12f, 2.1f, 25f));
+                SpawnEnemy("Cover Seeker B", OneBulletEnemy.EnemyKind.Cover, new Vector3(12f, 2.1f, 29f));
+                SpawnEnemy("Final Target", OneBulletEnemy.EnemyKind.Dodger, new Vector3(0f, 5f, 32f));
+                break;
         }
     }
 
-    private void BuildEnemies()
+    private void CreateGate(float xOffset, float z, float gapX)
     {
-        for (int i = 0; i < enemyCount; i++)
-        {
-            float angle = i * Mathf.PI * 2f / Mathf.Max(1, enemyCount);
-            Vector3 position = new Vector3(Mathf.Cos(angle) * 18f, 1.1f, Mathf.Sin(angle) * 18f + 4f);
-
-            GameObject enemy = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            enemy.name = "Physics Chaser";
-            enemy.transform.position = position;
-            enemy.transform.localScale = new Vector3(1.15f, 1.15f, 1.15f);
-            enemy.GetComponent<Renderer>().sharedMaterial = materials["enemy"];
-
-            Rigidbody body = enemy.AddComponent<Rigidbody>();
-            body.mass = 55f;
-            body.drag = 0.4f;
-            body.angularDrag = 0.2f;
-            body.interpolation = RigidbodyInterpolation.Interpolate;
-            body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-            body.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
-
-            FpsDamageable damageable = enemy.AddComponent<FpsDamageable>();
-            damageable.maxHealth = 100f;
-            damageable.scoreValue = 250;
-            damageable.destroyDelay = 2.8f;
-
-            PhysicsEnemy chaser = enemy.AddComponent<PhysicsEnemy>();
-            chaser.damagePerSecond = 14f;
-        }
+        CreateHazardBox("Gate Left", new Vector3(-15f + xOffset, 3.2f, z), new Vector3(16f + gapX, 5.8f, 1.2f), materials["danger"]);
+        CreateHazardBox("Gate Right", new Vector3(16f + xOffset, 3.2f, z), new Vector3(15f - gapX, 5.8f, 1.2f), materials["danger"]);
+        CreateHazardBox("Gate Top", new Vector3(xOffset, 8.4f, z), new Vector3(12f, 2.2f, 1.2f), materials["danger"]);
     }
 
-    private void BuildPhysicsProps()
+    private void CreateCoverBlock(Vector3 position, Vector3 scale)
     {
-        for (int i = 0; i < 18; i++)
-        {
-            GameObject crate = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            crate.name = "Movable Physics Crate";
-            crate.transform.position = new Vector3(Random.Range(-24f, 24f), 0.6f, Random.Range(-18f, 18f));
-            float size = Random.Range(0.75f, 1.45f);
-            crate.transform.localScale = new Vector3(size, size, size);
-            crate.GetComponent<Renderer>().sharedMaterial = materials["crate"];
-
-            Rigidbody body = crate.AddComponent<Rigidbody>();
-            body.mass = size * 12f;
-            body.interpolation = RigidbodyInterpolation.Interpolate;
-            body.collisionDetectionMode = CollisionDetectionMode.Continuous;
-        }
+        CreateBox("AI Cover", position, scale, materials["cover"], true);
+        RegisterCoverNode(position + new Vector3(-scale.x * 0.7f, 0.1f, 0f));
+        RegisterCoverNode(position + new Vector3(scale.x * 0.7f, 0.1f, 0f));
+        RegisterCoverNode(position + new Vector3(0f, 0.1f, scale.z * 0.85f));
     }
 
-    private GameObject CreateStaticBox(string objectName, Vector3 position, Vector3 scale, Material material)
+    private OneBulletEnemy SpawnEnemy(string enemyName, OneBulletEnemy.EnemyKind kind, Vector3 position)
+    {
+        GameObject enemy = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        enemy.name = enemyName;
+        enemy.transform.SetParent(levelRoot.transform, false);
+        enemy.transform.position = position;
+        enemy.transform.localScale = new Vector3(1.35f, 1.35f, 1.35f);
+        enemy.GetComponent<Renderer>().sharedMaterial = materials["enemy"];
+
+        OneBulletEnemy enemyController = enemy.AddComponent<OneBulletEnemy>();
+        enemyController.kind = kind;
+        enemyController.game = this;
+        enemyController.idleMaterial = materials["enemy"];
+        enemyController.alertMaterial = materials["enemyAlert"];
+        enemyController.deadMaterial = materials["enemyDead"];
+        RegisterEnemy(enemyController);
+
+        return enemyController;
+    }
+
+    private GameObject CreateHazardBox(string objectName, Vector3 position, Vector3 scale, Material material)
+    {
+        return CreateBox(objectName, position, scale, material, true);
+    }
+
+    private GameObject CreateBox(string objectName, Vector3 position, Vector3 scale, Material material, bool hazard)
     {
         GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
         box.name = objectName;
+        box.transform.SetParent(levelRoot.transform, false);
         box.transform.position = position;
         box.transform.localScale = scale;
         box.GetComponent<Renderer>().sharedMaterial = material;
+
+        if (hazard)
+        {
+            box.AddComponent<BulletHazard>();
+        }
+        else
+        {
+            Destroy(box.GetComponent<Collider>());
+        }
+
         return box;
     }
 
     private void CreatePointLight(string objectName, Vector3 position, Color color, float intensity, float range)
     {
         GameObject lightObject = new GameObject(objectName);
+        lightObject.transform.SetParent(levelRoot.transform, false);
         lightObject.transform.position = position;
         Light light = lightObject.AddComponent<Light>();
         light.type = LightType.Point;
         light.color = color;
         light.intensity = intensity;
         light.range = range;
-        light.shadows = LightShadows.Soft;
-    }
-}
-
-public class FpsPlayerController : MonoBehaviour
-{
-    public Camera viewCamera;
-    public Transform cameraPivot;
-    public float walkSpeed = 7f;
-    public float sprintSpeed = 10.5f;
-    public float acceleration = 28f;
-    public float airControl = 0.32f;
-    public float jumpVelocity = 6.4f;
-    public float lookSensitivity = 2.1f;
-
-    private Rigidbody body;
-    private float pitch;
-    private bool wantsJump;
-    private bool grounded;
-
-    public bool IsGrounded
-    {
-        get { return grounded; }
-    }
-
-    private void Awake()
-    {
-        body = GetComponent<Rigidbody>();
-        LockCursor(true);
-    }
-
-    private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            LockCursor(false);
-        }
-
-        if (Input.GetMouseButtonDown(0))
-        {
-            LockCursor(true);
-        }
-
-        if (Cursor.lockState == CursorLockMode.Locked)
-        {
-            Look();
-        }
-
-        if (Input.GetButtonDown("Jump"))
-        {
-            wantsJump = true;
-        }
-    }
-
-    private void FixedUpdate()
-    {
-        grounded = CheckGrounded();
-        Move();
-
-        if (wantsJump && grounded)
-        {
-            Vector3 velocity = body.velocity;
-            velocity.y = 0f;
-            body.velocity = velocity;
-            body.AddForce(Vector3.up * jumpVelocity, ForceMode.VelocityChange);
-        }
-
-        wantsJump = false;
-    }
-
-    private void Look()
-    {
-        float mouseX = Input.GetAxis("Mouse X") * lookSensitivity;
-        float mouseY = Input.GetAxis("Mouse Y") * lookSensitivity;
-
-        transform.Rotate(Vector3.up, mouseX, Space.World);
-        pitch = Mathf.Clamp(pitch - mouseY, -84f, 84f);
-        cameraPivot.localRotation = Quaternion.Euler(pitch, 0f, 0f);
-    }
-
-    private void Move()
-    {
-        float horizontal = Input.GetAxisRaw("Horizontal");
-        float vertical = Input.GetAxisRaw("Vertical");
-        Vector3 input = Vector3.ClampMagnitude(new Vector3(horizontal, 0f, vertical), 1f);
-        Vector3 desiredDirection = transform.TransformDirection(input);
-        float speed = Input.GetKey(KeyCode.LeftShift) ? sprintSpeed : walkSpeed;
-        Vector3 targetVelocity = desiredDirection * speed;
-
-        Vector3 currentHorizontalVelocity = new Vector3(body.velocity.x, 0f, body.velocity.z);
-        Vector3 velocityDelta = targetVelocity - currentHorizontalVelocity;
-        float control = grounded ? 1f : airControl;
-        velocityDelta = Vector3.ClampMagnitude(velocityDelta, acceleration * control * Time.fixedDeltaTime);
-
-        body.AddForce(velocityDelta, ForceMode.VelocityChange);
-    }
-
-    private bool CheckGrounded()
-    {
-        RaycastHit hit;
-        Vector3 origin = transform.position + Vector3.up * 0.05f;
-        return Physics.SphereCast(origin, 0.32f, Vector3.down, out hit, 1.05f, ~0, QueryTriggerInteraction.Ignore);
-    }
-
-    public void Teleport(Vector3 position)
-    {
-        body.velocity = Vector3.zero;
-        body.angularVelocity = Vector3.zero;
-        body.position = position;
-        transform.rotation = Quaternion.identity;
-        pitch = 0f;
-    }
-
-    private void LockCursor(bool locked)
-    {
-        Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
-        Cursor.visible = !locked;
-    }
-}
-
-public class FpsWeapon : MonoBehaviour
-{
-    public Camera viewCamera;
-    public Transform muzzle;
-    public Rigidbody ownerBody;
-    public float damage = 35f;
-    public float range = 140f;
-    public float fireRate = 0.11f;
-    public float impactForce = 26f;
-    public int clipSize = 18;
-    public float reloadTime = 1.25f;
-
-    private int ammo;
-    private float nextFireTime;
-    private bool reloading;
-    private Material tracerMaterial;
-    private Vector3 weaponRestPosition;
-    private bool cachedWeaponRestPosition;
-
-    public int Ammo
-    {
-        get { return ammo; }
-    }
-
-    public bool IsReloading
-    {
-        get { return reloading; }
-    }
-
-    private void Awake()
-    {
-        ammo = clipSize;
-        tracerMaterial = new Material(Shader.Find("Sprites/Default"));
-        tracerMaterial.color = new Color(1f, 0.93f, 0.28f, 1f);
-
-    }
-
-    private void Start()
-    {
-        CacheWeaponRestPosition();
-    }
-
-    private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            StartCoroutine(Reload());
-        }
-
-        if (Input.GetMouseButton(0) && Time.time >= nextFireTime && !reloading)
-        {
-            Shoot();
-        }
-    }
-
-    private void Shoot()
-    {
-        if (ammo <= 0)
-        {
-            StartCoroutine(Reload());
-            return;
-        }
-
-        ammo--;
-        nextFireTime = Time.time + fireRate;
-
-        Ray ray = viewCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-        RaycastHit hit;
-        Vector3 endPoint = ray.origin + ray.direction * range;
-
-        if (Physics.Raycast(ray, out hit, range, ~0, QueryTriggerInteraction.Ignore))
-        {
-            endPoint = hit.point;
-            Rigidbody hitBody = hit.rigidbody;
-            if (hitBody != null)
-            {
-                hitBody.AddForceAtPosition(ray.direction * impactForce, hit.point, ForceMode.Impulse);
-            }
-
-            FpsDamageable damageable = hit.collider.GetComponentInParent<FpsDamageable>();
-            if (damageable != null)
-            {
-                damageable.TakeDamage(damage, hit.point, ray.direction * impactForce, gameObject);
-            }
-        }
-
-        if (ownerBody != null)
-        {
-            ownerBody.AddForce(-ray.direction * 0.45f, ForceMode.Impulse);
-        }
-
-        StartCoroutine(ShowTracer(muzzle != null ? muzzle.position : ray.origin, endPoint));
-        StartCoroutine(WeaponKick());
-    }
-
-    private IEnumerator Reload()
-    {
-        if (reloading || ammo == clipSize)
-        {
-            yield break;
-        }
-
-        reloading = true;
-        yield return new WaitForSeconds(reloadTime);
-        ammo = clipSize;
-        reloading = false;
-    }
-
-    private IEnumerator ShowTracer(Vector3 start, Vector3 end)
-    {
-        GameObject tracerObject = new GameObject("Bullet Tracer");
-        LineRenderer tracer = tracerObject.AddComponent<LineRenderer>();
-        tracer.positionCount = 2;
-        tracer.SetPosition(0, start);
-        tracer.SetPosition(1, end);
-        tracer.startWidth = 0.035f;
-        tracer.endWidth = 0.004f;
-        tracer.material = tracerMaterial;
-        tracer.numCapVertices = 4;
-
-        yield return new WaitForSeconds(0.045f);
-        Destroy(tracerObject);
-    }
-
-    private IEnumerator WeaponKick()
-    {
-        if (muzzle == null || muzzle.parent == null)
-        {
-            yield break;
-        }
-
-        CacheWeaponRestPosition();
-        Transform rig = muzzle.parent;
-        rig.localPosition = weaponRestPosition + new Vector3(0f, 0.025f, -0.09f);
-        yield return new WaitForSeconds(0.045f);
-        rig.localPosition = weaponRestPosition;
-    }
-
-    private void CacheWeaponRestPosition()
-    {
-        if (cachedWeaponRestPosition || muzzle == null || muzzle.parent == null)
-        {
-            return;
-        }
-
-        weaponRestPosition = muzzle.parent.localPosition;
-        cachedWeaponRestPosition = true;
-    }
-}
-
-public class FpsDamageable : MonoBehaviour
-{
-    public float maxHealth = 100f;
-    public int scoreValue = 100;
-    public float destroyDelay = 2f;
-
-    private float health;
-    private bool dead;
-    private Rigidbody body;
-
-    private void Awake()
-    {
-        body = GetComponent<Rigidbody>();
-    }
-
-    private void Start()
-    {
-        health = maxHealth;
-    }
-
-    public void TakeDamage(float amount, Vector3 hitPoint, Vector3 impulse, GameObject attacker)
-    {
-        if (dead)
-        {
-            return;
-        }
-
-        health -= amount;
-        if (body != null)
-        {
-            body.AddForceAtPosition(impulse, hitPoint, ForceMode.Impulse);
-        }
-
-        if (health <= 0f)
-        {
-            Die(hitPoint, impulse);
-        }
-    }
-
-    private void Die(Vector3 hitPoint, Vector3 impulse)
-    {
-        dead = true;
-
-        if (FpsGameController.Instance != null)
-        {
-            FpsGameController.Instance.AddScore(scoreValue);
-        }
-
-        PhysicsEnemy enemy = GetComponent<PhysicsEnemy>();
-        if (enemy != null)
-        {
-            enemy.enabled = false;
-        }
-
-        Collider collider = GetComponent<Collider>();
-        if (collider != null)
-        {
-            collider.material = null;
-        }
-
-        if (body == null)
-        {
-            body = gameObject.AddComponent<Rigidbody>();
-        }
-
-        body.constraints = RigidbodyConstraints.None;
-        body.drag = 0.08f;
-        body.AddTorque(Random.onUnitSphere * 12f, ForceMode.Impulse);
-        body.AddForceAtPosition(impulse * 1.25f + Vector3.up * 3f, hitPoint, ForceMode.Impulse);
-        Destroy(gameObject, destroyDelay);
-    }
-}
-
-public class PhysicsEnemy : MonoBehaviour
-{
-    public float chaseForce = 34f;
-    public float maxSpeed = 6f;
-    public float attackRange = 1.6f;
-    public float damagePerSecond = 12f;
-
-    private Rigidbody body;
-    private Transform target;
-
-    private void Awake()
-    {
-        body = GetComponent<Rigidbody>();
-    }
-
-    private void Start()
-    {
-        if (FpsGameController.Instance != null && FpsGameController.Instance.player != null)
-        {
-            target = FpsGameController.Instance.player.transform;
-        }
-    }
-
-    private void FixedUpdate()
-    {
-        if (target == null)
-        {
-            return;
-        }
-
-        Vector3 toTarget = target.position - transform.position;
-        toTarget.y = 0f;
-        float distance = toTarget.magnitude;
-        if (distance < 0.01f)
-        {
-            return;
-        }
-
-        Vector3 direction = toTarget / distance;
-        body.AddForce(direction * chaseForce, ForceMode.Acceleration);
-
-        Vector3 flatVelocity = new Vector3(body.velocity.x, 0f, body.velocity.z);
-        if (flatVelocity.magnitude > maxSpeed)
-        {
-            flatVelocity = flatVelocity.normalized * maxSpeed;
-            body.velocity = new Vector3(flatVelocity.x, body.velocity.y, flatVelocity.z);
-        }
-
-        transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
-
-        if (distance <= attackRange && FpsGameController.Instance != null && FpsGameController.Instance.playerHealth != null)
-        {
-            FpsGameController.Instance.playerHealth.TakeDamage(damagePerSecond * Time.fixedDeltaTime);
-        }
-    }
-}
-
-public class PlayerHealth : MonoBehaviour
-{
-    public float maxHealth = 100f;
-    public Vector3 respawnPoint;
-
-    private float health;
-    private bool respawning;
-    private FpsPlayerController controller;
-
-    public float CurrentHealth
-    {
-        get { return health; }
-    }
-
-    private void Awake()
-    {
-        health = maxHealth;
-        controller = GetComponent<FpsPlayerController>();
-    }
-
-    public void TakeDamage(float amount)
-    {
-        if (respawning)
-        {
-            return;
-        }
-
-        health = Mathf.Max(0f, health - amount);
-        if (health <= 0f)
-        {
-            StartCoroutine(Respawn());
-        }
-    }
-
-    private IEnumerator Respawn()
-    {
-        respawning = true;
-        yield return new WaitForSeconds(0.8f);
-        health = maxHealth;
-
-        if (controller != null)
-        {
-            controller.Teleport(respawnPoint);
-        }
-        else
-        {
-            transform.position = respawnPoint;
-        }
-
-        respawning = false;
-    }
-}
-
-public class FpsGameController : MonoBehaviour
-{
-    public static FpsGameController Instance { get; private set; }
-
-    public FpsPlayerController player;
-    public FpsWeapon weapon;
-    public PlayerHealth playerHealth;
-    public int totalTargets;
-    public int totalEnemies;
-
-    private int score;
-    private int destroyedObjects;
-
-    private void Awake()
-    {
-        Instance = this;
-    }
-
-    public void AddScore(int amount)
-    {
-        score += amount;
-        destroyedObjects++;
     }
 
     private void OnGUI()
@@ -777,21 +481,380 @@ public class FpsGameController : MonoBehaviour
         GUI.color = Color.white;
         GUI.skin.label.fontSize = 18;
 
-        string ammoText = weapon != null && weapon.IsReloading ? "Reloading..." : weapon != null ? weapon.Ammo + " / " + weapon.clipSize : "--";
-        string healthText = playerHealth != null ? Mathf.CeilToInt(playerHealth.CurrentHealth).ToString() : "--";
+        int remaining = Mathf.Max(0, enemies.Count - killedEnemies);
+        GUI.Label(new Rect(20f, 18f, 720f, 28f), "One Bullet | Level " + (levelIndex + 1) + "/5 | Remaining: " + remaining + " | Attempts: " + attempts);
+        GUI.Label(new Rect(20f, 46f, 720f, 28f), "Time: " + levelTimer.ToString("0.0") + " / " + flightLimit.ToString("0") + " | " + statusText);
+        GUI.Label(new Rect(20f, 74f, 900f, 28f), "W/S steer up/down | A/D steer left/right | Shift boost | R restart | Space/click launch/continue");
 
-        GUI.Label(new Rect(20f, 18f, 420f, 28f), "Score: " + score + "   Destroyed: " + destroyedObjects + " / " + (totalTargets + totalEnemies));
-        GUI.Label(new Rect(20f, 46f, 420f, 28f), "Health: " + healthText + "   Ammo: " + ammoText);
-        GUI.Label(new Rect(20f, 74f, 700f, 28f), "WASD move | Shift sprint | Space jump | Mouse aim | Left click shoot | R reload | Esc unlock mouse");
-
-        float size = 18f;
-        Rect crosshair = new Rect(Screen.width * 0.5f - size * 0.5f, Screen.height * 0.5f - size * 0.5f, size, size);
-        GUI.Label(crosshair, "+");
-
-        if (playerHealth != null && playerHealth.CurrentHealth <= 0f)
+        if (state == GameState.Ready || state == GameState.Won || state == GameState.Lost || state == GameState.Complete)
         {
-            GUI.skin.label.fontSize = 30;
-            GUI.Label(new Rect(Screen.width * 0.5f - 130f, Screen.height * 0.5f + 50f, 300f, 40f), "Respawning...");
+            GUI.skin.label.fontSize = 28;
+            string prompt = state == GameState.Ready ? "Launch the single guided bullet" :
+                state == GameState.Won ? "Area clear" :
+                state == GameState.Complete ? "Vertical slice complete" : "Trajectory failed";
+            GUI.Label(new Rect(Screen.width * 0.5f - 230f, Screen.height * 0.5f - 26f, 520f, 40f), prompt);
         }
     }
+}
+
+public class OneBulletController : MonoBehaviour
+{
+    public OneBulletGameController game;
+    public TrailRenderer trail;
+    public float baseSpeed = 18f;
+    public float boostSpeed = 25f;
+    public float steerStrength = 1.65f;
+    public float radius = 0.32f;
+    public float predictionSeconds = 1.2f;
+
+    private Vector3 direction = Vector3.forward;
+    private bool flying;
+
+    public bool IsFlying
+    {
+        get { return flying; }
+    }
+
+    public Vector3 Direction
+    {
+        get { return direction; }
+    }
+
+    public float CurrentSpeed
+    {
+        get { return Input.GetKey(KeyCode.LeftShift) ? boostSpeed : baseSpeed; }
+    }
+
+    public void ResetBullet(Vector3 position, Vector3 startDirection)
+    {
+        flying = false;
+        transform.position = position;
+        direction = startDirection.normalized;
+        gameObject.SetActive(true);
+        if (trail != null)
+        {
+            trail.Clear();
+        }
+    }
+
+    public void Launch()
+    {
+        flying = true;
+        if (trail != null)
+        {
+            trail.Clear();
+        }
+    }
+
+    public void StopFlight()
+    {
+        flying = false;
+    }
+
+    public Vector3 PredictPosition(float seconds)
+    {
+        return transform.position + direction * baseSpeed * seconds;
+    }
+
+    private void FixedUpdate()
+    {
+        if (!flying || game == null)
+        {
+            return;
+        }
+
+        float horizontal = Input.GetAxisRaw("Horizontal");
+        float vertical = Input.GetAxisRaw("Vertical");
+        Vector3 steer = new Vector3(horizontal, vertical, 0f);
+        direction = (direction + steer * steerStrength * Time.fixedDeltaTime).normalized;
+
+        if (direction.z < 0.28f)
+        {
+            direction.z = 0.28f;
+            direction.Normalize();
+        }
+
+        Vector3 oldPosition = transform.position;
+        float distance = CurrentSpeed * Time.fixedDeltaTime;
+        Vector3 newPosition = oldPosition + direction * distance;
+
+        if (CheckCollision(oldPosition, distance, out Vector3 hitPosition))
+        {
+            transform.position = hitPosition;
+            return;
+        }
+
+        transform.position = newPosition;
+        if (!game.IsInsideBounds(transform.position))
+        {
+            game.FailLevel("Out of bounds: neural link severed.");
+        }
+    }
+
+    private bool CheckCollision(Vector3 origin, float distance, out Vector3 hitPosition)
+    {
+        hitPosition = origin;
+        RaycastHit[] hits = Physics.SphereCastAll(origin, radius, direction, distance, ~0, QueryTriggerInteraction.Collide);
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider hitCollider = hits[i].collider;
+            if (hitCollider == null || hitCollider.transform == transform)
+            {
+                continue;
+            }
+
+            OneBulletEnemy enemy = hitCollider.GetComponentInParent<OneBulletEnemy>();
+            if (enemy != null)
+            {
+                enemy.TakeBulletHit(hits[i].point, direction);
+                SpawnHitSpark(hits[i].point, game.GetMaterial("bullet"));
+                continue;
+            }
+
+            if (hitCollider.GetComponentInParent<BulletHazard>() != null)
+            {
+                hitPosition = hits[i].point - direction * radius;
+                game.FailLevel("Impact detected: the one bullet was lost.");
+                SpawnHitSpark(hits[i].point, game.GetMaterial("danger"));
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void SpawnHitSpark(Vector3 position, Material material)
+    {
+        GameObject spark = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        spark.name = "Hit Spark";
+        spark.transform.position = position;
+        spark.transform.localScale = Vector3.one * 0.5f;
+        spark.GetComponent<Renderer>().sharedMaterial = material;
+        Destroy(spark.GetComponent<Collider>());
+        Destroy(spark, 0.22f);
+    }
+}
+
+public class OneBulletEnemy : MonoBehaviour
+{
+    public enum EnemyKind
+    {
+        Static,
+        Dodger,
+        Cover
+    }
+
+    public EnemyKind kind;
+    public OneBulletGameController game;
+    public List<Transform> coverNodes;
+    public Material idleMaterial;
+    public Material alertMaterial;
+    public Material deadMaterial;
+    public float riskThreshold = 0.52f;
+    public float moveSpeed = 7.5f;
+    public float dodgeDistance = 5.2f;
+    public float reactionDelay = 0.18f;
+
+    private Renderer enemyRenderer;
+    private Vector3 startPosition;
+    private Vector3 desiredPosition;
+    private float cooldown;
+    private float reactionTimer;
+    private bool alerting;
+    private bool dead;
+
+    private void Awake()
+    {
+        enemyRenderer = GetComponent<Renderer>();
+    }
+
+    private void Start()
+    {
+        startPosition = transform.position;
+        desiredPosition = startPosition;
+    }
+
+    private void Update()
+    {
+        if (dead || game == null)
+        {
+            return;
+        }
+
+        cooldown -= Time.deltaTime;
+        transform.position = Vector3.MoveTowards(transform.position, desiredPosition, moveSpeed * Time.deltaTime);
+
+        if (kind == EnemyKind.Static || !game.IsFlying || game.bullet == null || !game.bullet.IsFlying)
+        {
+            return;
+        }
+
+        float risk = EvaluateRisk(transform.position);
+        if (risk > riskThreshold && cooldown <= 0f && !alerting)
+        {
+            alerting = true;
+            reactionTimer = reactionDelay;
+            SetMaterial(alertMaterial);
+        }
+
+        if (alerting)
+        {
+            reactionTimer -= Time.deltaTime;
+            if (reactionTimer <= 0f)
+            {
+                alerting = false;
+                cooldown = 1.2f;
+                if (kind == EnemyKind.Cover)
+                {
+                    MoveToCover();
+                }
+                else
+                {
+                    DodgeSideways();
+                }
+            }
+        }
+
+        if (Vector3.Distance(transform.position, desiredPosition) < 0.08f && !alerting)
+        {
+            SetMaterial(idleMaterial);
+        }
+    }
+
+    public void TakeBulletHit(Vector3 hitPoint, Vector3 bulletDirection)
+    {
+        if (dead)
+        {
+            return;
+        }
+
+        dead = true;
+        SetMaterial(deadMaterial);
+        transform.rotation = Quaternion.LookRotation(Vector3.up, -bulletDirection);
+        StartCoroutine(DeathRoutine(hitPoint));
+        game.NotifyEnemyKilled(this);
+    }
+
+    private IEnumerator DeathRoutine(Vector3 hitPoint)
+    {
+        GameObject burst = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        burst.name = "Enemy Hit Burst";
+        burst.transform.position = hitPoint;
+        burst.transform.localScale = Vector3.one * 1.2f;
+        burst.GetComponent<Renderer>().sharedMaterial = deadMaterial;
+        Destroy(burst.GetComponent<Collider>());
+
+        yield return new WaitForSeconds(0.22f);
+        Destroy(burst);
+        Destroy(gameObject, 0.35f);
+    }
+
+    private float EvaluateRisk(Vector3 position)
+    {
+        OneBulletController bullet = game.bullet;
+        Vector3 toEnemy = position - bullet.transform.position;
+        float projected = Vector3.Dot(toEnemy, bullet.Direction);
+        if (projected < 0f)
+        {
+            return 0f;
+        }
+
+        float maxDistance = bullet.baseSpeed * bullet.predictionSeconds;
+        Vector3 closest = bullet.transform.position + bullet.Direction * Mathf.Clamp(projected, 0f, maxDistance);
+        float distance = Vector3.Distance(closest, position);
+        float distanceScore = Mathf.Clamp01(1f - distance / 4.2f);
+        float aimScore = Mathf.Clamp01(Vector3.Dot(bullet.Direction, toEnemy.normalized));
+        return distanceScore * 0.76f + aimScore * 0.24f;
+    }
+
+    private void DodgeSideways()
+    {
+        OneBulletController bullet = game.bullet;
+        Vector3 side = Vector3.Cross(Vector3.up, bullet.Direction).normalized;
+        Vector3 left = game.ClampToArena(startPosition + side * dodgeDistance);
+        Vector3 right = game.ClampToArena(startPosition - side * dodgeDistance);
+        desiredPosition = EvaluateRisk(left) < EvaluateRisk(right) ? left : right;
+    }
+
+    private void MoveToCover()
+    {
+        if (coverNodes == null || coverNodes.Count == 0)
+        {
+            DodgeSideways();
+            return;
+        }
+
+        Transform bestNode = coverNodes[0];
+        float bestScore = float.NegativeInfinity;
+        for (int i = 0; i < coverNodes.Count; i++)
+        {
+            Vector3 nodePosition = coverNodes[i].position;
+            float riskSafety = 1f - EvaluateRisk(nodePosition);
+            float travelCost = Vector3.Distance(transform.position, nodePosition) * 0.035f;
+            float score = riskSafety - travelCost;
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestNode = coverNodes[i];
+            }
+        }
+
+        desiredPosition = game.ClampToArena(bestNode.position);
+    }
+
+    private void SetMaterial(Material material)
+    {
+        if (enemyRenderer != null && material != null)
+        {
+            enemyRenderer.sharedMaterial = material;
+        }
+    }
+}
+
+public class BulletCameraController : MonoBehaviour
+{
+    public Transform target;
+    public OneBulletController bullet;
+    public float followDistance = 7f;
+    public float followHeight = 2.6f;
+    public float smoothTime = 0.08f;
+
+    private Vector3 velocity;
+    private Vector3 overviewFocus;
+
+    public void SetOverview(Vector3 focus)
+    {
+        overviewFocus = focus;
+        transform.position = focus + new Vector3(0f, 9.5f, -17f);
+        transform.rotation = Quaternion.LookRotation(focus - transform.position, Vector3.up);
+    }
+
+    private void LateUpdate()
+    {
+        if (target == null || bullet == null)
+        {
+            return;
+        }
+
+        Vector3 focus = bullet.IsFlying ? target.position + bullet.Direction * 3f : overviewFocus;
+        Vector3 desired;
+        if (bullet.IsFlying)
+        {
+            desired = target.position - bullet.Direction * followDistance + Vector3.up * followHeight;
+        }
+        else
+        {
+            desired = overviewFocus + new Vector3(0f, 9.5f, -17f);
+        }
+
+        transform.position = Vector3.SmoothDamp(transform.position, desired, ref velocity, smoothTime);
+        Quaternion desiredRotation = Quaternion.LookRotation(focus - transform.position, Vector3.up);
+        transform.rotation = Quaternion.Slerp(transform.rotation, desiredRotation, Time.deltaTime * 12f);
+    }
+}
+
+public class BulletHazard : MonoBehaviour
+{
 }
