@@ -54,6 +54,10 @@ public sealed class RuleShotGameController : MonoBehaviour
     private Vector3 checkpoint;
     private int currentZone;
     private bool completed;
+    private bool titleScreenActive = true;
+    private float titleTimer;
+    private GameObject titleRoot;
+    private RuleCameraFollow cameraFollow;
     private string feedback = "A/D 移动，Space 跳跃，Shift 冲刺，鼠标左键发射规则弹。";
     private float feedbackTimer;
 
@@ -77,9 +81,22 @@ public sealed class RuleShotGameController : MonoBehaviour
 
     private void Update()
     {
+        titleTimer += Time.deltaTime;
+
         if (feedbackTimer > 0f)
         {
             feedbackTimer -= Time.deltaTime;
+        }
+
+        if (titleScreenActive)
+        {
+            AnimateTitleDecor();
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
+            {
+                StartRun();
+            }
+
+            return;
         }
 
         if (player == null)
@@ -267,11 +284,141 @@ public sealed class RuleShotGameController : MonoBehaviour
         ShowFeedback(zoneObjectives[currentZone], 4f);
 
         RuleCameraFollow follow = mainCamera.gameObject.AddComponent<RuleCameraFollow>();
+        cameraFollow = follow;
         follow.target = player.transform;
         follow.minX = -18f;
         follow.maxX = 132f;
         follow.minY = 1.5f;
         follow.maxY = 17f;
+
+        EnterTitleScreen();
+    }
+
+    private void EnterTitleScreen()
+    {
+        titleScreenActive = true;
+        titleTimer = 0f;
+        completed = false;
+        if (player != null)
+        {
+            player.SetControlLocked(true);
+        }
+
+        if (gun != null)
+        {
+            gun.SetControlLocked(true);
+        }
+
+        if (cameraFollow != null)
+        {
+            cameraFollow.enabled = false;
+        }
+
+        mainCamera.transform.position = new Vector3(-7.5f, 4.7f, -10f);
+        BuildTitleDecor();
+    }
+
+    private void StartRun()
+    {
+        titleScreenActive = false;
+        if (titleRoot != null)
+        {
+            Destroy(titleRoot);
+        }
+
+        if (player != null)
+        {
+            player.SetControlLocked(false);
+            player.ResetTo(checkpoint);
+        }
+
+        if (gun != null)
+        {
+            gun.SetControlLocked(false);
+        }
+
+        if (cameraFollow != null)
+        {
+            cameraFollow.enabled = true;
+        }
+
+        ShowFeedback("Rule gun online. Change rules, cross the city.", 3.2f);
+    }
+
+    private void BuildTitleDecor()
+    {
+        if (titleRoot != null)
+        {
+            Destroy(titleRoot);
+        }
+
+        titleRoot = new GameObject("RuleShot Title Screen Decor");
+        titleRoot.transform.SetParent(worldRoot.transform, false);
+
+        CreateTitleBox("Title Backplate", new Vector2(-7.5f, 4.9f), new Vector2(24f, 11.8f), new Color(0.015f, 0.022f, 0.045f, 0.96f), 80);
+        CreateTitleBox("Title Top Rail", new Vector2(-7.5f, 10.45f), new Vector2(22f, 0.14f), FreezeColor, 84);
+        CreateTitleBox("Title Bottom Rail", new Vector2(-7.5f, -0.55f), new Vector2(22f, 0.14f), LightColor, 84);
+        CreateTitleBox("Title Left Rail", new Vector2(-18.4f, 4.95f), new Vector2(0.14f, 10.6f), HeavyColor, 84);
+        CreateTitleBox("Title Right Rail", new Vector2(3.4f, 4.95f), new Vector2(0.14f, 10.6f), FreezeColor, 84);
+
+        for (int i = 0; i < 18; i++)
+        {
+            float x = -17.4f + i * 1.15f;
+            Color color = i % 3 == 0 ? HeavyColor : (i % 3 == 1 ? LightColor : FreezeColor);
+            CreateTitleBox("Pixel Skyline", new Vector2(x, 0.25f + (i % 5) * 0.18f), new Vector2(0.56f, 1.2f + (i % 4) * 0.5f), new Color(color.r * 0.2f, color.g * 0.22f, color.b * 0.28f, 0.86f), 82);
+            CreateTitleBox("Pixel Window", new Vector2(x, 1.55f + (i % 3) * 0.44f), new Vector2(0.32f, 0.08f), color, 85);
+        }
+
+        for (int i = 0; i < 15; i++)
+        {
+            float x = -17.9f + i * 1.45f;
+            CreateTitleBox("Grid Vertical", new Vector2(x, 4.4f), new Vector2(0.035f, 8.8f), new Color(0.1f, 0.72f, 0.9f, 0.22f), 81);
+        }
+
+        for (int i = 0; i < 9; i++)
+        {
+            float y = 0.15f + i * 1.05f;
+            CreateTitleBox("Grid Horizontal", new Vector2(-7.5f, y), new Vector2(21.4f, 0.035f), new Color(0.1f, 0.72f, 0.9f, 0.18f), 81);
+        }
+
+        CreateTitleBox("Rule Core", new Vector2(-14.6f, 6.55f), new Vector2(1.2f, 1.2f), HeavyColor, 86);
+        CreateTitleBox("Rule Core Inner", new Vector2(-14.6f, 6.55f), new Vector2(0.62f, 0.62f), new Color(0.02f, 0.025f, 0.05f), 87);
+        CreateTitleBox("Light Core", new Vector2(-12.6f, 6.55f), new Vector2(1.2f, 1.2f), LightColor, 86);
+        CreateTitleBox("Light Core Inner", new Vector2(-12.6f, 6.55f), new Vector2(0.62f, 0.62f), new Color(0.02f, 0.025f, 0.05f), 87);
+        CreateTitleBox("Freeze Core", new Vector2(-10.6f, 6.55f), new Vector2(1.2f, 1.2f), FreezeColor, 86);
+        CreateTitleBox("Freeze Core Inner", new Vector2(-10.6f, 6.55f), new Vector2(0.62f, 0.62f), new Color(0.02f, 0.025f, 0.05f), 87);
+
+        for (int i = 0; i < 10; i++)
+        {
+            float x = -16.9f + i * 2.05f;
+            CreateTitleBox("Data Tick", new Vector2(x, 9.55f), new Vector2(0.6f + (i % 3) * 0.3f, 0.08f), i % 2 == 0 ? FreezeColor : LightColor, 86);
+        }
+    }
+
+    private GameObject CreateTitleBox(string objectName, Vector2 position, Vector2 size, Color color, int sortingOrder)
+    {
+        GameObject box = CreateVisualBox(objectName, position, size, color, sortingOrder);
+        box.transform.SetParent(titleRoot.transform, true);
+        return box;
+    }
+
+    private void AnimateTitleDecor()
+    {
+        if (titleRoot == null)
+        {
+            return;
+        }
+
+        SpriteRenderer[] renderers = titleRoot.GetComponentsInChildren<SpriteRenderer>();
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i].name.Contains("Data Tick") || renderers[i].name.Contains("Pixel Window"))
+            {
+                Color color = renderers[i].color;
+                color.a = 0.45f + Mathf.PingPong(titleTimer * 0.9f + i * 0.13f, 0.55f);
+                renderers[i].color = color;
+            }
+        }
     }
 
     private void BuildBackground()
@@ -522,6 +669,12 @@ public sealed class RuleShotGameController : MonoBehaviour
 
     private void OnGUI()
     {
+        if (titleScreenActive)
+        {
+            DrawTitleScreenGUI();
+            return;
+        }
+
         if (gun == null)
         {
             return;
@@ -551,6 +704,82 @@ public sealed class RuleShotGameController : MonoBehaviour
             GUI.Label(new Rect(Screen.width * 0.5f - 360f, Screen.height - 170f, 720f, 32f), feedback);
         }
     }
+
+    private void DrawTitleScreenGUI()
+    {
+        float centerX = Screen.width * 0.5f;
+        float top = Mathf.Max(34f, Screen.height * 0.08f);
+        float panelWidth = Mathf.Min(920f, Screen.width - 52f);
+        float left = centerX - panelWidth * 0.5f;
+
+        GUI.color = new Color(0.02f, 0.03f, 0.055f, 0.9f);
+        GUI.Box(new Rect(left, top, panelWidth, 430f), GUIContent.none);
+        GUI.color = FreezeColor;
+        GUI.Box(new Rect(left, top, panelWidth, 3f), GUIContent.none);
+        GUI.Box(new Rect(left, top + 427f, panelWidth, 3f), GUIContent.none);
+        GUI.color = HeavyColor;
+        GUI.Box(new Rect(left, top, 3f, 430f), GUIContent.none);
+        GUI.color = LightColor;
+        GUI.Box(new Rect(left + panelWidth - 3f, top, 3f, 430f), GUIContent.none);
+
+        for (int i = 0; i < 16; i++)
+        {
+            float x = left + 28f + i * ((panelWidth - 56f) / 15f);
+            GUI.color = new Color(0.15f, 0.75f, 0.9f, 0.16f + Mathf.PingPong(titleTimer + i * 0.11f, 0.18f));
+            GUI.Box(new Rect(x, top + 18f, 2f, 394f), GUIContent.none);
+        }
+
+        GUI.color = Color.white;
+        GUI.skin.label.alignment = TextAnchor.MiddleCenter;
+        GUI.skin.label.fontSize = Mathf.Clamp(Screen.width / 18, 46, 72);
+        GUI.Label(new Rect(left, top + 42f, panelWidth, 78f), "RULESHOT");
+
+        GUI.skin.label.fontSize = 18;
+        GUI.color = new Color(0.68f, 0.95f, 1f);
+        GUI.Label(new Rect(left, top + 120f, panelWidth, 28f), "2D RULE-GUN PLATFORMER // NEON MECHANICAL CITY");
+
+        float cardY = top + 184f;
+        DrawTitleCard(left + 58f, cardY, 230f, "HEAVY", "Increase weight", "Pressure plates / breaks", HeavyColor);
+        DrawTitleCard(centerX - 115f, cardY, 230f, "LIGHT", "Reduce weight", "Wind lifts / pushing", LightColor);
+        DrawTitleCard(left + panelWidth - 288f, cardY, 230f, "FREEZE", "Pause motion", "Hazards / patrols", FreezeColor);
+
+        float buttonY = top + 344f;
+        GUI.color = new Color(0.04f, 0.08f, 0.12f, 0.96f);
+        Rect startRect = new Rect(centerX - 160f, buttonY, 320f, 48f);
+        GUI.Box(startRect, GUIContent.none);
+        GUI.color = new Color(0.9f, 1f, 1f);
+        GUI.skin.label.fontSize = 19;
+        GUI.Label(startRect, Mathf.PingPong(titleTimer, 1f) > 0.5f ? "PRESS ENTER / SPACE / CLICK" : "INITIALIZE RULE GUN");
+
+        GUI.color = new Color(0.75f, 0.9f, 1f);
+        GUI.skin.label.fontSize = 14;
+        GUI.Label(new Rect(left, top + 394f, panelWidth, 24f), "A/D MOVE   SPACE JUMP   SHIFT DASH   Q/E SWITCH   MOUSE FIRE");
+
+        GUI.skin.label.alignment = TextAnchor.UpperLeft;
+    }
+
+    private void DrawTitleCard(float x, float y, float width, string title, string lineOne, string lineTwo, Color accent)
+    {
+        Rect rect = new Rect(x, y, width, 104f);
+        GUI.color = new Color(0.025f, 0.035f, 0.06f, 0.96f);
+        GUI.Box(rect, GUIContent.none);
+        GUI.color = accent;
+        GUI.Box(new Rect(x, y, width, 3f), GUIContent.none);
+        GUI.Box(new Rect(x + 14f, y + 18f, 34f, 34f), GUIContent.none);
+        GUI.color = new Color(0.01f, 0.02f, 0.035f, 1f);
+        GUI.Box(new Rect(x + 22f, y + 26f, 18f, 18f), GUIContent.none);
+
+        GUI.color = Color.white;
+        GUI.skin.label.alignment = TextAnchor.UpperLeft;
+        GUI.skin.label.fontSize = 18;
+        GUI.Label(new Rect(x + 62f, y + 16f, width - 74f, 24f), title);
+        GUI.skin.label.fontSize = 13;
+        GUI.color = new Color(0.78f, 0.88f, 0.92f);
+        GUI.Label(new Rect(x + 62f, y + 45f, width - 74f, 22f), lineOne);
+        GUI.color = new Color(0.55f, 0.7f, 0.76f);
+        GUI.Label(new Rect(x + 62f, y + 67f, width - 74f, 22f), lineTwo);
+        GUI.skin.label.alignment = TextAnchor.MiddleCenter;
+    }
 }
 
 public sealed class RuleShotPlayerController : MonoBehaviour
@@ -568,6 +797,7 @@ public sealed class RuleShotPlayerController : MonoBehaviour
     private float dashCooldown;
     private bool jumpRequested;
     private bool facingRight = true;
+    private bool controlsLocked;
 
     private void Awake()
     {
@@ -577,6 +807,13 @@ public sealed class RuleShotPlayerController : MonoBehaviour
 
     private void Update()
     {
+        if (controlsLocked)
+        {
+            moveInput = 0f;
+            jumpRequested = false;
+            return;
+        }
+
         moveInput = Input.GetAxisRaw("Horizontal");
         if (moveInput > 0.01f)
         {
@@ -614,6 +851,11 @@ public sealed class RuleShotPlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (controlsLocked)
+        {
+            return;
+        }
+
         bool grounded = IsGrounded();
         Vector2 velocity = body.velocity;
 
@@ -655,6 +897,20 @@ public sealed class RuleShotPlayerController : MonoBehaviour
         dashCooldown = 0f;
     }
 
+    public void SetControlLocked(bool locked)
+    {
+        controlsLocked = locked;
+        moveInput = 0f;
+        jumpRequested = false;
+        dashTimer = 0f;
+        dashCooldown = 0f;
+        if (body != null)
+        {
+            body.velocity = Vector2.zero;
+            body.simulated = !locked;
+        }
+    }
+
     private bool IsGrounded()
     {
         Collider2D[] hits = Physics2D.OverlapBoxAll((Vector2)transform.position + Vector2.down * 0.66f, new Vector2(0.58f, 0.14f), 0f);
@@ -680,14 +936,31 @@ public sealed class RuleGunController : MonoBehaviour
 
     private GameObject muzzle;
     private float fireCooldown;
+    private bool controlsLocked;
 
     private void Start()
     {
         muzzle = game.CreateVisualBox("Rule Gun Muzzle", transform.position, new Vector2(0.9f, 0.16f), game.GetShotColor(CurrentShot), 14);
+        muzzle.SetActive(!controlsLocked);
     }
 
     private void Update()
     {
+        if (controlsLocked)
+        {
+            if (muzzle != null)
+            {
+                muzzle.SetActive(false);
+            }
+
+            return;
+        }
+
+        if (muzzle != null && !muzzle.activeSelf)
+        {
+            muzzle.SetActive(true);
+        }
+
         HandleSwitching();
         fireCooldown -= Time.deltaTime;
 
@@ -767,6 +1040,16 @@ public sealed class RuleGunController : MonoBehaviour
         }
 
         return direction;
+    }
+
+    public void SetControlLocked(bool locked)
+    {
+        controlsLocked = locked;
+        fireCooldown = 0f;
+        if (muzzle != null)
+        {
+            muzzle.SetActive(!locked);
+        }
     }
 }
 
