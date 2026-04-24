@@ -1,3 +1,4 @@
+using System.IO;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Rendering;
@@ -5,17 +6,21 @@ using UnityEngine.UI;
 
 public class SolarSystemExperience : MonoBehaviour
 {
+    private const string SolarSystemAssetFolder = "SolarSystem";
+
     private Camera mainCamera;
-    private AudioSource audioSource;
+    private AudioSource ambienceSource;
+    private AudioSource selectionSource;
     private AudioClip planetTone;
     private AudioClip moonTone;
+    private AudioClip returnTone;
+    private AudioClip ambienceLoop;
 
     private CelestialBody selectedBody;
 
     private readonly Vector3 overviewPosition = new Vector3(0f, 8f, -22f);
     private readonly Vector3 overviewLookTarget = new Vector3(0f, 1.5f, 0f);
 
-    private Vector3 desiredLookTarget;
     private Vector3 smoothedLookTarget;
     private Vector3 cameraVelocity;
     private Vector3 lookTargetVelocity;
@@ -27,6 +32,14 @@ public class SolarSystemExperience : MonoBehaviour
 
     private Font uiFont;
     private bool isBuilt;
+
+    private Texture2D earthDayTexture;
+    private Texture2D earthCloudTexture;
+    private Texture2D earthNightTexture;
+    private Texture2D moonTexture;
+    private Texture2D marsTexture;
+    private Texture2D sunTexture;
+    private Texture2D starsTexture;
 
     private void Awake()
     {
@@ -70,17 +83,29 @@ public class SolarSystemExperience : MonoBehaviour
     {
         uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
+        LoadTextures();
         SetupCamera();
         SetupLighting();
         SetupAudio();
         EnsureEventSystem();
+        BuildBackdrop();
         BuildSolarSystem();
         BuildUi();
         ShowIntroMessage();
 
-        desiredLookTarget = overviewLookTarget;
         smoothedLookTarget = overviewLookTarget;
         isBuilt = true;
+    }
+
+    private void LoadTextures()
+    {
+        earthDayTexture = LoadTextureFromStreamingAssets("earth_day.jpg");
+        earthCloudTexture = LoadTextureFromStreamingAssets("earth_clouds.jpg");
+        earthNightTexture = LoadTextureFromStreamingAssets("earth_night.jpg");
+        moonTexture = LoadTextureFromStreamingAssets("moon.jpg");
+        marsTexture = LoadTextureFromStreamingAssets("mars.jpg");
+        sunTexture = LoadTextureFromStreamingAssets("sun.jpg");
+        starsTexture = LoadTextureFromStreamingAssets("stars.jpg");
     }
 
     private void SetupCamera()
@@ -96,10 +121,11 @@ public class SolarSystemExperience : MonoBehaviour
         }
 
         mainCamera.clearFlags = CameraClearFlags.SolidColor;
-        mainCamera.backgroundColor = new Color(0.015f, 0.025f, 0.08f);
+        mainCamera.backgroundColor = new Color(0.005f, 0.01f, 0.03f);
         mainCamera.fieldOfView = 58f;
         mainCamera.nearClipPlane = 0.1f;
-        mainCamera.farClipPlane = 300f;
+        mainCamera.farClipPlane = 400f;
+        mainCamera.allowHDR = true;
         mainCamera.transform.position = overviewPosition;
         mainCamera.transform.rotation = Quaternion.LookRotation(overviewLookTarget - overviewPosition);
     }
@@ -107,8 +133,11 @@ public class SolarSystemExperience : MonoBehaviour
     private void SetupLighting()
     {
         RenderSettings.skybox = null;
-        RenderSettings.ambientMode = AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.05f, 0.06f, 0.1f);
+        RenderSettings.ambientMode = AmbientMode.Trilight;
+        RenderSettings.ambientSkyColor = new Color(0.08f, 0.1f, 0.16f);
+        RenderSettings.ambientEquatorColor = new Color(0.03f, 0.035f, 0.06f);
+        RenderSettings.ambientGroundColor = new Color(0.01f, 0.012f, 0.02f);
+        RenderSettings.ambientIntensity = 0.9f;
 
         Light[] lights = FindObjectsOfType<Light>();
         Light directional = null;
@@ -129,21 +158,35 @@ public class SolarSystemExperience : MonoBehaviour
             directional.type = LightType.Directional;
         }
 
-        directional.color = new Color(0.6f, 0.72f, 1f);
-        directional.intensity = 0.3f;
-        directional.transform.rotation = Quaternion.Euler(45f, -35f, 0f);
+        directional.color = new Color(0.68f, 0.78f, 1f);
+        directional.intensity = 0.22f;
+        directional.transform.rotation = Quaternion.Euler(38f, -28f, 0f);
         RenderSettings.sun = directional;
     }
 
     private void SetupAudio()
     {
-        audioSource = gameObject.AddComponent<AudioSource>();
-        audioSource.playOnAwake = false;
-        audioSource.spatialBlend = 0f;
-        audioSource.volume = 0.2f;
+        ambienceSource = gameObject.AddComponent<AudioSource>();
+        ambienceSource.playOnAwake = false;
+        ambienceSource.loop = true;
+        ambienceSource.spatialBlend = 0f;
+        ambienceSource.volume = 0.08f;
 
-        planetTone = CreateToneClip("PlanetTone", 523.25f, 0.18f);
-        moonTone = CreateToneClip("MoonTone", 659.25f, 0.16f);
+        selectionSource = gameObject.AddComponent<AudioSource>();
+        selectionSource.playOnAwake = false;
+        selectionSource.spatialBlend = 0f;
+        selectionSource.volume = 0.18f;
+
+        ambienceLoop = CreateAmbienceClip("SpaceAmbience", 2.4f);
+        planetTone = CreateSelectionClip("PlanetTone", 420f, 580f, 0.32f);
+        moonTone = CreateSelectionClip("MoonTone", 620f, 880f, 0.26f);
+        returnTone = CreateSelectionClip("ReturnTone", 340f, 510f, 0.22f);
+
+        if (ambienceLoop != null)
+        {
+            ambienceSource.clip = ambienceLoop;
+            ambienceSource.Play();
+        }
     }
 
     private void EnsureEventSystem()
@@ -156,6 +199,31 @@ public class SolarSystemExperience : MonoBehaviour
         GameObject eventSystemObject = new GameObject("EventSystem");
         eventSystemObject.AddComponent<EventSystem>();
         eventSystemObject.AddComponent<StandaloneInputModule>();
+    }
+
+    private void BuildBackdrop()
+    {
+        if (starsTexture == null)
+        {
+            return;
+        }
+
+        GameObject starDome = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        starDome.name = "Star Dome";
+        starDome.transform.position = Vector3.zero;
+        starDome.transform.localScale = new Vector3(-220f, 220f, 220f);
+
+        Collider domeCollider = starDome.GetComponent<Collider>();
+        if (domeCollider != null)
+        {
+            Destroy(domeCollider);
+        }
+
+        Renderer renderer = starDome.GetComponent<Renderer>();
+        renderer.shadowCastingMode = ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
+        renderer.material = CreateUnlitTextureMaterial(starsTexture, new Color(0.8f, 0.86f, 1f));
+        renderer.material.mainTextureScale = new Vector2(2f, 1f);
     }
 
     private void BuildSolarSystem()
@@ -171,17 +239,18 @@ public class SolarSystemExperience : MonoBehaviour
             new Color(1f, 0.5f, 0.1f),
             "The Sun is our star. It gives Earth light and warmth every day.",
             false);
+        ApplySunVisuals(sun.gameObject);
 
         SpinMotion sunSpin = sun.gameObject.AddComponent<SpinMotion>();
-        sunSpin.Initialize(Vector3.up, 10f);
+        sunSpin.Initialize(Vector3.up, 5f);
 
         Light sunLight = sun.gameObject.AddComponent<Light>();
         sunLight.type = LightType.Point;
-        sunLight.range = 45f;
-        sunLight.intensity = 2.4f;
-        sunLight.color = new Color(1f, 0.72f, 0.35f);
+        sunLight.range = 55f;
+        sunLight.intensity = 2.8f;
+        sunLight.color = new Color(1f, 0.75f, 0.45f);
 
-        Transform earthOrbit = CreateOrbitPivot(root.transform, "Earth Orbit", Vector3.zero, new Vector3(0f, 1f, 0.08f), 10f);
+        Transform earthOrbit = CreateOrbitPivot(root.transform, "Earth Orbit", Vector3.zero, new Vector3(0f, 1f, 0.08f), 8.5f);
         CelestialBody earth = CreateBody(
             earthOrbit,
             "Earth",
@@ -189,13 +258,14 @@ public class SolarSystemExperience : MonoBehaviour
             1.7f,
             new Color(0.2f, 0.5f, 1f),
             new Color(0.2f, 0.8f, 1f),
-            "Earth is our home. It has blue oceans, fluffy clouds, and lots of life.",
+            "Earth is our home. It has blue oceans, white clouds, glowing night lights, and lots of life.",
             false);
+        ApplyEarthVisuals(earth.gameObject);
 
         SpinMotion earthSpin = earth.gameObject.AddComponent<SpinMotion>();
-        earthSpin.Initialize(new Vector3(0.1f, 1f, 0f), 35f);
+        earthSpin.Initialize(new Vector3(0.12f, 1f, 0f), 28f);
 
-        Transform moonOrbit = CreateOrbitPivot(earthOrbit, "Moon Orbit", earth.transform.localPosition, new Vector3(0.1f, 1f, 0f), 55f);
+        Transform moonOrbit = CreateOrbitPivot(earthOrbit, "Moon Orbit", earth.transform.localPosition, new Vector3(0.1f, 1f, 0f), 42f);
         CelestialBody moon = CreateBody(
             moonOrbit,
             "Moon",
@@ -203,13 +273,14 @@ public class SolarSystemExperience : MonoBehaviour
             0.65f,
             new Color(0.82f, 0.84f, 0.9f),
             new Color(0.9f, 0.92f, 1f),
-            "The Moon is Earth's space buddy. It shines because sunlight bounces off it.",
+            "The Moon is Earth's rocky space buddy. Its crater marks were made by ancient impacts.",
             true);
+        ApplyMoonVisuals(moon.gameObject);
 
         SpinMotion moonSpin = moon.gameObject.AddComponent<SpinMotion>();
-        moonSpin.Initialize(Vector3.up, 18f);
+        moonSpin.Initialize(Vector3.up, 12f);
 
-        Transform marsOrbit = CreateOrbitPivot(root.transform, "Mars Orbit", Vector3.zero, new Vector3(0f, 1f, -0.04f), 6f);
+        Transform marsOrbit = CreateOrbitPivot(root.transform, "Mars Orbit", Vector3.zero, new Vector3(0f, 1f, -0.04f), 5.2f);
         CelestialBody mars = CreateBody(
             marsOrbit,
             "Mars",
@@ -217,11 +288,12 @@ public class SolarSystemExperience : MonoBehaviour
             1.1f,
             new Color(0.85f, 0.36f, 0.18f),
             new Color(1f, 0.42f, 0.18f),
-            "Mars is called the red planet because its dusty ground looks rusty.",
+            "Mars is called the red planet because its surface is covered in rusty-looking dust.",
             false);
+        ApplyMarsVisuals(mars.gameObject);
 
         SpinMotion marsSpin = mars.gameObject.AddComponent<SpinMotion>();
-        marsSpin.Initialize(new Vector3(-0.1f, 1f, 0.05f), 28f);
+        marsSpin.Initialize(new Vector3(-0.1f, 1f, 0.05f), 18f);
 
         CreateComet(root.transform);
     }
@@ -243,11 +315,73 @@ public class SolarSystemExperience : MonoBehaviour
         bodyObject.transform.localScale = Vector3.one * scale;
 
         Renderer renderer = bodyObject.GetComponent<Renderer>();
-        renderer.material = CreateLitMaterial(bodyColor, emissionColor, 0.05f, 0.45f);
+        renderer.material = CreateLitMaterial(bodyColor, emissionColor, 0.02f, 0.45f);
 
         CelestialBody body = bodyObject.AddComponent<CelestialBody>();
         body.Initialize(bodyName, fact, emissionColor, isMoon);
         return body;
+    }
+
+    private void ApplyEarthVisuals(GameObject earthObject)
+    {
+        Renderer renderer = earthObject.GetComponent<Renderer>();
+        Material earthMaterial = CreateTexturedMaterial(earthDayTexture, Color.white, 0.03f, 0.42f);
+
+        if (earthNightTexture != null)
+        {
+            earthMaterial.EnableKeyword("_EMISSION");
+            earthMaterial.SetTexture("_EmissionMap", earthNightTexture);
+            earthMaterial.SetColor("_EmissionColor", new Color(0.25f, 0.38f, 0.7f) * 1.15f);
+        }
+
+        renderer.material = earthMaterial;
+
+        if (earthCloudTexture != null)
+        {
+            GameObject cloudLayer = CreateShell(
+                earthObject.transform,
+                "Earth Clouds",
+                1.03f,
+                CreateTransparentMaterial(new Color(1f, 1f, 1f, 0.42f), 0.08f, earthCloudTexture));
+
+            SpinMotion cloudSpin = cloudLayer.AddComponent<SpinMotion>();
+            cloudSpin.Initialize(new Vector3(0.08f, 1f, 0f), 34f);
+        }
+
+        Material atmosphereMaterial = CreateTransparentMaterial(new Color(0.34f, 0.62f, 1f, 0.14f), 0.55f);
+        atmosphereMaterial.EnableKeyword("_EMISSION");
+        atmosphereMaterial.SetColor("_EmissionColor", new Color(0.18f, 0.45f, 1f) * 0.35f);
+        CreateShell(earthObject.transform, "Earth Atmosphere", 1.08f, atmosphereMaterial);
+    }
+
+    private void ApplyMoonVisuals(GameObject moonObject)
+    {
+        Renderer renderer = moonObject.GetComponent<Renderer>();
+        renderer.material = CreateTexturedMaterial(moonTexture, new Color(0.96f, 0.96f, 0.98f), 0f, 0.16f);
+    }
+
+    private void ApplyMarsVisuals(GameObject marsObject)
+    {
+        Renderer renderer = marsObject.GetComponent<Renderer>();
+        renderer.material = CreateTexturedMaterial(marsTexture, Color.white, 0.01f, 0.22f);
+    }
+
+    private void ApplySunVisuals(GameObject sunObject)
+    {
+        Renderer renderer = sunObject.GetComponent<Renderer>();
+        Material sunMaterial = CreateTexturedMaterial(sunTexture, Color.white, 0f, 0.18f);
+        sunMaterial.EnableKeyword("_EMISSION");
+        sunMaterial.SetTexture("_EmissionMap", sunTexture);
+        sunMaterial.SetColor("_EmissionColor", new Color(1f, 0.56f, 0.16f) * 1.7f);
+        renderer.material = sunMaterial;
+
+        Material coronaMaterial = CreateTransparentMaterial(new Color(1f, 0.62f, 0.18f, 0.17f), 0f, sunTexture);
+        coronaMaterial.EnableKeyword("_EMISSION");
+        coronaMaterial.SetColor("_EmissionColor", new Color(1f, 0.52f, 0.12f) * 0.65f);
+
+        GameObject corona = CreateShell(sunObject.transform, "Sun Corona", 1.18f, coronaMaterial);
+        SpinMotion coronaSpin = corona.AddComponent<SpinMotion>();
+        coronaSpin.Initialize(Vector3.up, -3f);
     }
 
     private Transform CreateOrbitPivot(Transform parent, string name, Vector3 localPosition, Vector3 axis, float speed)
@@ -264,7 +398,7 @@ public class SolarSystemExperience : MonoBehaviour
 
     private void CreateComet(Transform root)
     {
-        Transform cometOrbit = CreateOrbitPivot(root, "Comet Orbit", Vector3.zero, new Vector3(0.2f, 1f, 0f), 18f);
+        Transform cometOrbit = CreateOrbitPivot(root, "Comet Orbit", Vector3.zero, new Vector3(0.2f, 1f, 0f), 15f);
         GameObject comet = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         comet.name = "Comet";
         comet.transform.SetParent(cometOrbit, false);
@@ -273,10 +407,10 @@ public class SolarSystemExperience : MonoBehaviour
 
         Renderer renderer = comet.GetComponent<Renderer>();
         renderer.material = CreateLitMaterial(
-            new Color(0.8f, 0.95f, 1f),
+            new Color(0.82f, 0.94f, 1f),
             new Color(0.5f, 0.8f, 1f),
             0f,
-            0.2f);
+            0.15f);
 
         Collider cometCollider = comet.GetComponent<Collider>();
         if (cometCollider != null)
@@ -285,15 +419,37 @@ public class SolarSystemExperience : MonoBehaviour
         }
 
         SpinMotion cometSpin = comet.AddComponent<SpinMotion>();
-        cometSpin.Initialize(new Vector3(0.2f, 1f, 0f), 40f);
+        cometSpin.Initialize(new Vector3(0.2f, 1f, 0f), 26f);
 
         TrailRenderer trail = comet.AddComponent<TrailRenderer>();
-        trail.time = 2.2f;
+        trail.time = 2.4f;
         trail.startWidth = 0.28f;
         trail.endWidth = 0.02f;
         trail.material = CreateTrailMaterial(new Color(0.8f, 0.95f, 1f, 0.85f));
         trail.startColor = new Color(0.85f, 0.95f, 1f, 0.9f);
         trail.endColor = new Color(0.4f, 0.7f, 1f, 0f);
+    }
+
+    private GameObject CreateShell(Transform parent, string name, float scaleMultiplier, Material material)
+    {
+        GameObject shell = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        shell.name = name;
+        shell.transform.SetParent(parent, false);
+        shell.transform.localPosition = Vector3.zero;
+        shell.transform.localRotation = Quaternion.identity;
+        shell.transform.localScale = Vector3.one * scaleMultiplier;
+
+        Collider shellCollider = shell.GetComponent<Collider>();
+        if (shellCollider != null)
+        {
+            Destroy(shellCollider);
+        }
+
+        Renderer renderer = shell.GetComponent<Renderer>();
+        renderer.material = material;
+        renderer.shadowCastingMode = ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
+        return shell;
     }
 
     private void BuildUi()
@@ -321,7 +477,7 @@ public class SolarSystemExperience : MonoBehaviour
         GameObject panelObject = new GameObject("Info Panel", typeof(RectTransform), typeof(Image));
         panelObject.transform.SetParent(canvas.transform, false);
         Image panel = panelObject.GetComponent<Image>();
-        panel.color = new Color(0.03f, 0.06f, 0.16f, 0.82f);
+        panel.color = new Color(0.02f, 0.045f, 0.12f, 0.86f);
 
         RectTransform panelRect = panel.rectTransform;
         panelRect.anchorMin = new Vector2(0.06f, 0.04f);
@@ -371,9 +527,9 @@ public class SolarSystemExperience : MonoBehaviour
     {
         bodyTitleText.text = "Welcome, space explorer!";
         bodyTitleText.color = new Color(1f, 0.93f, 0.6f);
-        factText.text = "Click Earth or the Moon to zoom in, hear a cheerful space tone, and learn a fun fact. You can also click the Sun or Mars for extra exploration.";
+        factText.text = "Click Earth or the Moon to zoom in, hear space sounds, and explore a more realistic solar system scene. The Sun and Mars also have upgraded textures.";
         factText.color = new Color(0.9f, 0.95f, 1f);
-        hintText.text = "Need a quick demo flow? Click Earth, then Moon, then press Return to go back to the full solar system.";
+        hintText.text = "Try Earth first to see the cloud layer and glowing night lights, then press Return to fly back.";
     }
 
     private void HandleSelectionInput()
@@ -409,7 +565,6 @@ public class SolarSystemExperience : MonoBehaviour
     {
         selectedBody = body;
         body.PlaySelectionEffect();
-        desiredLookTarget = body.transform.position;
 
         bodyTitleText.text = body.BodyName;
         bodyTitleText.color = body.AccentColor;
@@ -418,14 +573,14 @@ public class SolarSystemExperience : MonoBehaviour
         hintText.text = "Click another world to compare it, or press Return / Esc to fly back to the main view.";
 
         returnButton.gameObject.SetActive(true);
-        audioSource.PlayOneShot(body.IsMoon ? moonTone : planetTone);
+        selectionSource.PlayOneShot(body.IsMoon ? moonTone : planetTone);
     }
 
     private void ReturnToOverview()
     {
         selectedBody = null;
-        desiredLookTarget = overviewLookTarget;
         returnButton.gameObject.SetActive(false);
+        selectionSource.PlayOneShot(returnTone);
         ShowIntroMessage();
     }
 
@@ -457,13 +612,75 @@ public class SolarSystemExperience : MonoBehaviour
 
     private Material CreateLitMaterial(Color baseColor, Color emissionColor, float metallic, float smoothness)
     {
-        Shader shader = Shader.Find("Standard");
-        Material material = new Material(shader);
+        Material material = new Material(Shader.Find("Standard"));
         material.color = baseColor;
         material.SetFloat("_Metallic", metallic);
         material.SetFloat("_Glossiness", smoothness);
         material.EnableKeyword("_EMISSION");
         material.SetColor("_EmissionColor", emissionColor * 0.45f);
+        return material;
+    }
+
+    private Material CreateTexturedMaterial(Texture2D albedoTexture, Color tint, float metallic, float smoothness)
+    {
+        Material material = new Material(Shader.Find("Standard"));
+        material.color = tint;
+        material.SetFloat("_Metallic", metallic);
+        material.SetFloat("_Glossiness", smoothness);
+
+        if (albedoTexture != null)
+        {
+            material.SetTexture("_MainTex", albedoTexture);
+        }
+
+        return material;
+    }
+
+    private Material CreateTransparentMaterial(Color tint, float smoothness, Texture2D mainTexture = null)
+    {
+        Material material = new Material(Shader.Find("Standard"));
+        material.color = tint;
+        material.SetFloat("_Metallic", 0f);
+        material.SetFloat("_Glossiness", smoothness);
+
+        if (mainTexture != null)
+        {
+            material.SetTexture("_MainTex", mainTexture);
+        }
+
+        material.SetFloat("_Mode", 2f);
+        material.SetOverrideTag("RenderType", "Transparent");
+        material.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
+        material.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
+        material.SetInt("_ZWrite", 0);
+        material.DisableKeyword("_ALPHATEST_ON");
+        material.EnableKeyword("_ALPHABLEND_ON");
+        material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        material.renderQueue = (int)RenderQueue.Transparent;
+        return material;
+    }
+
+    private Material CreateUnlitTextureMaterial(Texture2D texture, Color tint)
+    {
+        Shader shader = Shader.Find("Unlit/Texture");
+
+        if (shader == null)
+        {
+            shader = Shader.Find("Sprites/Default");
+        }
+
+        Material material = new Material(shader);
+
+        if (texture != null)
+        {
+            material.mainTexture = texture;
+        }
+
+        if (material.HasProperty("_Color"))
+        {
+            material.SetColor("_Color", tint);
+        }
+
         return material;
     }
 
@@ -481,7 +698,25 @@ public class SolarSystemExperience : MonoBehaviour
         return material;
     }
 
-    private AudioClip CreateToneClip(string clipName, float frequency, float duration)
+    private Texture2D LoadTextureFromStreamingAssets(string fileName)
+    {
+        string path = Path.Combine(Application.streamingAssetsPath, SolarSystemAssetFolder, fileName);
+
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        byte[] bytes = File.ReadAllBytes(path);
+        Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        texture.LoadImage(bytes, false);
+        texture.name = Path.GetFileNameWithoutExtension(fileName);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+        return texture;
+    }
+
+    private AudioClip CreateAmbienceClip(string clipName, float duration)
     {
         const int sampleRate = 44100;
         int sampleCount = Mathf.CeilToInt(sampleRate * duration);
@@ -490,8 +725,32 @@ public class SolarSystemExperience : MonoBehaviour
         for (int i = 0; i < sampleCount; i++)
         {
             float time = i / (float)sampleRate;
-            float envelope = Mathf.Clamp01(Mathf.Min(time * 10f, (duration - time) * 12f));
-            samples[i] = Mathf.Sin(2f * Mathf.PI * frequency * time) * envelope * 0.35f;
+            float drone = Mathf.Sin(2f * Mathf.PI * 55f * time) * 0.45f;
+            float shimmer = Mathf.Sin(2f * Mathf.PI * 110f * time) * 0.18f;
+            float air = Mathf.Sin(2f * Mathf.PI * 220f * time) * 0.08f;
+            samples[i] = (drone + shimmer + air) * 0.12f;
+        }
+
+        AudioClip clip = AudioClip.Create(clipName, sampleCount, 1, sampleRate, false);
+        clip.SetData(samples, 0);
+        return clip;
+    }
+
+    private AudioClip CreateSelectionClip(string clipName, float startFrequency, float endFrequency, float duration)
+    {
+        const int sampleRate = 44100;
+        int sampleCount = Mathf.CeilToInt(sampleRate * duration);
+        float[] samples = new float[sampleCount];
+
+        for (int i = 0; i < sampleCount; i++)
+        {
+            float t = i / (float)(sampleCount - 1);
+            float time = i / (float)sampleRate;
+            float frequency = Mathf.Lerp(startFrequency, endFrequency, t);
+            float envelope = Mathf.Sin(t * Mathf.PI);
+            float wave = Mathf.Sin(2f * Mathf.PI * frequency * time);
+            float harmonics = Mathf.Sin(2f * Mathf.PI * frequency * 2f * time) * 0.24f;
+            samples[i] = (wave + harmonics) * envelope * 0.26f;
         }
 
         AudioClip clip = AudioClip.Create(clipName, sampleCount, 1, sampleRate, false);
