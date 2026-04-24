@@ -60,6 +60,50 @@ public sealed class RuleShotGameController : MonoBehaviour
     private RuleCameraFollow cameraFollow;
     private string feedback = "A/D 移动，Space 跳跃，Shift 冲刺，鼠标左键发射规则弹。";
     private float feedbackTimer;
+    private Texture2D homeScreenTexture;
+    private Texture2D storeScreenTexture;
+    private readonly Dictionary<string, Texture2D> homeArt = new Dictionary<string, Texture2D>();
+    private ShellScreen shellScreen = ShellScreen.Home;
+    private int coins = 1200;
+    private int wardrobeTab = 0;
+    private int selectedStoreItem;
+    private readonly string[] wardrobeTabs = { "ARMOR", "VISOR", "WEAPON" };
+    private readonly int[] equippedWardrobeOptions = new int[3];
+    private readonly string[][] wardrobeOptionNames =
+    {
+        new[] { "NIGHTRUN", "TITAN", "PHANTOM", "AERO", "NOVA" },
+        new[] { "CYAN", "MAGENTA", "GOLD", "EMERALD", "CRIMSON" },
+        new[] { "RIFLE", "CARBINE", "CANNON", "SMG", "LANCE" }
+    };
+    private readonly string[] storeNames =
+    {
+        "PLASMA CANNON",
+        "WEAPON ATTACH",
+        "ION BARREL",
+        "PULSE SKIN",
+        "FIELD AGENT",
+        "STEALTH RIG",
+        "CREDIT CACHE",
+        "COIN POUCH",
+        "COIN",
+        "CRYSTAL",
+        "ENERGY CELL",
+        "POWER CORE"
+    };
+    private readonly int[] storePrices = { 500, 300, 300, 200, 300, 200, 200, 300, 300, 400, 200, 500 };
+
+    private enum ShellScreen
+    {
+        Home,
+        Store
+    }
+
+    private enum WardrobeCategory
+    {
+        Armor,
+        Visor,
+        Weapon
+    }
 
     public Color HeavyColor { get; private set; } = new Color(1f, 0.34f, 0.12f);
     public Color LightColor { get; private set; } = new Color(0.18f, 1f, 0.68f);
@@ -75,6 +119,7 @@ public sealed class RuleShotGameController : MonoBehaviour
 
     private void Start()
     {
+        LoadShellArt();
         ConfigureScene();
         BuildWorld();
     }
@@ -91,9 +136,13 @@ public sealed class RuleShotGameController : MonoBehaviour
         if (titleScreenActive)
         {
             AnimateTitleDecor();
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
+            if (shellScreen == ShellScreen.Home && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space)))
             {
                 StartRun();
+            }
+            else if (shellScreen == ShellScreen.Store && Input.GetKeyDown(KeyCode.Escape))
+            {
+                shellScreen = ShellScreen.Home;
             }
 
             return;
@@ -297,6 +346,7 @@ public sealed class RuleShotGameController : MonoBehaviour
     private void EnterTitleScreen()
     {
         titleScreenActive = true;
+        shellScreen = ShellScreen.Home;
         titleTimer = 0f;
         completed = false;
         if (player != null)
@@ -667,6 +717,46 @@ public sealed class RuleShotGameController : MonoBehaviour
         return Sprite.Create(texture, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1f);
     }
 
+    private void LoadShellArt()
+    {
+        homeScreenTexture = Resources.Load<Texture2D>("UI/home_screen");
+        storeScreenTexture = Resources.Load<Texture2D>("UI/store_screen");
+
+        string[] dynamicHomeAssets =
+        {
+            "bg_sky_moon",
+            "bg_city_far",
+            "bg_alley_mid",
+            "rain_lines",
+            "neon_signs",
+            "neon_glow_layers",
+            "button_start_normal",
+            "button_start_hover",
+            "button_start_pressed",
+            "button_custom_normal",
+            "button_custom_hover",
+            "button_custom_pressed",
+            "button_store_normal",
+            "button_store_hover",
+            "button_store_pressed",
+            "agent_home",
+            "reward_panel",
+            "progress_bar",
+            "coin_gold",
+            "chest_widget"
+        };
+
+        homeArt.Clear();
+        for (int i = 0; i < dynamicHomeAssets.Length; i++)
+        {
+            Texture2D texture = Resources.Load<Texture2D>("Home/" + dynamicHomeAssets[i]);
+            if (texture != null)
+            {
+                homeArt[dynamicHomeAssets[i]] = texture;
+            }
+        }
+    }
+
     private void OnGUI()
     {
         if (titleScreenActive)
@@ -707,78 +797,906 @@ public sealed class RuleShotGameController : MonoBehaviour
 
     private void DrawTitleScreenGUI()
     {
-        float centerX = Screen.width * 0.5f;
-        float top = Mathf.Max(34f, Screen.height * 0.08f);
-        float panelWidth = Mathf.Min(920f, Screen.width - 52f);
-        float left = centerX - panelWidth * 0.5f;
-
-        GUI.color = new Color(0.02f, 0.03f, 0.055f, 0.9f);
-        GUI.Box(new Rect(left, top, panelWidth, 430f), GUIContent.none);
-        GUI.color = FreezeColor;
-        GUI.Box(new Rect(left, top, panelWidth, 3f), GUIContent.none);
-        GUI.Box(new Rect(left, top + 427f, panelWidth, 3f), GUIContent.none);
-        GUI.color = HeavyColor;
-        GUI.Box(new Rect(left, top, 3f, 430f), GUIContent.none);
-        GUI.color = LightColor;
-        GUI.Box(new Rect(left + panelWidth - 3f, top, 3f, 430f), GUIContent.none);
-
-        for (int i = 0; i < 16; i++)
+        if (shellScreen == ShellScreen.Store)
         {
-            float x = left + 28f + i * ((panelWidth - 56f) / 15f);
-            GUI.color = new Color(0.15f, 0.75f, 0.9f, 0.16f + Mathf.PingPong(titleTimer + i * 0.11f, 0.18f));
-            GUI.Box(new Rect(x, top + 18f, 2f, 394f), GUIContent.none);
+            DrawStoreScreen();
+        }
+        else
+        {
+            DrawHomeScreen();
         }
 
         GUI.color = Color.white;
-        GUI.skin.label.alignment = TextAnchor.MiddleCenter;
-        GUI.skin.label.fontSize = Mathf.Clamp(Screen.width / 18, 46, 72);
-        GUI.Label(new Rect(left, top + 42f, panelWidth, 78f), "RULESHOT");
-
-        GUI.skin.label.fontSize = 18;
-        GUI.color = new Color(0.68f, 0.95f, 1f);
-        GUI.Label(new Rect(left, top + 120f, panelWidth, 28f), "2D RULE-GUN PLATFORMER // NEON MECHANICAL CITY");
-
-        float cardY = top + 184f;
-        DrawTitleCard(left + 58f, cardY, 230f, "HEAVY", "Increase weight", "Pressure plates / breaks", HeavyColor);
-        DrawTitleCard(centerX - 115f, cardY, 230f, "LIGHT", "Reduce weight", "Wind lifts / pushing", LightColor);
-        DrawTitleCard(left + panelWidth - 288f, cardY, 230f, "FREEZE", "Pause motion", "Hazards / patrols", FreezeColor);
-
-        float buttonY = top + 344f;
-        GUI.color = new Color(0.04f, 0.08f, 0.12f, 0.96f);
-        Rect startRect = new Rect(centerX - 160f, buttonY, 320f, 48f);
-        GUI.Box(startRect, GUIContent.none);
-        GUI.color = new Color(0.9f, 1f, 1f);
-        GUI.skin.label.fontSize = 19;
-        GUI.Label(startRect, Mathf.PingPong(titleTimer, 1f) > 0.5f ? "PRESS ENTER / SPACE / CLICK" : "INITIALIZE RULE GUN");
-
-        GUI.color = new Color(0.75f, 0.9f, 1f);
-        GUI.skin.label.fontSize = 14;
-        GUI.Label(new Rect(left, top + 394f, panelWidth, 24f), "A/D MOVE   SPACE JUMP   SHIFT DASH   Q/E SWITCH   MOUSE FIRE");
-
         GUI.skin.label.alignment = TextAnchor.UpperLeft;
     }
 
-    private void DrawTitleCard(float x, float y, float width, string title, string lineOne, string lineTwo, Color accent)
+    private void DrawHomeScreen()
     {
-        Rect rect = new Rect(x, y, width, 104f);
-        GUI.color = new Color(0.025f, 0.035f, 0.06f, 0.96f);
-        GUI.Box(rect, GUIContent.none);
-        GUI.color = accent;
-        GUI.Box(new Rect(x, y, width, 3f), GUIContent.none);
-        GUI.Box(new Rect(x + 14f, y + 18f, 34f, 34f), GUIContent.none);
-        GUI.color = new Color(0.01f, 0.02f, 0.035f, 1f);
-        GUI.Box(new Rect(x + 22f, y + 26f, 18f, 18f), GUIContent.none);
+        if (HasDynamicHomeArt())
+        {
+            DrawDynamicHomeScreen();
+            return;
+        }
 
-        GUI.color = Color.white;
-        GUI.skin.label.alignment = TextAnchor.UpperLeft;
-        GUI.skin.label.fontSize = 18;
-        GUI.Label(new Rect(x + 62f, y + 16f, width - 74f, 24f), title);
-        GUI.skin.label.fontSize = 13;
-        GUI.color = new Color(0.78f, 0.88f, 0.92f);
-        GUI.Label(new Rect(x + 62f, y + 45f, width - 74f, 22f), lineOne);
-        GUI.color = new Color(0.55f, 0.7f, 0.76f);
-        GUI.Label(new Rect(x + 62f, y + 67f, width - 74f, 22f), lineTwo);
-        GUI.skin.label.alignment = TextAnchor.MiddleCenter;
+        if (homeScreenTexture != null)
+        {
+            Rect imageRect = DrawShellTextureCover(homeScreenTexture, 1376f, 768f);
+            if (DrawImageHotspot(new Rect(116f, 148f, 384f, 128f), imageRect, 1376f, 768f))
+            {
+                StartRun();
+            }
+
+            if (DrawImageHotspot(new Rect(116f, 319f, 384f, 128f), imageRect, 1376f, 768f))
+            {
+                shellScreen = ShellScreen.Store;
+                wardrobeTab = 0;
+            }
+
+            if (DrawImageHotspot(new Rect(116f, 489f, 384f, 128f), imageRect, 1376f, 768f))
+            {
+                shellScreen = ShellScreen.Store;
+            }
+
+            return;
+        }
+
+        float scale = GetShellScale();
+        float ox = GetShellOffsetX(scale);
+        float oy = GetShellOffsetY(scale);
+        Rect canvas = new Rect(ox, oy, 1365f * scale, 768f * scale);
+        DrawFill(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0.004f, 0.007f, 0.02f));
+        DrawCyberAlley(canvas, scale);
+
+        Rect topBar = SRect(0f, 0f, 1365f, 58f, scale, ox, oy);
+        DrawFill(topBar, new Color(0.006f, 0.011f, 0.03f, 0.96f));
+        DrawFill(SRect(0f, 56f, 1365f, 3f, scale, ox, oy), new Color(0.88f, 0.98f, 1f));
+        DrawPixelIcon(SRect(23f, 20f, 22f, 13f, scale, ox, oy), FreezeColor);
+        DrawLabel(SRect(63f, 13f, 360f, 34f, scale, ox, oy), "PIXEL_CORE_OS", 23, FreezeColor, TextAnchor.MiddleLeft, FontStyle.Bold, scale);
+        DrawGem(SRect(1247f, 15f, 34f, 28f, scale, ox, oy), scale);
+        DrawLabel(SRect(1292f, 12f, 90f, 36f, scale, ox, oy), coins.ToString(), 23, new Color(0.7f, 0.9f, 0.94f), TextAnchor.MiddleLeft, FontStyle.Bold, scale);
+        DrawLabel(SRect(7f, 66f, 90f, 18f, scale, ox, oy), "v1.0.1", 12, new Color(0.62f, 0.68f, 0.78f), TextAnchor.MiddleLeft, FontStyle.Normal, scale);
+
+        if (DrawNeonButton(SRect(116f, 148f, 384f, 128f, scale, ox, oy), "START MISSION", new Color(0.91f, 0.22f, 1f), scale))
+        {
+            StartRun();
+        }
+
+        if (DrawNeonButton(SRect(116f, 319f, 384f, 128f, scale, ox, oy), "AGENT\nCUSTOMIZATION", FreezeColor, scale))
+        {
+            shellScreen = ShellScreen.Store;
+            wardrobeTab = 0;
+        }
+
+        if (DrawNeonButton(SRect(116f, 489f, 384f, 128f, scale, ox, oy), "CYBER STORE", new Color(0.72f, 0.29f, 1f), scale))
+        {
+            shellScreen = ShellScreen.Store;
+        }
+
+        DrawAgent(SRect(630f, 284f, 150f, 330f, scale, ox, oy), scale);
+        DrawRewardPanel(SRect(875f, 620f, 474f, 125f, scale, ox, oy), scale);
+    }
+
+    private bool HasDynamicHomeArt()
+    {
+        return homeArt.ContainsKey("bg_sky_moon") &&
+            homeArt.ContainsKey("bg_city_far") &&
+            homeArt.ContainsKey("bg_alley_mid") &&
+            homeArt.ContainsKey("button_start_normal") &&
+            homeArt.ContainsKey("button_custom_normal") &&
+            homeArt.ContainsKey("button_store_normal") &&
+            homeArt.ContainsKey("agent_home");
+    }
+
+    private void DrawDynamicHomeScreen()
+    {
+        Rect canvas = GetShellCoverRect(1376f, 768f);
+        DrawFill(new Rect(0f, 0f, Screen.width, Screen.height), Color.black);
+        DrawFill(canvas, new Color(0.01f, 0.015f, 0.035f));
+
+        float s = canvas.width / 1376f;
+        float t = titleTimer;
+
+        DrawHomeTexture("bg_sky_moon", new Rect(0f, 58f, 1376f, 150f), canvas, Color.white);
+        DrawHomeTexture("bg_city_far", new Rect(-20f - Mathf.PingPong(t * 2f, 10f), 138f, 1416f, 150f), canvas, new Color(0.86f, 0.9f, 1f));
+        DrawHomeTexture("bg_alley_mid", new Rect(0f, 216f, 1376f, 452f), canvas, Color.white);
+        DrawFill(SRect(0f, 665f, 1376f, 103f, s, canvas.x, canvas.y), new Color(0.018f, 0.035f, 0.045f, 0.72f));
+
+        DrawHomeTexture("rain_lines", new Rect(0f, 62f + Mathf.Repeat(t * 120f, 178f) - 178f, 1376f, 534f), canvas, new Color(0.75f, 0.95f, 1f, 0.48f));
+        DrawHomeTexture("rain_lines", new Rect(0f, 62f + Mathf.Repeat(t * 120f, 178f), 1376f, 534f), canvas, new Color(0.75f, 0.95f, 1f, 0.48f));
+
+        DrawFill(SRect(0f, 0f, 1376f, 58f, s, canvas.x, canvas.y), new Color(0.006f, 0.011f, 0.03f, 0.97f));
+        DrawFill(SRect(0f, 56f, 1376f, 3f, s, canvas.x, canvas.y), new Color(0.88f, 0.98f, 1f));
+        DrawPixelIcon(SRect(23f, 20f, 22f, 13f, s, canvas.x, canvas.y), FreezeColor);
+        DrawLabel(SRect(63f, 13f, 360f, 34f, s, canvas.x, canvas.y), "PIXEL_CORE_OS", 23, FreezeColor, TextAnchor.MiddleLeft, FontStyle.Bold, s);
+        DrawGem(SRect(1247f, 15f, 34f, 28f, s, canvas.x, canvas.y), s);
+        DrawLabel(SRect(1292f, 12f, 90f, 36f, s, canvas.x, canvas.y), coins.ToString(), 23, new Color(0.7f, 0.9f, 0.94f), TextAnchor.MiddleLeft, FontStyle.Bold, s);
+        DrawLabel(SRect(7f, 66f, 90f, 18f, s, canvas.x, canvas.y), "v1.0.1", 12, new Color(0.62f, 0.68f, 0.78f), TextAnchor.MiddleLeft, FontStyle.Normal, s);
+
+        if (DrawHomeImageButton(new Rect(116f, 148f, 384f, 128f), canvas, "button_start"))
+        {
+            StartRun();
+        }
+
+        if (DrawHomeImageButton(new Rect(116f, 319f, 384f, 128f), canvas, "button_custom"))
+        {
+            shellScreen = ShellScreen.Store;
+            wardrobeTab = 0;
+        }
+
+        if (DrawHomeImageButton(new Rect(116f, 489f, 384f, 128f), canvas, "button_store"))
+        {
+            shellScreen = ShellScreen.Store;
+        }
+
+        float bob = Mathf.Sin(t * 2.4f) * 7f;
+        DrawHomeTexture("agent_home", new Rect(634f, 278f + bob, 150f, 343f), canvas, Color.white);
+        DrawDynamicRewardPanel(canvas);
+    }
+
+    private void DrawDynamicRewardPanel(Rect canvas)
+    {
+        float s = canvas.width / 1376f;
+        Rect panel = SRect(875f, 620f, 474f, 125f, s, canvas.x, canvas.y);
+        DrawFill(panel, new Color(0.01f, 0.025f, 0.04f, 0.92f));
+        DrawFrame(panel, new Color(0.88f, 1f, 1f), 3f * s);
+        DrawLabel(new Rect(panel.x + 22f * s, panel.y + 15f * s, 270f * s, 31f * s), "PLAYTIME REWARDS", 20, FreezeColor, TextAnchor.MiddleLeft, FontStyle.Bold, s);
+        DrawHomeTexture("progress_bar", new Rect(899f, 678f, 293f, 34f), canvas, Color.white);
+        DrawFill(SRect(904f, 685f, 145f, 20f, s, canvas.x, canvas.y), new Color(0.15f, 0.86f, 0.95f, 0.72f));
+        DrawLabel(SRect(899f, 678f, 293f, 34f, s, canvas.x, canvas.y), "2h 15m / 5h", 19, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, s);
+
+        float coinPulse = 1f + Mathf.Sin(titleTimer * 5f) * 0.05f;
+        DrawHomeTexture("coin_gold", new Rect(1160f, 633f, 58f * coinPulse, 58f * coinPulse), canvas, Color.white);
+        DrawHomeTexture("chest_widget", new Rect(1243f, 636f, 74f, 82f), canvas, new Color(1f, 1f, 1f, 0.92f + Mathf.Sin(titleTimer * 3f) * 0.08f));
+        DrawLabel(SRect(1263f, 709f, 62f, 30f, s, canvas.x, canvas.y), "Coins", 16, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, s);
+    }
+
+    private void DrawStoreScreen()
+    {
+        if (storeScreenTexture != null)
+        {
+            Rect imageRect = DrawShellTexture(storeScreenTexture, 1152f, 922f);
+            bool closeLeft = DrawImageHotspot(new Rect(510f, 98f, 36f, 38f), imageRect, 1152f, 922f);
+            bool closeRight = DrawImageHotspot(new Rect(1085f, 98f, 38f, 38f), imageRect, 1152f, 922f);
+            bool exit = DrawImageHotspot(new Rect(864f, 854f, 288f, 68f), imageRect, 1152f, 922f);
+            if (closeLeft || closeRight || exit)
+            {
+                shellScreen = ShellScreen.Home;
+            }
+
+            return;
+        }
+
+        float scale = GetShellScale();
+        float ox = GetShellOffsetX(scale);
+        float oy = GetShellOffsetY(scale);
+        float contentOx = ox + 113f * scale;
+        Rect canvas = new Rect(ox, oy, 1365f * scale, 768f * scale);
+        DrawFill(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0.006f, 0.007f, 0.018f));
+        DrawStoreBackground(canvas, scale);
+
+        DrawFill(SRect(0f, 0f, 1365f, 58f, scale, ox, oy), new Color(0.006f, 0.01f, 0.028f, 0.97f));
+        DrawFill(SRect(0f, 56f, 1365f, 3f, scale, ox, oy), new Color(0.92f, 0.96f, 1f));
+        DrawPixelIcon(SRect(17f, 22f, 21f, 13f, scale, ox, oy), FreezeColor);
+        DrawLabel(SRect(52f, 13f, 280f, 34f, scale, ox, oy), "PIXEL_CORE_OS", 21, FreezeColor, TextAnchor.MiddleLeft, FontStyle.Bold, scale);
+        DrawHudChip(SRect(497f, 10f, 222f, 35f, scale, ox, oy), scale);
+
+        DrawStorePanel(SRect(63f, 82f, 505f, 630f, scale, contentOx, oy), "AGENT WARDROBE", scale);
+        DrawStorePanel(SRect(608f, 82f, 505f, 630f, scale, contentOx, oy), "CYBER STORE", scale);
+
+        DrawWardrobeArea(scale, contentOx, oy);
+        DrawStoreArea(scale, contentOx, oy);
+        DrawBottomNav(scale, ox, oy);
+    }
+
+    private void DrawWardrobeArea(float scale, float ox, float oy)
+    {
+        int activeOption = GetEquippedWardrobeOption(wardrobeTab);
+        for (int i = 0; i < 5; i++)
+        {
+            Rect slot = SRect(72f + i * 92f, 190f, 74f, 88f, scale, ox, oy);
+            DrawSlot(slot, i == activeOption ? new Color(1f, 0.86f, 0.55f) : new Color(0.45f, 0.62f, 0.68f), scale);
+            DrawWardrobeOptionIcon(slot, wardrobeTab, i, scale);
+            if (GUI.Button(slot, GUIContent.none, GUIStyle.none))
+            {
+                equippedWardrobeOptions[wardrobeTab] = i;
+            }
+        }
+
+        for (int i = 0; i < 3; i++)
+        {
+            Rect labelRect = SRect(72f, 298f + i * 101f, 116f, 24f, scale, ox, oy);
+            Rect iconSlot = SRect(72f, 327f + i * 101f, 84f, 84f, scale, ox, oy);
+            Rect valueSlot = SRect(170f, 334f + i * 101f, 238f, 58f, scale, ox, oy);
+            Rect actionSlot = SRect(424f, 334f + i * 101f, 94f, 58f, scale, ox, oy);
+
+            bool isActiveCategory = wardrobeTab == i;
+            Color accent = GetWardrobeCategoryAccent(i);
+            DrawLabel(labelRect, wardrobeTabs[i], 13, isActiveCategory ? accent : new Color(0.65f, 0.76f, 0.8f), TextAnchor.MiddleLeft, FontStyle.Bold, scale);
+            DrawSlot(iconSlot, isActiveCategory ? accent : new Color(0.5f, 0.58f, 0.6f), scale);
+            DrawWardrobeOptionIcon(iconSlot, i, GetEquippedWardrobeOption(i), scale);
+
+            DrawFill(valueSlot, new Color(0.05f, 0.11f, 0.14f, 0.82f));
+            DrawFrame(valueSlot, new Color(0.32f, 0.55f, 0.62f), 2f * scale);
+            DrawLabel(valueSlot, GetEquippedWardrobeName(i), 16, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+
+            DrawFill(actionSlot, isActiveCategory ? new Color(accent.r, accent.g, accent.b, 0.82f) : new Color(0.10f, 0.22f, 0.28f, 0.92f));
+            DrawFrame(actionSlot, isActiveCategory ? new Color(0.9f, 1f, 1f) : new Color(0.32f, 0.55f, 0.62f), 2f * scale);
+            DrawLabel(actionSlot, isActiveCategory ? "EDITING" : "SELECT", 14, isActiveCategory ? new Color(0.03f, 0.12f, 0.16f) : new Color(0.66f, 0.94f, 1f), TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+            if (GUI.Button(actionSlot, GUIContent.none, GUIStyle.none))
+            {
+                wardrobeTab = i;
+            }
+        }
+
+        DrawAgent(SRect(228f, 310f, 168f, 245f, scale, ox, oy), scale);
+        DrawFill(SRect(188f, 552f, 190f, 9f, scale, ox, oy), new Color(0.18f, 1f, 0.82f, 0.7f));
+
+        for (int i = 0; i < wardrobeTabs.Length; i++)
+        {
+            Rect tab = SRect(181f + i * 85f, 619f, 59f, 59f, scale, ox, oy);
+            Color accent = i == 0 ? new Color(1f, 0.72f, 0.66f) : (i == 1 ? FreezeColor : new Color(1f, 0.46f, 0.74f));
+            DrawSlot(tab, wardrobeTab == i ? accent : new Color(0.24f, 0.69f, 0.82f), scale);
+            DrawTabIcon(tab, i, accent, scale);
+            DrawLabel(SRect(174f + i * 85f, 678f, 74f, 23f, scale, ox, oy), wardrobeTabs[i], 13, i == wardrobeTab ? accent : new Color(0.68f, 0.78f, 0.84f), TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+            if (GUI.Button(tab, GUIContent.none, GUIStyle.none))
+            {
+                wardrobeTab = i;
+            }
+        }
+    }
+
+    private void DrawStoreArea(float scale, float ox, float oy)
+    {
+        Rect reward = SRect(635f, 169f, 462f, 60f, scale, ox, oy);
+        DrawFrame(reward, FreezeColor, 3f * scale);
+        DrawLabel(SRect(694f, 183f, 235f, 31f, scale, ox, oy), "PLAYTIME REWARD:", 24, new Color(0.58f, 0.77f, 0.86f), TextAnchor.MiddleLeft, FontStyle.Bold, scale);
+        DrawLabel(SRect(930f, 182f, 67f, 32f, scale, ox, oy), "1250", 25, new Color(0.46f, 1f, 0.65f), TextAnchor.MiddleLeft, FontStyle.Bold, scale);
+        DrawCoin(SRect(1002f, 178f, 42f, 42f, scale, ox, oy), scale);
+
+        for (int i = 0; i < storeNames.Length; i++)
+        {
+            int col = i % 4;
+            int row = i / 4;
+            Rect slot = SRect(635f + col * 115f, 248f + row * 140f, 98f, 119f, scale, ox, oy);
+            DrawSlot(slot, i == selectedStoreItem ? new Color(0.8f, 1f, 1f) : FreezeColor, scale);
+            DrawItemIcon(slot, i + 3, scale);
+            DrawLabel(new Rect(slot.x + 5f * scale, slot.y + 84f * scale, slot.width - 10f * scale, 28f * scale), storeNames[i], 11, new Color(0.86f, 0.95f, 1f), TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+            DrawLabel(SRect(635f + col * 115f, 368f + row * 140f, 98f, 28f, scale, ox, oy), storePrices[i] + " C", 16, new Color(1f, 0.78f, 0.55f), TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+
+            if (GUI.Button(slot, GUIContent.none, GUIStyle.none))
+            {
+                selectedStoreItem = i;
+            }
+        }
+
+        Rect scroll = SRect(1098f, 248f, 9f, 420f, scale, ox, oy);
+        DrawFill(scroll, new Color(0.55f, 0.59f, 0.68f, 0.75f));
+        DrawFill(new Rect(scroll.x, scroll.y, scroll.width, scroll.height * 0.48f), new Color(0.08f, 0.95f, 1f, 0.82f));
+    }
+
+    private void DrawBottomNav(float scale, float ox, float oy)
+    {
+        Rect bar = new Rect(ox, Screen.height - 80f * scale, 1365f * scale, 80f * scale);
+        DrawFill(bar, new Color(0.005f, 0.012f, 0.025f, 0.98f));
+        DrawFill(new Rect(bar.x, bar.y, bar.width, 3f * scale), new Color(0.86f, 1f, 1f));
+
+        string[] labels = { "GRAVITY", "WARDROBE", "STORE", "EXIT" };
+        for (int i = 0; i < 4; i++)
+        {
+            Rect tab = new Rect(bar.x + i * bar.width / 4f, bar.y + 4f * scale, bar.width / 4f, bar.height - 8f * scale);
+            bool active = i == 1;
+            if (active)
+            {
+                DrawFill(tab, new Color(0.03f, 0.86f, 1f, 0.82f));
+                DrawFrame(tab, new Color(0.9f, 1f, 1f), 2f * scale);
+            }
+
+            DrawLabel(new Rect(tab.x, tab.y + 43f * scale, tab.width, 20f * scale), labels[i], 10, active ? new Color(0.03f, 0.12f, 0.16f) : new Color(0.55f, 0.64f, 0.72f), TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+            DrawNavIcon(new Rect(tab.x + tab.width * 0.5f - 16f * scale, tab.y + 13f * scale, 32f * scale, 24f * scale), i, active, scale);
+            if (i == 3 && GUI.Button(tab, GUIContent.none, GUIStyle.none))
+            {
+                shellScreen = ShellScreen.Home;
+            }
+        }
+    }
+
+    private void DrawCyberAlley(Rect canvas, float scale)
+    {
+        DrawFill(canvas, new Color(0.025f, 0.033f, 0.065f));
+        DrawFill(new Rect(canvas.x, canvas.y + 58f * scale, canvas.width, canvas.height - 58f * scale), new Color(0.04f, 0.047f, 0.08f));
+
+        for (int i = 0; i < 13; i++)
+        {
+            float x = canvas.x + (i * 122f - 40f) * scale;
+            float w = (92f + (i % 4) * 21f) * scale;
+            float h = (460f + (i % 5) * 46f) * scale;
+            float y = canvas.y + 87f * scale;
+            DrawFill(new Rect(x, y, w, h), i % 2 == 0 ? new Color(0.08f, 0.11f, 0.16f) : new Color(0.10f, 0.08f, 0.18f));
+            DrawFrame(new Rect(x, y, w, h), new Color(0.20f, 0.25f, 0.34f), scale);
+            for (int j = 0; j < 6; j++)
+            {
+                DrawFill(new Rect(x + 12f * scale, y + (34f + j * 53f) * scale, w - 24f * scale, 3f * scale), new Color(0.16f, 0.70f, 0.84f, 0.26f));
+            }
+        }
+
+        DrawFill(new Rect(canvas.x + 548f * scale, canvas.y + 58f * scale, 253f * scale, 642f * scale), new Color(0.10f, 0.09f, 0.20f, 0.85f));
+        DrawFill(new Rect(canvas.x + 806f * scale, canvas.y + 252f * scale, 113f * scale, 395f * scale), new Color(0.45f, 0.12f, 0.54f, 0.52f));
+        DrawFill(new Rect(canvas.x + 772f * scale, canvas.y + 24f * scale, 54f * scale, 196f * scale), new Color(0.28f, 0.08f, 0.43f, 0.95f));
+        DrawFrame(new Rect(canvas.x + 772f * scale, canvas.y + 24f * scale, 54f * scale, 196f * scale), new Color(0.95f, 0.32f, 1f), 3f * scale);
+        DrawLabel(new Rect(canvas.x + 776f * scale, canvas.y + 62f * scale, 46f * scale, 100f * scale), "101\n0K", 28, new Color(1f, 0.45f, 1f), TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+
+        DrawFill(new Rect(canvas.x, canvas.y + 662f * scale, canvas.width, 106f * scale), new Color(0.03f, 0.06f, 0.08f));
+        for (int i = 0; i < 36; i++)
+        {
+            float x = canvas.x + (i * 43f + Mathf.PingPong(titleTimer * 18f + i * 7f, 18f)) * scale;
+            DrawFill(new Rect(x, canvas.y + (70f + (i * 37) % 560) * scale, 2f * scale, 72f * scale), new Color(0.56f, 0.90f, 1f, 0.42f));
+        }
+    }
+
+    private void DrawStoreBackground(Rect canvas, float scale)
+    {
+        DrawFill(canvas, new Color(0.025f, 0.025f, 0.055f));
+        for (int i = 0; i < 12; i++)
+        {
+            Rect beam = new Rect(canvas.x + i * 104f * scale, canvas.y + 58f * scale, 48f * scale, 710f * scale);
+            DrawFill(beam, i % 2 == 0 ? new Color(0.10f, 0.09f, 0.16f) : new Color(0.13f, 0.10f, 0.20f));
+            DrawFrame(beam, new Color(0.28f, 0.29f, 0.38f), scale);
+        }
+
+        DrawFill(new Rect(canvas.x + 679f * scale, canvas.y + 58f * scale, 7f * scale, 660f * scale), new Color(0.01f, 0.015f, 0.025f));
+        DrawFill(new Rect(canvas.x + 683f * scale, canvas.y + 58f * scale, 7f * scale, 660f * scale), new Color(0.65f, 0.98f, 1f, 0.7f));
+        DrawFill(new Rect(canvas.x + 0f, canvas.y + 708f * scale, canvas.width, 32f * scale), new Color(0.10f, 0.11f, 0.16f));
+        for (int i = 0; i < 27; i++)
+        {
+            Color stripe = i % 3 == 0 ? new Color(1f, 0.25f, 0.75f) : (i % 3 == 1 ? new Color(0.58f, 1f, 0.25f) : new Color(1f, 0.75f, 0.25f));
+            DrawFill(new Rect(canvas.x + i * 43f * scale, canvas.y + 718f * scale, 29f * scale, 8f * scale), stripe);
+        }
+    }
+
+    private void DrawStorePanel(Rect rect, string title, float scale)
+    {
+        DrawFill(rect, new Color(0.02f, 0.055f, 0.075f, 0.93f));
+        DrawFrame(rect, new Color(0.40f, 0.43f, 0.50f), 4f * scale);
+        DrawFill(new Rect(rect.x + 16f * scale, rect.y + 9f * scale, rect.width - 32f * scale, 56f * scale), new Color(0.11f, 0.12f, 0.17f));
+        DrawFrame(new Rect(rect.x + 16f * scale, rect.y + 9f * scale, rect.width - 32f * scale, 56f * scale), new Color(0.35f, 0.36f, 0.42f), 3f * scale);
+        DrawLabel(new Rect(rect.x, rect.y + 12f * scale, rect.width, 46f * scale), title, 25, FreezeColor, TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+        Rect close = new Rect(rect.x + rect.width - 58f * scale, rect.y + 16f * scale, 34f * scale, 34f * scale);
+        DrawFill(close, new Color(0.72f, 0.18f, 0.24f));
+        DrawFrame(close, new Color(0.24f, 0.08f, 0.10f), 2f * scale);
+        DrawLabel(close, "X", 20, new Color(0.16f, 0.04f, 0.06f), TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+        if (GUI.Button(close, GUIContent.none, GUIStyle.none))
+        {
+            shellScreen = ShellScreen.Home;
+        }
+    }
+
+    private void DrawRewardPanel(Rect rect, float scale)
+    {
+        DrawFill(rect, new Color(0.01f, 0.025f, 0.04f, 0.96f));
+        DrawFrame(rect, new Color(0.88f, 1f, 1f), 3f * scale);
+        DrawLabel(new Rect(rect.x + 22f * scale, rect.y + 15f * scale, 270f * scale, 31f * scale), "PLAYTIME REWARDS", 20, FreezeColor, TextAnchor.MiddleLeft, FontStyle.Bold, scale);
+        Rect bar = new Rect(rect.x + 24f * scale, rect.y + 59f * scale, 293f * scale, 33f * scale);
+        DrawFrame(bar, new Color(0.94f, 1f, 1f), 2f * scale);
+        DrawFill(new Rect(bar.x + 4f * scale, bar.y + 6f * scale, 143f * scale, bar.height - 12f * scale), FreezeColor);
+        DrawLabel(bar, "2h 15m / 5h", 19, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+        DrawCoin(new Rect(rect.x + 316f * scale, rect.y + 50f * scale, 58f * scale, 58f * scale), scale);
+        DrawChest(new Rect(rect.x + 382f * scale, rect.y + 16f * scale, 70f * scale, 64f * scale), scale);
+        DrawLabel(new Rect(rect.x + 390f * scale, rect.y + 78f * scale, 62f * scale, 30f * scale), "Coins", 16, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+    }
+
+    private void DrawHudChip(Rect rect, float scale)
+    {
+        DrawFill(rect, new Color(0.03f, 0.03f, 0.035f));
+        DrawFrame(rect, new Color(0.87f, 0.87f, 0.82f), 2f * scale);
+        DrawLabel(new Rect(rect.x + 14f * scale, rect.y, 36f * scale, rect.height), "HP", 12, Color.white, TextAnchor.MiddleLeft, FontStyle.Bold, scale);
+        for (int i = 0; i < 4; i++)
+        {
+            DrawFrame(new Rect(rect.x + (40f + i * 18f) * scale, rect.y + 10f * scale, 14f * scale, 14f * scale), new Color(0.65f, 0.65f, 0.65f), scale);
+            if (i == 0)
+            {
+                DrawFill(new Rect(rect.x + (42f + i * 18f) * scale, rect.y + 12f * scale, 10f * scale, 10f * scale), new Color(1f, 0.58f, 0.64f));
+            }
+        }
+        DrawLabel(new Rect(rect.x + 135f * scale, rect.y, 72f * scale, rect.height), "SECTOR 04", 12, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+    }
+
+    private bool DrawNeonButton(Rect rect, string text, Color accent, float scale)
+    {
+        bool hover = rect.Contains(Event.current.mousePosition);
+        DrawFill(new Rect(rect.x - 7f * scale, rect.y - 7f * scale, rect.width + 14f * scale, rect.height + 14f * scale), new Color(accent.r, accent.g, accent.b, hover ? 0.22f : 0.13f));
+        DrawFill(rect, new Color(0.025f, 0.038f, 0.065f, 0.95f));
+        DrawFrame(rect, accent, 5f * scale);
+        DrawFrame(new Rect(rect.x + 9f * scale, rect.y + 9f * scale, rect.width - 18f * scale, rect.height - 18f * scale), new Color(0.65f, 1f, 1f, 0.50f), 2f * scale);
+        for (int i = 0; i < 11; i++)
+        {
+            DrawFill(new Rect(rect.x + 18f * scale, rect.y + (21f + i * 8f) * scale, rect.width - 36f * scale, 2f * scale), new Color(0.18f, 0.45f, 0.62f, 0.18f));
+        }
+        DrawLabel(rect, text, 35, new Color(0.68f, 1f, 1f), TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+        return GUI.Button(rect, GUIContent.none, GUIStyle.none);
+    }
+
+    private void DrawAgent(Rect rect, float scale)
+    {
+        float x = rect.x;
+        float y = rect.y;
+        float s = rect.height / 330f;
+        Color armorPrimary = GetArmorPrimaryColor();
+        Color armorSecondary = GetArmorSecondaryColor();
+        Color armorAccent = GetArmorAccentColor();
+        Color visorColor = GetVisorGlowColor();
+        int weaponVariant = GetEquippedWardrobeOption((int)WardrobeCategory.Weapon);
+
+        DrawFill(new Rect(x + 60f * s, y + 5f * s, 50f * s, 29f * s), new Color(0.80f, 0.57f, 0.47f));
+        DrawFill(new Rect(x + 68f * s, y + 0f * s, 42f * s, 18f * s), armorSecondary);
+        DrawFrame(new Rect(x + 66f * s, y + 0f * s, 46f * s, 19f * s), new Color(0.05f, 0.08f, 0.09f), 2.5f * s);
+        DrawFill(new Rect(x + 72f * s, y + 32f * s, 62f * s, 24f * s), visorColor);
+        DrawFrame(new Rect(x + 69f * s, y + 29f * s, 67f * s, 29f * s), new Color(0.05f, 0.07f, 0.09f), 4f * s);
+
+        DrawFill(new Rect(x + 57f * s, y + 60f * s, 63f * s, 91f * s), armorPrimary);
+        DrawFrame(new Rect(x + 57f * s, y + 60f * s, 63f * s, 91f * s), new Color(0.04f, 0.05f, 0.06f), 4f * s);
+        DrawFill(new Rect(x + 61f * s, y + 87f * s, 18f * s, 39f * s), armorAccent);
+        DrawFill(new Rect(x + 88f * s, y + 76f * s, 23f * s, 14f * s), armorAccent);
+
+        DrawFill(new Rect(x + 17f * s, y + 70f * s, 34f * s, 72f * s), armorSecondary);
+        DrawFill(new Rect(x + 108f * s, y + 74f * s, 31f * s, 84f * s), armorSecondary * 0.92f);
+        DrawFill(new Rect(x + 47f * s, y + 148f * s, 30f * s, 95f * s), armorPrimary * 0.85f);
+        DrawFill(new Rect(x + 87f * s, y + 148f * s, 31f * s, 99f * s), armorPrimary * 0.78f);
+        DrawFill(new Rect(x + 31f * s, y + 231f * s, 43f * s, 22f * s), new Color(0.08f, 0.10f, 0.12f));
+        DrawFill(new Rect(x + 84f * s, y + 240f * s, 46f * s, 21f * s), new Color(0.08f, 0.10f, 0.12f));
+
+        DrawFill(new Rect(x + 26f * s, y + 48f * s, 28f * s, 84f * s), armorAccent * 0.7f);
+        DrawFill(new Rect(x + 32f * s, y + 45f * s, 20f * s, 64f * s), armorSecondary);
+        DrawGunIcon(new Rect(x + 4f * s, y + 44f * s, 48f * s, 42f * s), weaponVariant, scale);
+        DrawFill(new Rect(x + 73f * s, y + 92f * s, 10f * s, 10f * s), visorColor * 0.9f);
+        DrawFill(new Rect(x + 94f * s, y + 107f * s, 10f * s, 10f * s), armorAccent);
+    }
+
+    private void DrawSlot(Rect rect, Color border, float scale)
+    {
+        DrawFill(rect, new Color(0.04f, 0.11f, 0.14f, 0.88f));
+        DrawFrame(rect, border, 2f * scale);
+        DrawFill(new Rect(rect.x + 4f * scale, rect.y + 4f * scale, rect.width - 8f * scale, rect.height - 8f * scale), new Color(0.10f, 0.16f, 0.18f, 0.44f));
+    }
+
+    private void DrawItemIcon(Rect rect, int index, float scale)
+    {
+        int kind = index % 8;
+        Rect icon = new Rect(rect.x + rect.width * 0.2f, rect.y + rect.height * 0.18f, rect.width * 0.6f, rect.height * 0.46f);
+        if (kind == 0)
+        {
+            DrawArmorPiece(icon, 0, scale);
+        }
+        else if (kind == 1 || kind == 2)
+        {
+            DrawFill(new Rect(icon.x, icon.y + icon.height * 0.35f, icon.width, icon.height * 0.22f), kind == 1 ? new Color(0.78f, 0.36f, 1f) : new Color(1f, 0.68f, 0.25f));
+            DrawFill(new Rect(icon.x + icon.width * 0.14f, icon.y + icon.height * 0.55f, icon.width * 0.72f, icon.height * 0.20f), new Color(0.18f, 0.20f, 0.24f));
+        }
+        else if (kind == 3)
+        {
+            DrawGunIcon(icon, 0, scale);
+        }
+        else if (kind == 4)
+        {
+            DrawAgent(icon, scale);
+        }
+        else if (kind == 5)
+        {
+            DrawGem(icon, scale);
+        }
+        else if (kind == 6)
+        {
+            DrawCoin(icon, scale);
+        }
+        else
+        {
+            DrawFill(icon, new Color(0.20f, 0.35f, 0.42f));
+            DrawFill(new Rect(icon.x + icon.width * 0.38f, icon.y + icon.height * 0.1f, icon.width * 0.25f, icon.height * 0.8f), LightColor);
+        }
+    }
+
+    private void DrawWardrobeOptionIcon(Rect rect, int categoryIndex, int optionIndex, float scale)
+    {
+        Rect icon = new Rect(rect.x + rect.width * 0.16f, rect.y + rect.height * 0.14f, rect.width * 0.68f, rect.height * 0.56f);
+        WardrobeCategory category = (WardrobeCategory)Mathf.Clamp(categoryIndex, 0, 2);
+        if (category == WardrobeCategory.Armor)
+        {
+            DrawArmorPiece(icon, optionIndex, scale);
+            return;
+        }
+
+        if (category == WardrobeCategory.Visor)
+        {
+            Color visorColor = GetVisorColor(optionIndex);
+            DrawFill(new Rect(icon.x, icon.y + icon.height * 0.32f, icon.width, icon.height * 0.24f), visorColor);
+            DrawFrame(new Rect(icon.x - 2f * scale, icon.y + icon.height * 0.26f, icon.width + 4f * scale, icon.height * 0.34f), new Color(0.07f, 0.09f, 0.11f), 2f * scale);
+            DrawFill(new Rect(icon.x + icon.width * 0.14f, icon.y + icon.height * 0.58f, icon.width * 0.72f, icon.height * 0.16f), new Color(0.18f, 0.20f, 0.24f));
+            return;
+        }
+
+        DrawGunIcon(icon, optionIndex, scale);
+    }
+
+    private void DrawArmorPiece(Rect rect, int variant, float scale)
+    {
+        Color color = GetArmorColorByOption(variant);
+        Color accent = GetArmorAccentByOption(variant);
+        DrawFill(new Rect(rect.x + rect.width * 0.20f, rect.y + rect.height * 0.14f, rect.width * 0.60f, rect.height * 0.62f), color);
+        DrawFill(new Rect(rect.x + rect.width * 0.06f, rect.y + rect.height * 0.24f, rect.width * 0.24f, rect.height * 0.34f), color * 0.85f);
+        DrawFill(new Rect(rect.x + rect.width * 0.70f, rect.y + rect.height * 0.24f, rect.width * 0.24f, rect.height * 0.34f), color * 0.85f);
+        DrawFill(new Rect(rect.x + rect.width * 0.36f, rect.y + rect.height * 0.28f, rect.width * 0.28f, rect.height * 0.16f), accent);
+        DrawFrame(new Rect(rect.x + rect.width * 0.20f, rect.y + rect.height * 0.14f, rect.width * 0.60f, rect.height * 0.62f), new Color(0.08f, 0.09f, 0.1f), 2f * scale);
+    }
+
+    private void DrawGunIcon(Rect rect, int variant, float scale)
+    {
+        int style = Mathf.Abs(variant) % 5;
+        Color body =
+            style == 1 ? new Color(0.36f, 0.72f, 0.78f) :
+            style == 2 ? new Color(0.68f, 0.56f, 0.38f) :
+            style == 3 ? new Color(0.44f, 0.82f, 0.56f) :
+            style == 4 ? new Color(0.74f, 0.30f, 0.32f) :
+            new Color(0.50f, 0.58f, 0.62f);
+        DrawFill(new Rect(rect.x + rect.width * 0.08f, rect.y + rect.height * 0.35f, rect.width * 0.63f, rect.height * 0.25f), body);
+        DrawFill(new Rect(rect.x + rect.width * 0.62f, rect.y + rect.height * 0.42f, rect.width * 0.32f, rect.height * 0.12f), new Color(0.16f, 0.18f, 0.20f));
+        DrawFill(new Rect(rect.x + rect.width * 0.33f, rect.y + rect.height * 0.58f, rect.width * 0.18f, rect.height * 0.28f), style == 2 ? new Color(0.31f, 0.21f, 0.14f) : new Color(0.25f, 0.17f, 0.15f));
+        DrawFill(new Rect(rect.x + rect.width * 0.73f, rect.y + rect.height * 0.36f, rect.width * 0.10f, rect.height * 0.20f), style == 4 ? new Color(1f, 0.36f, 0.42f) : FreezeColor);
+    }
+
+    private int GetEquippedWardrobeOption(int categoryIndex)
+    {
+        if (categoryIndex < 0 || categoryIndex >= equippedWardrobeOptions.Length)
+        {
+            return 0;
+        }
+
+        return Mathf.Clamp(equippedWardrobeOptions[categoryIndex], 0, 4);
+    }
+
+    private string GetEquippedWardrobeName(int categoryIndex)
+    {
+        if (categoryIndex < 0 || categoryIndex >= wardrobeOptionNames.Length)
+        {
+            return string.Empty;
+        }
+
+        string[] options = wardrobeOptionNames[categoryIndex];
+        int optionIndex = GetEquippedWardrobeOption(categoryIndex);
+        return options[Mathf.Clamp(optionIndex, 0, options.Length - 1)];
+    }
+
+    private Color GetWardrobeCategoryAccent(int categoryIndex)
+    {
+        if (categoryIndex == (int)WardrobeCategory.Armor)
+        {
+            return new Color(1f, 0.72f, 0.66f);
+        }
+
+        if (categoryIndex == (int)WardrobeCategory.Visor)
+        {
+            return FreezeColor;
+        }
+
+        return new Color(1f, 0.46f, 0.74f);
+    }
+
+    private Color GetArmorColorByOption(int optionIndex)
+    {
+        int style = Mathf.Abs(optionIndex) % 5;
+        if (style == 1)
+        {
+            return new Color(0.56f, 0.60f, 0.62f);
+        }
+
+        if (style == 2)
+        {
+            return new Color(0.26f, 0.30f, 0.34f);
+        }
+
+        if (style == 3)
+        {
+            return new Color(0.24f, 0.38f, 0.44f);
+        }
+
+        if (style == 4)
+        {
+            return new Color(0.31f, 0.25f, 0.36f);
+        }
+
+        return new Color(0.35f, 0.43f, 0.46f);
+    }
+
+    private Color GetArmorAccentByOption(int optionIndex)
+    {
+        int style = Mathf.Abs(optionIndex) % 5;
+        if (style == 1)
+        {
+            return new Color(0.98f, 0.64f, 0.18f);
+        }
+
+        if (style == 2)
+        {
+            return new Color(0.96f, 0.28f, 0.34f);
+        }
+
+        if (style == 3)
+        {
+            return new Color(0.22f, 0.92f, 0.78f);
+        }
+
+        if (style == 4)
+        {
+            return new Color(0.80f, 0.48f, 1f);
+        }
+
+        return new Color(0.55f, 0.74f, 0.78f);
+    }
+
+    private Color GetArmorPrimaryColor()
+    {
+        return GetArmorColorByOption(GetEquippedWardrobeOption((int)WardrobeCategory.Armor));
+    }
+
+    private Color GetArmorSecondaryColor()
+    {
+        return Color.Lerp(GetArmorPrimaryColor(), new Color(0.82f, 0.86f, 0.88f), 0.28f);
+    }
+
+    private Color GetArmorAccentColor()
+    {
+        return GetArmorAccentByOption(GetEquippedWardrobeOption((int)WardrobeCategory.Armor));
+    }
+
+    private Color GetVisorColor(int optionIndex)
+    {
+        int style = Mathf.Abs(optionIndex) % 5;
+        if (style == 1)
+        {
+            return new Color(0.98f, 0.34f, 1f);
+        }
+
+        if (style == 2)
+        {
+            return new Color(1f, 0.82f, 0.24f);
+        }
+
+        if (style == 3)
+        {
+            return new Color(0.28f, 1f, 0.70f);
+        }
+
+        if (style == 4)
+        {
+            return new Color(1f, 0.32f, 0.32f);
+        }
+
+        return FreezeColor;
+    }
+
+    private Color GetVisorGlowColor()
+    {
+        return GetVisorColor(GetEquippedWardrobeOption((int)WardrobeCategory.Visor));
+    }
+
+    private void DrawTabIcon(Rect rect, int index, Color color, float scale)
+    {
+        Rect inner = new Rect(rect.x + rect.width * 0.28f, rect.y + rect.height * 0.22f, rect.width * 0.44f, rect.height * 0.42f);
+        if (index == 0)
+        {
+            DrawFill(inner, color);
+            DrawFill(new Rect(inner.x - inner.width * 0.22f, inner.y + inner.height * 0.1f, inner.width * 0.25f, inner.height * 0.45f), color);
+            DrawFill(new Rect(inner.x + inner.width * 0.97f, inner.y + inner.height * 0.1f, inner.width * 0.25f, inner.height * 0.45f), color);
+        }
+        else if (index == 1)
+        {
+            DrawFill(new Rect(inner.x - inner.width * 0.25f, inner.y + inner.height * 0.25f, inner.width * 1.5f, inner.height * 0.36f), color);
+        }
+        else
+        {
+            DrawFill(inner, color);
+            DrawFill(new Rect(inner.x + inner.width * 0.72f, inner.y + inner.height * 0.28f, inner.width * 0.45f, inner.height * 0.34f), color * 0.9f);
+        }
+    }
+
+    private void DrawNavIcon(Rect rect, int index, bool active, float scale)
+    {
+        Color color = active ? new Color(0.03f, 0.12f, 0.16f) : new Color(0.48f, 0.55f, 0.62f);
+        if (index == 0)
+        {
+            DrawFrame(new Rect(rect.x + 7f * scale, rect.y + 4f * scale, 18f * scale, 13f * scale), color, 2f * scale);
+            DrawFill(new Rect(rect.x + 15f * scale, rect.y, 3f * scale, 6f * scale), color);
+        }
+        else if (index == 1)
+        {
+            DrawTabIcon(rect, 0, color, scale);
+        }
+        else if (index == 2)
+        {
+            DrawFrame(new Rect(rect.x + 4f * scale, rect.y + 7f * scale, 24f * scale, 15f * scale), color, 2f * scale);
+            DrawFill(new Rect(rect.x + 10f * scale, rect.y + 3f * scale, 12f * scale, 6f * scale), color);
+        }
+        else
+        {
+            DrawFill(new Rect(rect.x + 5f * scale, rect.y + 4f * scale, 18f * scale, 3f * scale), color);
+            DrawFill(new Rect(rect.x + 20f * scale, rect.y + 1f * scale, 3f * scale, 19f * scale), color);
+            DrawFill(new Rect(rect.x + 22f * scale, rect.y + 8f * scale, 8f * scale, 3f * scale), color);
+        }
+    }
+
+    private void DrawGem(Rect rect, float scale)
+    {
+        DrawFill(new Rect(rect.x + rect.width * 0.18f, rect.y, rect.width * 0.64f, rect.height * 0.22f), new Color(0.65f, 1f, 1f));
+        DrawFill(new Rect(rect.x, rect.y + rect.height * 0.22f, rect.width, rect.height * 0.30f), new Color(0.16f, 0.85f, 1f));
+        DrawFill(new Rect(rect.x + rect.width * 0.18f, rect.y + rect.height * 0.52f, rect.width * 0.64f, rect.height * 0.48f), new Color(0.04f, 0.55f, 0.95f));
+        DrawFrame(new Rect(rect.x + rect.width * 0.10f, rect.y + rect.height * 0.08f, rect.width * 0.80f, rect.height * 0.82f), new Color(0.43f, 1f, 1f), scale);
+    }
+
+    private void DrawCoin(Rect rect, float scale)
+    {
+        DrawFill(new Rect(rect.x + rect.width * 0.14f, rect.y + rect.height * 0.06f, rect.width * 0.72f, rect.height * 0.88f), new Color(0.78f, 0.43f, 0.04f));
+        DrawFill(new Rect(rect.x + rect.width * 0.22f, rect.y + rect.height * 0.10f, rect.width * 0.58f, rect.height * 0.80f), new Color(1f, 0.80f, 0.17f));
+        DrawFrame(new Rect(rect.x + rect.width * 0.24f, rect.y + rect.height * 0.18f, rect.width * 0.50f, rect.height * 0.64f), new Color(1f, 0.95f, 0.46f), 2f * scale);
+        DrawLabel(rect, "C", 22, new Color(0.72f, 0.42f, 0.06f), TextAnchor.MiddleCenter, FontStyle.Bold, scale);
+    }
+
+    private void DrawChest(Rect rect, float scale)
+    {
+        DrawFill(new Rect(rect.x + rect.width * 0.10f, rect.y + rect.height * 0.30f, rect.width * 0.80f, rect.height * 0.54f), new Color(0.42f, 0.20f, 0.08f));
+        DrawFill(new Rect(rect.x + rect.width * 0.16f, rect.y + rect.height * 0.08f, rect.width * 0.68f, rect.height * 0.34f), new Color(0.60f, 0.32f, 0.12f));
+        DrawFrame(new Rect(rect.x + rect.width * 0.10f, rect.y + rect.height * 0.20f, rect.width * 0.80f, rect.height * 0.64f), new Color(1f, 0.73f, 0.34f), 2f * scale);
+        DrawFill(new Rect(rect.x + rect.width * 0.46f, rect.y + rect.height * 0.26f, rect.width * 0.12f, rect.height * 0.58f), new Color(1f, 0.76f, 0.26f));
+    }
+
+    private void DrawPixelIcon(Rect rect, Color color)
+    {
+        DrawFill(rect, color);
+        DrawFill(new Rect(rect.x + rect.width * 0.16f, rect.y + rect.height * 0.28f, rect.width * 0.18f, rect.height * 0.18f), new Color(0.02f, 0.08f, 0.10f));
+        DrawFill(new Rect(rect.x + rect.width * 0.60f, rect.y + rect.height * 0.28f, rect.width * 0.18f, rect.height * 0.18f), new Color(0.02f, 0.08f, 0.10f));
+    }
+
+    private Texture2D HomeArt(string key)
+    {
+        Texture2D texture;
+        homeArt.TryGetValue(key, out texture);
+        return texture;
+    }
+
+    private void DrawHomeTexture(string key, Rect sourceRect, Rect canvas, Color color)
+    {
+        Texture2D texture = HomeArt(key);
+        if (texture == null)
+        {
+            return;
+        }
+
+        float sx = canvas.width / 1376f;
+        float sy = canvas.height / 768f;
+        Rect rect = new Rect(
+            canvas.x + sourceRect.x * sx,
+            canvas.y + sourceRect.y * sy,
+            sourceRect.width * sx,
+            sourceRect.height * sy);
+        Color previous = GUI.color;
+        GUI.color = color;
+        GUI.DrawTexture(rect, texture, ScaleMode.StretchToFill, true);
+        GUI.color = previous;
+    }
+
+    private bool DrawHomeImageButton(Rect sourceRect, Rect canvas, string keyPrefix)
+    {
+        float sx = canvas.width / 1376f;
+        float sy = canvas.height / 768f;
+        Rect rect = new Rect(
+            canvas.x + sourceRect.x * sx,
+            canvas.y + sourceRect.y * sy,
+            sourceRect.width * sx,
+            sourceRect.height * sy);
+        bool hover = rect.Contains(Event.current.mousePosition);
+        string state = hover ? (Input.GetMouseButton(0) ? "pressed" : "hover") : "normal";
+        Texture2D texture = HomeArt(keyPrefix + "_" + state);
+        if (texture == null)
+        {
+            texture = HomeArt(keyPrefix + "_normal");
+        }
+
+        if (texture != null)
+        {
+            GUI.DrawTexture(rect, texture, ScaleMode.StretchToFill, true);
+        }
+
+        return GUI.Button(rect, GUIContent.none, GUIStyle.none);
+    }
+
+    private Rect GetShellRect(float sourceWidth, float sourceHeight)
+    {
+        float scale = Mathf.Min(Screen.width / sourceWidth, Screen.height / sourceHeight);
+        return new Rect(
+            (Screen.width - sourceWidth * scale) * 0.5f,
+            (Screen.height - sourceHeight * scale) * 0.5f,
+            sourceWidth * scale,
+            sourceHeight * scale);
+    }
+
+    private Rect GetShellCoverRect(float sourceWidth, float sourceHeight)
+    {
+        float scale = Mathf.Max(Screen.width / sourceWidth, Screen.height / sourceHeight);
+        return new Rect(
+            (Screen.width - sourceWidth * scale) * 0.5f,
+            (Screen.height - sourceHeight * scale) * 0.5f,
+            sourceWidth * scale,
+            sourceHeight * scale);
+    }
+
+    private Rect DrawShellTexture(Texture2D texture, float sourceWidth, float sourceHeight)
+    {
+        DrawFill(new Rect(0f, 0f, Screen.width, Screen.height), Color.black);
+        Rect rect = GetShellRect(sourceWidth, sourceHeight);
+        GUI.DrawTexture(rect, texture, ScaleMode.StretchToFill, false);
+        return rect;
+    }
+
+    private Rect DrawShellTextureCover(Texture2D texture, float sourceWidth, float sourceHeight)
+    {
+        DrawFill(new Rect(0f, 0f, Screen.width, Screen.height), Color.black);
+        Rect rect = GetShellCoverRect(sourceWidth, sourceHeight);
+        GUI.DrawTexture(rect, texture, ScaleMode.StretchToFill, false);
+        return rect;
+    }
+
+    private bool DrawImageHotspot(Rect sourceRect, Rect imageRect, float sourceWidth, float sourceHeight)
+    {
+        Rect rect = new Rect(
+            imageRect.x + sourceRect.x / sourceWidth * imageRect.width,
+            imageRect.y + sourceRect.y / sourceHeight * imageRect.height,
+            sourceRect.width / sourceWidth * imageRect.width,
+            sourceRect.height / sourceHeight * imageRect.height);
+        return GUI.Button(rect, GUIContent.none, GUIStyle.none);
+    }
+
+    private void DrawFrame(Rect rect, Color color, float thickness)
+    {
+        DrawFill(new Rect(rect.x, rect.y, rect.width, thickness), color);
+        DrawFill(new Rect(rect.x, rect.yMax - thickness, rect.width, thickness), color);
+        DrawFill(new Rect(rect.x, rect.y, thickness, rect.height), color);
+        DrawFill(new Rect(rect.xMax - thickness, rect.y, thickness, rect.height), color);
+    }
+
+    private void DrawFill(Rect rect, Color color)
+    {
+        Color previous = GUI.color;
+        GUI.color = color;
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = previous;
+    }
+
+    private void DrawLabel(Rect rect, string text, int fontSize, Color color, TextAnchor anchor, FontStyle fontStyle, float scale)
+    {
+        GUIStyle style = new GUIStyle(GUI.skin.label);
+        style.alignment = anchor;
+        style.fontSize = Mathf.Max(8, Mathf.RoundToInt(fontSize * scale));
+        style.fontStyle = fontStyle;
+        style.normal.textColor = color;
+        style.wordWrap = text.Contains("\n");
+        GUI.Label(rect, text, style);
+    }
+
+    private Rect SRect(float x, float y, float width, float height, float scale, float ox, float oy)
+    {
+        return new Rect(ox + x * scale, oy + y * scale, width * scale, height * scale);
+    }
+
+    private float GetShellScale()
+    {
+        return Mathf.Min(Screen.width / 1365f, Screen.height / 768f);
+    }
+
+    private float GetShellOffsetX(float scale)
+    {
+        return (Screen.width - 1365f * scale) * 0.5f;
+    }
+
+    private float GetShellOffsetY(float scale)
+    {
+        return (Screen.height - 768f * scale) * 0.5f;
     }
 }
 
