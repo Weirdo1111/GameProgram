@@ -46,3 +46,9 @@ Desktop.ini
 *.aab
 *.unitypackage
 *.app
+
+# Local source packs used during art integration
+Assets/ExternalArt/
+Assets/ExternalDownloads/
+Assets/ExternalArt.meta
+Assets/ExternalDownloads.meta

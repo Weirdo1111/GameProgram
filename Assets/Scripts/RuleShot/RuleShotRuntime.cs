@@ -63,6 +63,8 @@ public sealed class RuleShotGameController : MonoBehaviour
     private Texture2D homeScreenTexture;
     private Texture2D storeScreenTexture;
     private readonly Dictionary<string, Texture2D> homeArt = new Dictionary<string, Texture2D>();
+    private readonly Dictionary<string, Texture2D> gameplayArt = new Dictionary<string, Texture2D>();
+    private readonly Dictionary<string, Sprite> gameplaySprites = new Dictionary<string, Sprite>();
     private ShellScreen shellScreen = ShellScreen.Home;
     private int coins = 1200;
     private int wardrobeTab = 0;
@@ -167,6 +169,13 @@ public sealed class RuleShotGameController : MonoBehaviour
         get { return pixelSprite; }
     }
 
+    public Sprite GetGameplaySprite(string key)
+    {
+        Sprite sprite;
+        gameplaySprites.TryGetValue(key, out sprite);
+        return sprite;
+    }
+
     public int CurrentZone
     {
         get { return currentZone; }
@@ -238,7 +247,9 @@ public sealed class RuleShotGameController : MonoBehaviour
 
     public void ShowFlash(Vector2 position, Color color, float size = 0.5f)
     {
-        GameObject flash = CreateVisualBox("Rule Flash", position, Vector2.one * size, color, 30);
+        string artKey = color.b > color.r + 0.12f ? "fx_freeze" : "fx_muzzle";
+        GameObject flash = CreateGameplaySpriteBox("Rule Flash", position, Vector2.one * size * 1.8f, artKey, new Color(color.r, color.g, color.b, 0.92f), 30);
+        CreateVisualChild(flash.transform, "Rule Flash Core", Vector2.zero, Vector2.one * size * 0.28f, Color.white, 31);
         flash.AddComponent<RuleAutoDestroy>().lifetime = 0.18f;
     }
 
@@ -293,7 +304,168 @@ public sealed class RuleShotGameController : MonoBehaviour
         GameObject box = CreateVisualBox(objectName, position, size, color, sortingOrder);
         BoxCollider2D collider = box.AddComponent<BoxCollider2D>();
         collider.size = Vector2.one;
+        if (ShouldDecorateSolidBox(objectName))
+        {
+            AddPlatformSkin(box, size, GetAccentColorForObject(objectName));
+        }
+
         return box;
+    }
+
+    private GameObject CreateGameplaySpriteBox(string objectName, Vector2 position, Vector2 size, string artKey, Color color, int sortingOrder)
+    {
+        GameObject box = new GameObject(objectName);
+        box.transform.SetParent(worldRoot.transform, false);
+        box.transform.position = position;
+
+        SpriteRenderer renderer = box.AddComponent<SpriteRenderer>();
+        renderer.sortingOrder = sortingOrder;
+        ApplyArtToRenderer(renderer, artKey, size, color);
+        return box;
+    }
+
+    private GameObject CreateVisualChild(Transform parent, string objectName, Vector2 localPosition, Vector2 size, Color color, int sortingOrder)
+    {
+        GameObject child = new GameObject(objectName);
+        child.transform.SetParent(parent, false);
+        child.transform.localPosition = localPosition;
+        child.transform.localScale = new Vector3(size.x, size.y, 1f);
+
+        SpriteRenderer renderer = child.AddComponent<SpriteRenderer>();
+        renderer.sprite = pixelSprite;
+        renderer.color = color;
+        renderer.sortingOrder = sortingOrder;
+        return child;
+    }
+
+    private GameObject CreateGameplayChild(Transform parent, string objectName, Vector2 localPosition, Vector2 size, string artKey, Color color, int sortingOrder)
+    {
+        GameObject child = new GameObject(objectName);
+        child.transform.SetParent(parent, false);
+        child.transform.localPosition = localPosition;
+
+        SpriteRenderer renderer = child.AddComponent<SpriteRenderer>();
+        renderer.sortingOrder = sortingOrder;
+        ApplyArtToRenderer(renderer, artKey, size, color);
+        return child;
+    }
+
+    private void ApplyArtToRenderer(SpriteRenderer renderer, string artKey, Vector2 size, Color color)
+    {
+        Sprite sprite = GetGameplaySprite(artKey);
+        if (sprite == null)
+        {
+            renderer.sprite = pixelSprite;
+            renderer.color = color;
+            renderer.transform.localScale = new Vector3(size.x, size.y, 1f);
+            return;
+        }
+
+        renderer.sprite = sprite;
+        renderer.color = color;
+        Vector2 spriteSize = sprite.bounds.size;
+        float sx = size.x / Mathf.Max(spriteSize.x, 0.01f);
+        float sy = size.y / Mathf.Max(spriteSize.y, 0.01f);
+        renderer.transform.localScale = new Vector3(sx, sy, 1f);
+    }
+
+    private bool ShouldDecorateSolidBox(string objectName)
+    {
+        return objectName.Contains("Walkway") ||
+            objectName.Contains("Platform") ||
+            objectName.Contains("Wall") ||
+            objectName.Contains("Ledge") ||
+            objectName.Contains("Floor");
+    }
+
+    private Color GetAccentColorForObject(string objectName)
+    {
+        if (objectName.Contains("Z1") || objectName.Contains("Heavy"))
+        {
+            return HeavyColor;
+        }
+
+        if (objectName.Contains("Z2") || objectName.Contains("Light") || objectName.Contains("Wind"))
+        {
+            return LightColor;
+        }
+
+        if (objectName.Contains("Z3") || objectName.Contains("Freeze"))
+        {
+            return FreezeColor;
+        }
+
+        if (objectName.Contains("Combo") || objectName.Contains("Z4"))
+        {
+            return new Color(1f, 0.8f, 0.18f);
+        }
+
+        if (objectName.Contains("Shaft") || objectName.Contains("Final") || objectName.Contains("Z5"))
+        {
+            return new Color(1f, 0.18f, 0.58f);
+        }
+
+        return new Color(0.22f, 0.86f, 0.96f);
+    }
+
+    private void AddPlatformSkin(GameObject target, Vector2 size, Color accent)
+    {
+        SpriteRenderer renderer = target.GetComponent<SpriteRenderer>();
+        if (renderer == null)
+        {
+            return;
+        }
+
+        int baseOrder = renderer.sortingOrder;
+        Color baseColor = renderer.color;
+        renderer.color = new Color(baseColor.r * 0.9f, baseColor.g * 0.95f, baseColor.b * 1.08f, 1f);
+
+        CreateGameplayChild(target.transform, "Panel Surface", Vector2.zero, new Vector2(size.x, Mathf.Max(size.y, 0.72f)), "platform_tile", Color.white, baseOrder + 1);
+
+        if (size.x >= size.y)
+        {
+            CreateVisualChild(target.transform, "Top Rail", new Vector2(0f, size.y * 0.42f), new Vector2(size.x * 0.94f, Mathf.Min(0.1f, size.y * 0.24f)), accent, baseOrder + 2);
+            CreateVisualChild(target.transform, "Bottom Shadow", new Vector2(0f, -size.y * 0.42f), new Vector2(size.x * 0.96f, Mathf.Min(0.14f, size.y * 0.32f)), new Color(0.01f, 0.02f, 0.05f, 0.75f), baseOrder + 1);
+
+            int lampCount = Mathf.Clamp(Mathf.RoundToInt(size.x / 2.4f), 1, 9);
+            for (int i = 0; i < lampCount; i++)
+            {
+                float t = lampCount == 1 ? 0.5f : i / (float)(lampCount - 1);
+                float x = Mathf.Lerp(-size.x * 0.38f, size.x * 0.38f, t);
+                CreateVisualChild(target.transform, "Signal Lamp", new Vector2(x, size.y * 0.16f), new Vector2(0.18f, 0.06f), new Color(accent.r, accent.g, accent.b, 0.92f), baseOrder + 3);
+            }
+        }
+        else
+        {
+            CreateVisualChild(target.transform, "Wall Rail", new Vector2(0f, 0f), new Vector2(Mathf.Min(size.x * 0.34f, 0.16f), size.y * 0.92f), accent, baseOrder + 2);
+        }
+    }
+
+    private void BuildBackdropPanels(string artKey, float startX, int count, float step, Vector2 size, float baseY, int sortingOrder, Color tint)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            float x = startX + i * step;
+            float y = baseY + Mathf.Sin(i * 0.65f) * 0.35f;
+            CreateGameplaySpriteBox("Backdrop " + artKey, new Vector2(x, y), size, artKey, tint, sortingOrder);
+        }
+    }
+
+    private void BuildCharacterRig(GameObject actor, Color armorColor, Color visorColor, Color accentColor, int sortingBase, bool shielded)
+    {
+        CreateVisualChild(actor.transform, "Torso Plate", new Vector2(0f, -0.02f), new Vector2(0.62f, 0.78f), armorColor, sortingBase + 1);
+        CreateVisualChild(actor.transform, "Chest Core", new Vector2(0f, 0.03f), new Vector2(0.28f, 0.18f), accentColor, sortingBase + 3);
+        CreateVisualChild(actor.transform, "Helmet", new Vector2(0f, 0.34f), new Vector2(0.46f, 0.34f), armorColor * 1.08f, sortingBase + 2);
+        CreateVisualChild(actor.transform, "Visor", new Vector2(0f, 0.31f), new Vector2(0.34f, 0.12f), visorColor, sortingBase + 4);
+        CreateVisualChild(actor.transform, "Leg Left", new Vector2(-0.14f, -0.42f), new Vector2(0.18f, 0.42f), armorColor * 0.9f, sortingBase + 1);
+        CreateVisualChild(actor.transform, "Leg Right", new Vector2(0.14f, -0.42f), new Vector2(0.18f, 0.42f), armorColor * 0.9f, sortingBase + 1);
+        CreateVisualChild(actor.transform, "Arm Left", new Vector2(-0.31f, 0.02f), new Vector2(0.14f, 0.5f), armorColor * 0.92f, sortingBase + 1);
+        CreateVisualChild(actor.transform, "Arm Right", new Vector2(0.31f, 0.02f), new Vector2(0.14f, 0.5f), armorColor * 0.92f, sortingBase + 1);
+        CreateVisualChild(actor.transform, "Boot Glow", new Vector2(0f, -0.56f), new Vector2(0.42f, 0.05f), new Color(accentColor.r, accentColor.g, accentColor.b, 0.82f), sortingBase + 3);
+        if (shielded)
+        {
+            CreateVisualChild(actor.transform, "Shield Ring", new Vector2(0f, 0.04f), new Vector2(0.96f, 1.22f), new Color(1f, 0.82f, 0.22f, 0.32f), sortingBase);
+        }
     }
 
     private void ConfigureScene()
@@ -474,22 +646,41 @@ public sealed class RuleShotGameController : MonoBehaviour
     private void BuildBackground()
     {
         CreateVisualBox("Back Sky Band", new Vector2(54f, 6f), new Vector2(190f, 32f), new Color(0.035f, 0.04f, 0.075f), -50);
+        CreateVisualBox("Sky Bloom", new Vector2(54f, 10.5f), new Vector2(190f, 12f), new Color(0.06f, 0.1f, 0.18f, 0.4f), -49);
         CreateVisualBox("Far Neon Grid", new Vector2(54f, -2.8f), new Vector2(190f, 0.12f), new Color(0.05f, 0.32f, 0.45f), -45);
 
-        for (int i = 0; i < 26; i++)
+        if (GetGameplaySprite("bg_lab_back") != null)
         {
-            float x = -28f + i * 7.2f;
-            float height = 5f + (i % 5) * 1.4f;
-            Color color = i % 2 == 0 ? new Color(0.055f, 0.065f, 0.1f) : new Color(0.075f, 0.055f, 0.11f);
-            CreateVisualBox("Distant Building", new Vector2(x, height * 0.5f - 2f), new Vector2(4.2f, height), color, -42);
-            Color signColor = i % 3 == 0 ? HeavyColor : (i % 3 == 1 ? LightColor : FreezeColor);
-            CreateVisualBox("Neon Sign", new Vector2(x, height - 1f), new Vector2(2.5f, 0.18f), signColor * 0.85f, -41);
+            BuildBackdropPanels("bg_lab_back", -18f, 12, 15.6f, new Vector2(19f, 10f), 4.8f, -48, new Color(0.4f, 0.78f, 0.96f, 0.24f));
+            BuildBackdropPanels("bg_lab_middle", -14f, 11, 17.2f, new Vector2(21f, 12f), 2.8f, -43, new Color(0.36f, 0.94f, 1f, 0.34f));
+            BuildBackdropPanels("bg_lab_front", -10f, 10, 18.8f, new Vector2(17f, 8f), -0.25f, -37, new Color(0.7f, 0.92f, 1f, 0.24f));
+        }
+        else
+        {
+            for (int i = 0; i < 26; i++)
+            {
+                float x = -28f + i * 7.2f;
+                float height = 5f + (i % 5) * 1.4f;
+                Color color = i % 2 == 0 ? new Color(0.055f, 0.065f, 0.1f) : new Color(0.075f, 0.055f, 0.11f);
+                CreateVisualBox("Distant Building", new Vector2(x, height * 0.5f - 2f), new Vector2(4.2f, height), color, -42);
+                Color signColor = i % 3 == 0 ? HeavyColor : (i % 3 == 1 ? LightColor : FreezeColor);
+                CreateVisualBox("Neon Sign", new Vector2(x, height - 1f), new Vector2(2.5f, 0.18f), signColor * 0.85f, -41);
+            }
         }
 
         for (int i = 0; i < 12; i++)
         {
             float x = -22f + i * 14f;
             CreateVisualBox("Foreground Cable", new Vector2(x, 9.8f + Mathf.Sin(i) * 1.2f), new Vector2(10f, 0.08f), new Color(0.1f, 0.65f, 0.8f, 0.7f), -35);
+        }
+
+        for (int i = 0; i < 18; i++)
+        {
+            float x = -23f + i * 9.6f;
+            float width = 2.1f + (i % 3) * 0.45f;
+            float height = 2.4f + (i % 4) * 1.05f;
+            CreateVisualBox("Foreground Tower", new Vector2(x, height * 0.5f - 0.85f), new Vector2(width, height), new Color(0.02f, 0.045f, 0.08f, 0.76f), -34);
+            CreateVisualBox("Tower Glow", new Vector2(x, height - 0.65f), new Vector2(width * 0.7f, 0.08f), i % 2 == 0 ? FreezeColor : LightColor, -33);
         }
     }
 
@@ -571,12 +762,14 @@ public sealed class RuleShotGameController : MonoBehaviour
 
     private void BuildPlayer()
     {
-        GameObject playerObject = CreateVisualBox("Rule Hunter", GetZoneStart(firstZone), new Vector2(0.72f, 1.16f), new Color(0.88f, 0.94f, 1f), 12);
+        GameObject playerObject = CreateVisualBox("Rule Hunter", GetZoneStart(firstZone), new Vector2(0.72f, 1.16f), new Color(0.13f, 0.17f, 0.22f), 12);
         playerObject.AddComponent<BoxCollider2D>();
         Rigidbody2D body = playerObject.AddComponent<Rigidbody2D>();
         body.freezeRotation = true;
         body.gravityScale = 3.3f;
         body.mass = 1f;
+
+        BuildCharacterRig(playerObject, new Color(0.34f, 0.42f, 0.5f), new Color(0.14f, 0.88f, 1f), new Color(1f, 0.48f, 0.2f), 12, false);
 
         player = playerObject.AddComponent<RuleShotPlayerController>();
         player.game = this;
@@ -606,7 +799,9 @@ public sealed class RuleShotGameController : MonoBehaviour
 
     private RuleAffectable CreateRuleBox(string objectName, Vector2 position)
     {
-        GameObject box = CreateSolidBox(objectName, position, new Vector2(1.35f, 1.35f), new Color(0.52f, 0.62f, 0.7f), 8);
+        GameObject box = CreateGameplaySpriteBox(objectName, position, new Vector2(1.35f, 1.35f), "crate_box", Color.white, 8);
+        BoxCollider2D collider = box.AddComponent<BoxCollider2D>();
+        collider.size = Vector2.one;
         Rigidbody2D body = box.AddComponent<Rigidbody2D>();
         body.freezeRotation = true;
         body.gravityScale = 2.5f;
@@ -621,6 +816,8 @@ public sealed class RuleShotGameController : MonoBehaviour
     private void CreateFragileFloor(string objectName, Vector2 position, Vector2 size)
     {
         GameObject floor = CreateSolidBox(objectName, position, size, new Color(0.38f, 0.23f, 0.28f), 4);
+        CreateVisualChild(floor.transform, "Fragile Crack A", new Vector2(-size.x * 0.18f, 0f), new Vector2(size.x * 0.24f, 0.05f), new Color(1f, 0.72f, 0.78f, 0.92f), 7);
+        CreateVisualChild(floor.transform, "Fragile Crack B", new Vector2(size.x * 0.14f, 0.02f), new Vector2(size.x * 0.3f, 0.05f), new Color(0.7f, 0.86f, 1f, 0.88f), 7);
         RuleAffectable affectable = floor.AddComponent<RuleAffectable>();
         affectable.game = this;
         affectable.kind = RuleAffectableKind.FragileFloor;
@@ -628,22 +825,32 @@ public sealed class RuleShotGameController : MonoBehaviour
 
     private RuleDoor CreateDoor(string objectName, Vector2 position, Vector2 size)
     {
-        GameObject doorObject = CreateSolidBox(objectName, position, size, new Color(0.8f, 0.14f, 0.2f), 6);
+        GameObject doorObject = CreateGameplaySpriteBox(objectName, position, new Vector2(1.6f, size.y + 0.7f), "door_locked", Color.white, 6);
+        BoxCollider2D collider = doorObject.AddComponent<BoxCollider2D>();
+        collider.size = new Vector2(size.x, size.y);
         RuleDoor door = doorObject.AddComponent<RuleDoor>();
         door.closedPosition = position;
         door.openOffset = Vector2.up * (size.y + 0.6f);
+        door.closedSprite = GetGameplaySprite("door_locked");
+        door.openSprite = GetGameplaySprite("door_open");
+        CreateVisualChild(doorObject.transform, "Door Glow", new Vector2(0f, size.y * 0.36f), new Vector2(0.58f, 0.14f), DangerColor, 7);
         return door;
     }
 
     private RulePressurePlate CreatePressurePlate(string objectName, Vector2 position, RuleDoor door, float requiredMass)
     {
-        GameObject plateObject = CreateVisualBox(objectName, position, new Vector2(2.5f, 0.22f), HeavyColor, 7);
+        GameObject plateObject = CreateVisualBox(objectName, position, new Vector2(2.5f, 0.22f), new Color(0.17f, 0.2f, 0.24f), 7);
         BoxCollider2D collider = plateObject.AddComponent<BoxCollider2D>();
         collider.isTrigger = true;
+        CreateVisualChild(plateObject.transform, "Plate Rail", Vector2.zero, new Vector2(2.3f, 0.1f), HeavyColor, 8);
+        GameObject indicator = CreateGameplayChild(plateObject.transform, "Indicator Sprite", new Vector2(0f, 1.06f), new Vector2(0.82f, 1.06f), "switch_off", Color.white, 8);
         RulePressurePlate plate = plateObject.AddComponent<RulePressurePlate>();
         plate.game = this;
         plate.targetDoor = door;
         plate.requiredMass = requiredMass;
+        plate.closedIndicator = GetGameplaySprite("switch_off");
+        plate.openIndicator = GetGameplaySprite("switch_on");
+        plate.indicatorRenderer = indicator.GetComponent<SpriteRenderer>();
         return plate;
     }
 
@@ -652,6 +859,8 @@ public sealed class RuleShotGameController : MonoBehaviour
         GameObject wind = CreateVisualBox(objectName, position, size, new Color(0.08f, 0.9f, 0.65f, 0.28f), 2);
         BoxCollider2D collider = wind.AddComponent<BoxCollider2D>();
         collider.isTrigger = true;
+        CreateGameplayChild(wind.transform, "Wind Burst", new Vector2(0f, 0.18f), new Vector2(size.x * 0.82f, size.y * 0.84f), "fx_smoke", new Color(0.62f, 1f, 0.92f, 0.22f), 3);
+        CreateGameplayChild(wind.transform, "Wind Spark", new Vector2(0f, 0.62f), new Vector2(size.x * 0.48f, size.y * 0.42f), "fx_freeze", new Color(0.44f, 1f, 0.86f, 0.16f), 4);
         RuleWindZone windZone = wind.AddComponent<RuleWindZone>();
         windZone.force = 46f;
         windZone.game = this;
@@ -660,6 +869,7 @@ public sealed class RuleShotGameController : MonoBehaviour
     private void CreateMovingPlatform(string objectName, Vector2 start, Vector2 end, Vector2 size, float speed)
     {
         GameObject platform = CreateSolidBox(objectName, start, size, new Color(0.18f, 0.26f, 0.32f), 5);
+        CreateVisualChild(platform.transform, "Mover Rail", new Vector2(0f, 0f), new Vector2(size.x * 0.22f, size.y * 0.86f), FreezeColor, 8);
         RuleMovingPlatform mover = platform.AddComponent<RuleMovingPlatform>();
         mover.start = start;
         mover.end = end;
@@ -673,19 +883,32 @@ public sealed class RuleShotGameController : MonoBehaviour
 
     private void CreateHazard(string objectName, Vector2 position, Vector2 size, bool freezeable)
     {
-        GameObject hazard = CreateVisualBox(objectName, position, size, DangerColor, 9);
+        bool isSaw = objectName.Contains("Saw");
+        GameObject hazard = isSaw
+            ? CreateGameplaySpriteBox(objectName, position, size * 1.38f, "hazard_saw", Color.white, 9)
+            : CreateVisualBox(objectName, position, size, DangerColor, 9);
         BoxCollider2D collider = hazard.AddComponent<BoxCollider2D>();
         collider.isTrigger = true;
+        if (!isSaw)
+        {
+            CreateVisualChild(hazard.transform, "Laser Core", Vector2.zero, new Vector2(size.x * 0.45f, size.y * 0.94f), new Color(1f, 0.85f, 0.92f, 0.92f), 10);
+            CreateVisualChild(hazard.transform, "Laser Glow", Vector2.zero, new Vector2(size.x * 1.8f, size.y), new Color(1f, 0.18f, 0.3f, 0.24f), 8);
+        }
+
         RuleHazard hazardController = hazard.AddComponent<RuleHazard>();
         hazardController.game = this;
         hazardController.freezeable = freezeable;
+        hazardController.spinVisual = isSaw;
     }
 
     private void CreateEnemy(string objectName, RuleEnemyKind kind, Vector2 position, float leftBound, float rightBound)
     {
-        GameObject enemy = CreateVisualBox(objectName, position, new Vector2(0.9f, 1.25f), new Color(0.9f, 0.92f, 0.96f), 11);
+        Color armor = kind == RuleEnemyKind.ShieldExecutor ? new Color(0.42f, 0.34f, 0.18f) : new Color(0.24f, 0.3f, 0.36f);
+        Color accent = kind == RuleEnemyKind.ShieldExecutor ? new Color(1f, 0.82f, 0.24f) : FreezeColor;
+        GameObject enemy = CreateVisualBox(objectName, position, new Vector2(0.9f, 1.25f), new Color(0.1f, 0.12f, 0.16f), 11);
         BoxCollider2D collider = enemy.AddComponent<BoxCollider2D>();
         collider.isTrigger = true;
+        BuildCharacterRig(enemy, armor, new Color(0.92f, 0.98f, 1f), accent, 11, kind == RuleEnemyKind.ShieldExecutor);
 
         RuleEnemy enemyController = enemy.AddComponent<RuleEnemy>();
         enemyController.game = this;
@@ -696,16 +919,18 @@ public sealed class RuleShotGameController : MonoBehaviour
 
     private void CreateFinish(Vector2 position)
     {
-        GameObject finish = CreateVisualBox("Finish Gate", position, new Vector2(2.2f, 3f), new Color(1f, 0.85f, 0.18f), 10);
+        GameObject finish = CreateGameplaySpriteBox("Finish Gate", position, new Vector2(2.8f, 3.8f), "door_open", new Color(1f, 0.94f, 0.72f), 10);
         BoxCollider2D collider = finish.AddComponent<BoxCollider2D>();
         collider.isTrigger = true;
+        CreateGameplayChild(finish.transform, "Finish Halo", new Vector2(0f, 0f), new Vector2(2.6f, 3.1f), "fx_freeze", new Color(1f, 0.82f, 0.26f, 0.36f), 11);
         RuleFinishGate gate = finish.AddComponent<RuleFinishGate>();
         gate.game = this;
     }
 
     private void CreateLabelBar(string objectName, Vector2 position, Color color)
     {
-        CreateVisualBox(objectName, position, new Vector2(8f, 0.16f), color, 3);
+        GameObject bar = CreateVisualBox(objectName, position, new Vector2(8f, 0.16f), color, 3);
+        CreateVisualChild(bar.transform, "Label Glow", Vector2.zero, new Vector2(8.4f, 0.32f), new Color(color.r, color.g, color.b, 0.18f), 2);
     }
 
     private Sprite BuildPixelSprite()
@@ -755,6 +980,42 @@ public sealed class RuleShotGameController : MonoBehaviour
                 homeArt[dynamicHomeAssets[i]] = texture;
             }
         }
+
+        string[] dynamicGameplayAssets =
+        {
+            "bg_lab_back",
+            "bg_lab_middle",
+            "bg_lab_front",
+            "crate_box",
+            "door_locked",
+            "door_open",
+            "hazard_saw",
+            "switch_on",
+            "switch_off",
+            "platform_tile",
+            "fx_muzzle",
+            "fx_freeze",
+            "fx_smoke"
+        };
+
+        gameplayArt.Clear();
+        gameplaySprites.Clear();
+        for (int i = 0; i < dynamicGameplayAssets.Length; i++)
+        {
+            Texture2D texture = Resources.Load<Texture2D>("Gameplay/" + dynamicGameplayAssets[i]);
+            if (texture != null)
+            {
+                gameplayArt[dynamicGameplayAssets[i]] = texture;
+                gameplaySprites[dynamicGameplayAssets[i]] = BuildRuntimeSprite(texture, dynamicGameplayAssets[i]);
+            }
+        }
+    }
+
+    private Sprite BuildRuntimeSprite(Texture2D texture, string spriteName)
+    {
+        Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), 100f, 0u, SpriteMeshType.FullRect);
+        sprite.name = spriteName;
+        return sprite;
     }
 
     private void OnGUI()
@@ -2215,6 +2476,9 @@ public sealed class RulePressurePlate : MonoBehaviour
     public RuleDoor targetDoor;
     public float requiredMass = 4.5f;
     public string requiredHint;
+    public SpriteRenderer indicatorRenderer;
+    public Sprite closedIndicator;
+    public Sprite openIndicator;
 
     private readonly List<Rigidbody2D> bodies = new List<Rigidbody2D>();
     private SpriteRenderer spriteRenderer;
@@ -2251,6 +2515,12 @@ public sealed class RulePressurePlate : MonoBehaviour
         {
             spriteRenderer.color = open ? new Color(1f, 0.78f, 0.18f) : game.HeavyColor;
         }
+
+        if (indicatorRenderer != null)
+        {
+            indicatorRenderer.sprite = open && openIndicator != null ? openIndicator : closedIndicator;
+            indicatorRenderer.color = open ? Color.white : new Color(1f, 1f, 1f, 0.96f);
+        }
     }
 
     private void OnTriggerEnter2D(Collider2D other)
@@ -2282,6 +2552,8 @@ public sealed class RuleDoor : MonoBehaviour
 {
     public Vector2 closedPosition;
     public Vector2 openOffset;
+    public Sprite closedSprite;
+    public Sprite openSprite;
 
     private Collider2D doorCollider;
     private SpriteRenderer spriteRenderer;
@@ -2302,6 +2574,11 @@ public sealed class RuleDoor : MonoBehaviour
 
         if (spriteRenderer != null)
         {
+            if (closedSprite != null && openSprite != null)
+            {
+                spriteRenderer.sprite = open ? openSprite : closedSprite;
+            }
+
             spriteRenderer.color = open ? new Color(0.2f, 0.55f, 0.38f, 0.45f) : new Color(0.8f, 0.14f, 0.2f);
         }
     }
@@ -2312,21 +2589,27 @@ public sealed class RuleWindZone : MonoBehaviour
     public RuleShotGameController game;
     public float force = 42f;
 
-    private SpriteRenderer spriteRenderer;
+    private SpriteRenderer[] spriteRenderers;
     private float pulse;
 
     private void Awake()
     {
-        spriteRenderer = GetComponent<SpriteRenderer>();
+        spriteRenderers = GetComponentsInChildren<SpriteRenderer>();
     }
 
     private void Update()
     {
         pulse += Time.deltaTime * 5f;
-        if (spriteRenderer != null)
+        for (int i = 0; i < spriteRenderers.Length; i++)
         {
-            float alpha = 0.18f + Mathf.Sin(pulse) * 0.06f;
-            spriteRenderer.color = new Color(0.08f, 0.9f, 0.65f, alpha);
+            if (spriteRenderers[i] == null)
+            {
+                continue;
+            }
+
+            Color baseColor = spriteRenderers[i].color;
+            float alpha = 0.14f + Mathf.Sin(pulse + i * 0.45f) * 0.08f;
+            spriteRenderers[i].color = new Color(baseColor.r, baseColor.g, baseColor.b, Mathf.Clamp01(alpha));
         }
     }
 
@@ -2384,16 +2667,17 @@ public sealed class RuleHazard : MonoBehaviour
 {
     public RuleShotGameController game;
     public bool freezeable = true;
+    public bool spinVisual = true;
 
     private Collider2D hazardCollider;
-    private SpriteRenderer spriteRenderer;
+    private SpriteRenderer[] spriteRenderers;
     private float freezeTimer;
     private float spin;
 
     private void Awake()
     {
         hazardCollider = GetComponent<Collider2D>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
+        spriteRenderers = GetComponentsInChildren<SpriteRenderer>();
     }
 
     private void Update()
@@ -2408,8 +2692,11 @@ public sealed class RuleHazard : MonoBehaviour
             return;
         }
 
-        spin += Time.deltaTime * 140f;
-        transform.rotation = Quaternion.Euler(0f, 0f, spin);
+        if (spinVisual)
+        {
+            spin += Time.deltaTime * 140f;
+            transform.rotation = Quaternion.Euler(0f, 0f, spin);
+        }
     }
 
     public void ApplyRule(RuleShotType shotType)
@@ -2433,9 +2720,17 @@ public sealed class RuleHazard : MonoBehaviour
             hazardCollider.enabled = active;
         }
 
-        if (spriteRenderer != null)
+        for (int i = 0; i < spriteRenderers.Length; i++)
         {
-            spriteRenderer.color = active ? game.DangerColor : game.FreezeColor;
+            if (spriteRenderers[i] == null)
+            {
+                continue;
+            }
+
+            Color tint = active ? game.DangerColor : game.FreezeColor;
+            Color source = spriteRenderers[i].color;
+            float alpha = source.a <= 0f ? 1f : source.a;
+            spriteRenderers[i].color = new Color(tint.r, tint.g, tint.b, alpha);
         }
     }
 
@@ -2461,7 +2756,7 @@ public sealed class RuleEnemy : MonoBehaviour
     public float rightBound;
     public float moveSpeed = 2.2f;
 
-    private SpriteRenderer spriteRenderer;
+    private SpriteRenderer[] spriteRenderers;
     private Collider2D enemyCollider;
     private int direction = 1;
     private float frozenTimer;
@@ -2470,7 +2765,7 @@ public sealed class RuleEnemy : MonoBehaviour
 
     private void Awake()
     {
-        spriteRenderer = GetComponent<SpriteRenderer>();
+        spriteRenderers = GetComponentsInChildren<SpriteRenderer>();
         enemyCollider = GetComponent<Collider2D>();
     }
 
@@ -2567,9 +2862,12 @@ public sealed class RuleEnemy : MonoBehaviour
 
     private void SetColor(Color color)
     {
-        if (spriteRenderer != null)
+        for (int i = 0; i < spriteRenderers.Length; i++)
         {
-            spriteRenderer.color = color;
+            if (spriteRenderers[i] != null)
+            {
+                spriteRenderers[i].color = color;
+            }
         }
     }
 
