@@ -54,6 +54,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Transform poolRoot;
     private Camera mainCamera;
     private Sprite playerSprite;
+    private Sprite[] survivorSprites;
     private Sprite zombieSprite;
     private Sprite fastZombieSprite;
     private Sprite tankZombieSprite;
@@ -452,6 +453,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
         player = playerObject.AddComponent<ZombieStormPlayer>();
         player.Initialize(this);
 
+        ZombieStormSurvivorAnimator survivorAnimator = playerObject.AddComponent<ZombieStormSurvivorAnimator>();
+        survivorAnimator.Initialize(this, playerRenderer, survivorSprites);
+
         weapons = playerObject.AddComponent<ZombieStormWeaponManager>();
         weapons.Initialize(this, player);
         weapons.UnlockWeapon(ZombieStormWeaponType.Pistol);
@@ -518,6 +522,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
         mineSprite = CreatePixelSprite(new Color(0.22f, 0.22f, 0.25f), 12, true, new Color(1f, 0.18f, 0.08f));
         tileSprite = CreatePixelSprite(Color.white, 8, false, Color.white);
         ruinSprite = CreatePixelSprite(Color.white, 12, false, new Color(0.06f, 0.06f, 0.08f));
+
+        survivorSprites = LoadSurvivorSprites();
+        if (survivorSprites.Length > 0)
+        {
+            playerSprite = survivorSprites[0];
+        }
     }
 
     private void UpdateDynamicDifficulty()
@@ -912,6 +922,24 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
     }
 
+    private Sprite[] LoadSurvivorSprites()
+    {
+        Texture2D[] textures = Resources.LoadAll<Texture2D>("ZombieStorm/SurvivorFrames");
+        Array.Sort(textures, (a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
+
+        Sprite[] sprites = new Sprite[textures.Length];
+        for (int i = 0; i < textures.Length; i++)
+        {
+            Texture2D texture = textures[i];
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            Rect rect = new Rect(0f, 0f, texture.width, texture.height);
+            sprites[i] = Sprite.Create(texture, rect, new Vector2(0.5f, 0.5f), 300f);
+        }
+
+        return sprites;
+    }
+
     private string FormatTime(int seconds)
     {
         return (seconds / 60).ToString("00") + ":" + (seconds % 60).ToString("00");
@@ -934,6 +962,91 @@ public sealed class ZombieStormUpgradeOption
     public static ZombieStormUpgradeOption ForPassive(string title, string description, ZombieStormPassiveType passive)
     {
         return new ZombieStormUpgradeOption { Title = title, Description = description, IsWeapon = false, Passive = passive };
+    }
+}
+
+public sealed class ZombieStormSurvivorAnimator : MonoBehaviour
+{
+    private ZombieStormGameController game;
+    private SpriteRenderer spriteRenderer;
+    private Sprite[] frames;
+    private int currentFrame;
+    private int sequenceStart;
+    private int sequenceEnd;
+    private float frameTimer;
+    private float frameRate = 10f;
+
+    public void Initialize(ZombieStormGameController owner, SpriteRenderer renderer, Sprite[] survivorFrames)
+    {
+        game = owner;
+        spriteRenderer = renderer;
+        frames = survivorFrames ?? new Sprite[0];
+        SetSequence(0, 15, 8f);
+    }
+
+    private void Update()
+    {
+        if (frames == null || frames.Length == 0 || spriteRenderer == null)
+        {
+            return;
+        }
+
+        Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+        ZombieStormEnemy target = game != null ? game.FindNearestEnemy(transform.position, 12f) : null;
+        bool attacking = target != null;
+        bool moving = input.sqrMagnitude > 0.05f;
+
+        if (target != null)
+        {
+            spriteRenderer.flipX = target.transform.position.x < transform.position.x;
+        }
+        else if (Mathf.Abs(input.x) > 0.05f)
+        {
+            spriteRenderer.flipX = input.x < 0f;
+        }
+
+        if (attacking)
+        {
+            SetSequence(80, 120, 18f);
+        }
+        else if (moving)
+        {
+            SetSequence(64, 80, 10f);
+        }
+        else
+        {
+            SetSequence(0, 15, 7f);
+        }
+
+        frameTimer += Time.deltaTime;
+        float frameDuration = 1f / frameRate;
+        while (frameTimer >= frameDuration)
+        {
+            frameTimer -= frameDuration;
+            currentFrame++;
+            if (currentFrame > sequenceEnd)
+            {
+                currentFrame = sequenceStart;
+            }
+        }
+
+        spriteRenderer.sprite = frames[Mathf.Clamp(currentFrame, 0, frames.Length - 1)];
+    }
+
+    private void SetSequence(int start, int end, float fps)
+    {
+        start = Mathf.Clamp(start, 0, Mathf.Max(0, frames.Length - 1));
+        end = Mathf.Clamp(end, start, Mathf.Max(0, frames.Length - 1));
+        if (sequenceStart == start && sequenceEnd == end)
+        {
+            return;
+        }
+
+        sequenceStart = start;
+        sequenceEnd = end;
+        currentFrame = sequenceStart;
+        frameTimer = 0f;
+        frameRate = Mathf.Max(1f, fps);
     }
 }
 

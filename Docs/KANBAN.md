@@ -19,11 +19,13 @@
 ## In Progress
 
 - Playtest tuning based on first hands-on run.
+- Player art direction polish using the supplied survivor shooting frames.
 
 ## Review
 
 - Playtest tuning: first upgrade should land within 10-20 seconds.
 - Balance pass for enemy spawn density, boss timing, and XP pacing.
+- Check survivor animation scale, pivot stability, and readability inside a real Unity Play session.
 
 ## Done
 
@@ -34,3 +36,4 @@
 - Core roguelite loop with level-up three-choice UI.
 - Compile validation with `dotnet build Assembly-CSharp.csproj`.
 - GitHub branch, commit, push, and draft PR publication.
+- First pass player replacement with imported survivor shooting animation frames.
