@@ -18,7 +18,7 @@
 
 ## In Progress
 
-- GitHub branch, commit, push, and draft PR publication.
+- Playtest tuning based on first hands-on run.
 
 ## Review
 
@@ -33,3 +33,4 @@
 - Procedural pixel-style city arena and neon effects.
 - Core roguelite loop with level-up three-choice UI.
 - Compile validation with `dotnet build Assembly-CSharp.csproj`.
+- GitHub branch, commit, push, and draft PR publication.
