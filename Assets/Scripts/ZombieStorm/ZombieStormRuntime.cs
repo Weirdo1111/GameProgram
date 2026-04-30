@@ -3,14 +3,16 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-public enum ZombieStormWeaponType
+public enum ZombieStormSkillType
 {
-    Pistol,
-    Shotgun,
-    Molotov,
-    SawRing,
-    Lightning,
-    Mine
+    MagicBolt,
+    OrbitingKnife,
+    MeteorStorm,
+    FireZone,
+    SummonDrone,
+    ChainLightning,
+    ShieldBurst,
+    UltimateStorm
 }
 
 public enum ZombieStormEnemyType
@@ -48,7 +50,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     public int targetFrameRate = 120;
 
     public ZombieStormPlayer Player { get; private set; }
-    public ZombieStormWeaponManager Weapons { get; private set; }
+    public ZombieStormSkillManager Skills { get; private set; }
     public IReadOnlyList<ZombieStormEnemy> Enemies { get { return enemies; } }
 
     private readonly List<ZombieStormEnemy> enemies = new List<ZombieStormEnemy>(256);
@@ -100,11 +102,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private float cameraShakeTime;
     private float cameraShakePower;
     private float screenFlash;
+    private Color screenFlashColor = new Color(1f, 0.08f, 0.04f);
     private bool leveling;
     private bool finished;
     private bool won;
     private int bossCount;
-    private string feedbackText = "WASD move. Weapons fire automatically.";
+    private string feedbackText = "WASD move. Skills cast automatically. Press F for ultimate.";
 
     public float DamageMultiplier { get { return 1f + GetPassiveLevel(ZombieStormPassiveType.Damage) * 0.18f; } }
     public float CooldownMultiplier { get { return Mathf.Max(0.35f, 1f - GetPassiveLevel(ZombieStormPassiveType.FireRate) * 0.08f); } }
@@ -189,7 +192,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.Label(new Rect(24f, 18f, 760f, 28f), Title + " / Zombie Storm");
         GUI.skin.label.fontSize = 14;
         GUI.color = new Color(0.78f, 0.86f, 0.92f, 1f);
-        GUI.Label(new Rect(24f, 45f, 420f, 24f), "WASD move | Auto fire | 1/2/3 upgrade | Enter restart");
+        GUI.Label(new Rect(24f, 45f, 420f, 24f), "WASD move | Auto skills | F ultimate | 1/2/3 upgrade | Enter restart");
         GUI.color = Color.white;
         GUI.skin.label.fontSize = 18;
 
@@ -208,11 +211,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.Label(new Rect(Screen.width - 206f, 18f, 190f, 32f), "Survive " + FormatTime(remain));
         GUI.skin.label.fontSize = 18;
 
-        if (Weapons != null)
+        if (Skills != null)
         {
             DrawPanel(new Rect(Screen.width - 286f, 70f, 268f, 150f), new Color(0.035f, 0.045f, 0.055f, 0.74f), new Color(0.9f, 0.28f, 0.2f, 0.24f));
             GUI.skin.label.fontSize = 15;
-            GUI.Label(new Rect(Screen.width - 268f, 84f, 244f, 124f), Weapons.GetLoadoutText());
+            GUI.Label(new Rect(Screen.width - 268f, 84f, 244f, 124f), Skills.GetLoadoutText());
             GUI.skin.label.fontSize = 18;
         }
 
@@ -427,6 +430,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     public void FlashScreen(float amount)
     {
+        screenFlashColor = new Color(1f, 0.08f, 0.04f);
+        screenFlash = Mathf.Max(screenFlash, amount);
+    }
+
+    public void FlashScreen(Color color, float amount)
+    {
+        screenFlashColor = color;
         screenFlash = Mathf.Max(screenFlash, amount);
     }
 
@@ -507,19 +517,19 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ShowFeedback(message, 999f);
     }
 
-    public Sprite GetWeaponSprite(ZombieStormWeaponType weaponType)
+    public Sprite GetSkillSprite(ZombieStormSkillType skillType)
     {
-        if (weaponType == ZombieStormWeaponType.SawRing)
+        if (skillType == ZombieStormSkillType.OrbitingKnife)
         {
             return sawSprite;
         }
 
-        if (weaponType == ZombieStormWeaponType.Mine)
+        if (skillType == ZombieStormSkillType.SummonDrone || skillType == ZombieStormSkillType.ShieldBurst)
         {
             return mineSprite;
         }
 
-        if (weaponType == ZombieStormWeaponType.Molotov)
+        if (skillType == ZombieStormSkillType.FireZone || skillType == ZombieStormSkillType.MeteorStorm)
         {
             return fireSprite;
         }
@@ -571,6 +581,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return new Vector2(value.x * cos - value.y * sin, value.x * sin + value.y * cos);
     }
 
+    public static Color WithAlpha(Color color, float alpha)
+    {
+        return new Color(color.r, color.g, color.b, alpha);
+    }
+
     private void StartRun()
     {
         runTime = 0f;
@@ -593,19 +608,19 @@ public sealed class ZombieStormGameController : MonoBehaviour
         SpriteRenderer playerRenderer = playerObject.AddComponent<SpriteRenderer>();
         playerRenderer.sprite = playerSprite;
         playerRenderer.sortingOrder = 30;
-        AddShadow(playerObject.transform, new Vector3(1.55f, 0.52f, 1f), -0.18f, 18);
+        AddShadow(playerObject.transform, new Vector3(2.05f, 0.68f, 1f), -0.2f, 18);
         Rigidbody2D body = playerObject.AddComponent<Rigidbody2D>();
         body.gravityScale = 0f;
         body.freezeRotation = true;
         Player = playerObject.AddComponent<ZombieStormPlayer>();
         Player.Initialize(this, playerRenderer);
 
-        Weapons = playerObject.AddComponent<ZombieStormWeaponManager>();
-        Weapons.Initialize(this, Player);
-        Weapons.UnlockWeapon(ZombieStormWeaponType.Pistol);
+        Skills = playerObject.AddComponent<ZombieStormSkillManager>();
+        Skills.Initialize(this, Player);
+        Skills.LearnSkill(ZombieStormSkillType.MagicBolt);
 
         FollowPlayer(true);
-        ShowFeedback("Wave 1: pistol online. Move, kite, collect XP.", 3f);
+        ShowFeedback("Wave 1: Magic Bolt online. Move, kite, collect XP.", 3f);
     }
 
     private void BuildScene()
@@ -916,23 +931,23 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private ZombieStormUpgradeOption CreateRandomUpgradeOption()
     {
-        if (Weapons == null)
+        if (Skills == null)
         {
             return null;
         }
 
         if (UnityEngine.Random.value < 0.58f)
         {
-            ZombieStormWeaponType weaponType = (ZombieStormWeaponType)UnityEngine.Random.Range(0, Enum.GetValues(typeof(ZombieStormWeaponType)).Length);
-            int level = Weapons.GetWeaponLevel(weaponType);
+            ZombieStormSkillType weaponType = (ZombieStormSkillType)UnityEngine.Random.Range(0, Enum.GetValues(typeof(ZombieStormSkillType)).Length);
+            int level = Skills.GetSkillLevel(weaponType);
             if (level <= 0)
             {
-                return ZombieStormUpgradeOption.Weapon("unlock_" + weaponType, "Unlock " + WeaponName(weaponType), WeaponSummary(weaponType), delegate { Weapons.UnlockWeapon(weaponType); });
+                return ZombieStormUpgradeOption.Skill("unlock_" + weaponType, "Learn " + SkillName(weaponType), SkillSummary(weaponType), SkillAccent(weaponType), delegate { Skills.LearnSkill(weaponType); });
             }
 
             if (level < 5)
             {
-                return ZombieStormUpgradeOption.Weapon("level_" + weaponType, WeaponName(weaponType) + " Lv." + (level + 1), "More damage, cadence, or coverage.", delegate { Weapons.LevelUpWeapon(weaponType); });
+                return ZombieStormUpgradeOption.Skill("level_" + weaponType, SkillName(weaponType) + " Lv." + (level + 1), SkillLevelSummary(weaponType, level + 1), SkillAccent(weaponType), delegate { Skills.LevelUpSkill(weaponType); });
             }
         }
 
@@ -948,7 +963,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return null;
         }
 
-        return ZombieStormUpgradeOption.Passive("passive_" + passive, PassiveName(passive) + " Lv." + (level + 1), PassiveSummary(passive), delegate { AddPassive(passive); });
+        return ZombieStormUpgradeOption.Passive("passive_" + passive, PassiveName(passive) + " Lv." + (level + 1), PassiveSummary(passive, level + 1), PassiveAccent(passive), delegate { AddPassive(passive); });
     }
 
     private void AddFallbackPassive(ZombieStormPassiveType passive)
@@ -984,28 +999,51 @@ public sealed class ZombieStormGameController : MonoBehaviour
         currentChoices.Clear();
         leveling = false;
         Time.timeScale = 1f;
+        PlayUpgradeBurst(option);
         ShowFeedback(option.Title + " acquired.", 2.2f);
     }
 
-    private void CheckEvolutions()
+    private void PlayUpgradeBurst(ZombieStormUpgradeOption option)
     {
-        if (Weapons == null)
+        if (Player == null)
         {
             return;
         }
 
-        TryEvolve(ZombieStormWeaponType.Pistol, ZombieStormPassiveType.FireRate, "Gatling Storm evolved.");
-        TryEvolve(ZombieStormWeaponType.Molotov, ZombieStormPassiveType.Area, "Inferno Field evolved.");
-        TryEvolve(ZombieStormWeaponType.SawRing, ZombieStormPassiveType.MaxHealth, "Meatgrinder Field evolved.");
-        TryEvolve(ZombieStormWeaponType.Lightning, ZombieStormPassiveType.Crit, "Chain Thunder evolved.");
-        TryEvolve(ZombieStormWeaponType.Mine, ZombieStormPassiveType.Damage, "Mine Matrix evolved.");
+        Color accent = option != null ? option.Accent : new Color(0.4f, 0.9f, 1f, 1f);
+        Vector2 center = Player.transform.position;
+        SpawnAreaEffect(center, 1.35f, 0f, 0.28f, 1f, WithAlpha(accent, 0.42f), "upgrade_pulse");
+        SpawnAreaEffect(center, 2.15f, 0f, 0.42f, 1f, WithAlpha(new Color(1f, 0.88f, 0.28f), 0.32f), "upgrade_ring");
+        for (int i = 0; i < 12; i++)
+        {
+            float angle = i * 30f;
+            Vector2 offset = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * UnityEngine.Random.Range(0.75f, 1.9f);
+            SpawnHitSpark(center + offset, WithAlpha(accent, 0.82f), UnityEngine.Random.Range(0.16f, 0.28f));
+        }
+
+        ShakeCamera(0.1f, 0.18f);
+        FlashScreen(accent, 0.46f);
     }
 
-    private void TryEvolve(ZombieStormWeaponType weapon, ZombieStormPassiveType passive, string message)
+    private void CheckEvolutions()
     {
-        if (Weapons.GetWeaponLevel(weapon) >= 5 && GetPassiveLevel(passive) > 0 && !Weapons.IsEvolved(weapon))
+        if (Skills == null)
         {
-            Weapons.Evolve(weapon);
+            return;
+        }
+
+        TryEvolve(ZombieStormSkillType.MagicBolt, ZombieStormPassiveType.FireRate, "Arcane Barrage evolved.");
+        TryEvolve(ZombieStormSkillType.OrbitingKnife, ZombieStormPassiveType.MaxHealth, "Blade Halo evolved.");
+        TryEvolve(ZombieStormSkillType.MeteorStorm, ZombieStormPassiveType.Area, "Judgement Meteor evolved.");
+        TryEvolve(ZombieStormSkillType.ChainLightning, ZombieStormPassiveType.Crit, "Storm Chain evolved.");
+        TryEvolve(ZombieStormSkillType.SummonDrone, ZombieStormPassiveType.Damage, "Drone Swarm evolved.");
+    }
+
+    private void TryEvolve(ZombieStormSkillType weapon, ZombieStormPassiveType passive, string message)
+    {
+        if (Skills.GetSkillLevel(weapon) >= 5 && GetPassiveLevel(passive) > 0 && !Skills.IsEvolved(weapon))
+        {
+            Skills.Evolve(weapon);
             ShowFeedback(message, 3f);
         }
     }
@@ -1046,6 +1084,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         {
             Rect rect = new Rect(startX + i * 260f, y, 240f, 178f);
             Color edge = i == 0 ? new Color(0.2f, 0.75f, 1f, 0.72f) : i == 1 ? new Color(1f, 0.75f, 0.18f, 0.72f) : new Color(1f, 0.2f, 0.5f, 0.72f);
+            edge = currentChoices[i].Accent;
+            edge.a = 0.72f;
             DrawPanel(rect, new Color(0.045f, 0.055f, 0.07f, 0.98f), edge);
             GUI.color = new Color(edge.r, edge.g, edge.b, 0.16f);
             GUI.DrawTexture(new Rect(rect.x + 8f, rect.y + 8f, rect.width - 16f, 46f), Texture2D.whiteTexture);
@@ -1056,9 +1096,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
             GUI.Label(new Rect(rect.x + 24f, rect.y + 19f, 30f, 26f), (i + 1).ToString());
             GUI.skin.label.fontSize = 17;
             GUI.Label(new Rect(rect.x + 58f, rect.y + 17f, rect.width - 76f, 34f), currentChoices[i].Title);
+            GUI.skin.label.fontSize = 12;
+            GUI.color = new Color(edge.r, edge.g, edge.b, 1f);
+            GUI.Label(new Rect(rect.x + 18f, rect.y + 54f, rect.width - 36f, 18f), currentChoices[i].Category);
             GUI.skin.label.fontSize = 15;
             GUI.color = new Color(0.78f, 0.85f, 0.92f, 1f);
-            GUI.Label(new Rect(rect.x + 18f, rect.y + 66f, rect.width - 36f, 76f), currentChoices[i].Description);
+            GUI.Label(new Rect(rect.x + 18f, rect.y + 72f, rect.width - 36f, 64f), currentChoices[i].Description);
             GUI.color = Color.white;
             if (GUI.Button(new Rect(rect.x + 42f, rect.y + 136f, 156f, 30f), "Pick " + (i + 1)))
             {
@@ -1100,7 +1143,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return;
         }
 
-        GUI.color = new Color(1f, 0.08f, 0.04f, Mathf.Clamp01(screenFlash) * 0.24f);
+        GUI.color = new Color(screenFlashColor.r, screenFlashColor.g, screenFlashColor.b, Mathf.Clamp01(screenFlash) * 0.24f);
         GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
         GUI.color = Color.white;
     }
@@ -1278,31 +1321,67 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return (seconds / 60).ToString("00") + ":" + (seconds % 60).ToString("00");
     }
 
-    private static string WeaponName(ZombieStormWeaponType weapon)
+    private static string SkillName(ZombieStormSkillType weapon)
     {
         switch (weapon)
         {
-            case ZombieStormWeaponType.Pistol: return "Pistol";
-            case ZombieStormWeaponType.Shotgun: return "Shotgun";
-            case ZombieStormWeaponType.Molotov: return "Molotov";
-            case ZombieStormWeaponType.SawRing: return "Saw Ring";
-            case ZombieStormWeaponType.Lightning: return "Lightning";
-            case ZombieStormWeaponType.Mine: return "Mine";
+            case ZombieStormSkillType.MagicBolt: return "Magic Bolt";
+            case ZombieStormSkillType.OrbitingKnife: return "Orbiting Knives";
+            case ZombieStormSkillType.MeteorStorm: return "Meteor Storm";
+            case ZombieStormSkillType.FireZone: return "Fire Zone";
+            case ZombieStormSkillType.SummonDrone: return "Summon Drone";
+            case ZombieStormSkillType.ChainLightning: return "Chain Lightning";
+            case ZombieStormSkillType.ShieldBurst: return "Shield Burst";
+            case ZombieStormSkillType.UltimateStorm: return "Ultimate: Full-Screen Thunder";
             default: return weapon.ToString();
         }
     }
 
-    private static string WeaponSummary(ZombieStormWeaponType weapon)
+    private static string SkillSummary(ZombieStormSkillType weapon)
     {
         switch (weapon)
         {
-            case ZombieStormWeaponType.Pistol: return "Targets the nearest zombie.";
-            case ZombieStormWeaponType.Shotgun: return "Fires a close-range cone.";
-            case ZombieStormWeaponType.Molotov: return "Drops burning zones around you.";
-            case ZombieStormWeaponType.SawRing: return "Spins blades around the survivor.";
-            case ZombieStormWeaponType.Lightning: return "Strikes random enemies.";
-            case ZombieStormWeaponType.Mine: return "Leaves traps while moving.";
-            default: return "Adds another automatic weapon.";
+            case ZombieStormSkillType.MagicBolt: return "Adds auto magic shots with a bright launch spark.";
+            case ZombieStormSkillType.OrbitingKnife: return "Adds visible blades that orbit and cut nearby enemies.";
+            case ZombieStormSkillType.MeteorStorm: return "Adds warning circles, then delayed impact blasts.";
+            case ZombieStormSkillType.FireZone: return "Adds burning ground pools with ember flashes.";
+            case ZombieStormSkillType.SummonDrone: return "Adds an AI drone that circles you and shoots targets.";
+            case ZombieStormSkillType.ChainLightning: return "Adds jumping lightning with blue links between enemies.";
+            case ZombieStormSkillType.ShieldBurst: return "Adds a close-range defensive shockwave trigger.";
+            case ZombieStormSkillType.UltimateStorm: return "Adds one ultimate. Press F for a full-screen storm.";
+            default: return "Adds another automatic skill.";
+        }
+    }
+
+    private static string SkillLevelSummary(ZombieStormSkillType weapon, int nextLevel)
+    {
+        switch (weapon)
+        {
+            case ZombieStormSkillType.MagicBolt: return "Lv." + nextLevel + ": faster bolts, more damage, extra pierce.";
+            case ZombieStormSkillType.OrbitingKnife: return "Lv." + nextLevel + ": more blades, wider orbit, stronger ticks.";
+            case ZombieStormSkillType.MeteorStorm: return "Lv." + nextLevel + ": more impacts, bigger warning circles.";
+            case ZombieStormSkillType.FireZone: return "Lv." + nextLevel + ": larger pools, longer burn duration.";
+            case ZombieStormSkillType.SummonDrone: return "Lv." + nextLevel + ": more drones and faster AI fire.";
+            case ZombieStormSkillType.ChainLightning: return "Lv." + nextLevel + ": more jumps and stronger chain damage.";
+            case ZombieStormSkillType.ShieldBurst: return "Lv." + nextLevel + ": larger defensive ring and harder hit.";
+            case ZombieStormSkillType.UltimateStorm: return "Lv." + nextLevel + ": stronger F ultimate, shorter cooldown.";
+            default: return "Lv." + nextLevel + ": improves this automatic skill.";
+        }
+    }
+
+    private static Color SkillAccent(ZombieStormSkillType weapon)
+    {
+        switch (weapon)
+        {
+            case ZombieStormSkillType.MagicBolt: return new Color(0.45f, 0.95f, 1f, 1f);
+            case ZombieStormSkillType.OrbitingKnife: return new Color(0.92f, 0.96f, 1f, 1f);
+            case ZombieStormSkillType.MeteorStorm: return new Color(1f, 0.46f, 0.08f, 1f);
+            case ZombieStormSkillType.FireZone: return new Color(1f, 0.28f, 0.05f, 1f);
+            case ZombieStormSkillType.SummonDrone: return new Color(0.35f, 0.9f, 1f, 1f);
+            case ZombieStormSkillType.ChainLightning: return new Color(0.38f, 0.72f, 1f, 1f);
+            case ZombieStormSkillType.ShieldBurst: return new Color(0.78f, 0.98f, 1f, 1f);
+            case ZombieStormSkillType.UltimateStorm: return new Color(0.95f, 0.86f, 1f, 1f);
+            default: return new Color(0.5f, 0.9f, 1f, 1f);
         }
     }
 
@@ -1322,19 +1401,35 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    private static string PassiveSummary(ZombieStormPassiveType passive)
+    private static string PassiveSummary(ZombieStormPassiveType passive, int nextLevel)
     {
         switch (passive)
         {
-            case ZombieStormPassiveType.Damage: return "All weapons hit harder.";
-            case ZombieStormPassiveType.FireRate: return "Weapon cooldowns become shorter.";
-            case ZombieStormPassiveType.Area: return "Explosions, fire, and rings grow wider.";
-            case ZombieStormPassiveType.MoveSpeed: return "Move faster through gaps.";
-            case ZombieStormPassiveType.PickupRange: return "XP and coins pull from farther away.";
-            case ZombieStormPassiveType.Crit: return "Chance to deal double damage.";
-            case ZombieStormPassiveType.MaxHealth: return "More HP and a small heal.";
-            case ZombieStormPassiveType.CoinGain: return "Earn more coins from drops.";
+            case ZombieStormPassiveType.Damage: return "Lv." + nextLevel + ": all skill damage increases by 18%.";
+            case ZombieStormPassiveType.FireRate: return "Lv." + nextLevel + ": all skill cooldowns become shorter.";
+            case ZombieStormPassiveType.Area: return "Lv." + nextLevel + ": explosions, fire, and rings grow wider.";
+            case ZombieStormPassiveType.MoveSpeed: return "Lv." + nextLevel + ": player movement speed increases.";
+            case ZombieStormPassiveType.PickupRange: return "Lv." + nextLevel + ": XP and coins pull from farther away.";
+            case ZombieStormPassiveType.Crit: return "Lv." + nextLevel + ": higher chance to deal double damage.";
+            case ZombieStormPassiveType.MaxHealth: return "Lv." + nextLevel + ": max HP increases and heals now.";
+            case ZombieStormPassiveType.CoinGain: return "Lv." + nextLevel + ": coin drops are worth more.";
             default: return "Passive power increase.";
+        }
+    }
+
+    private static Color PassiveAccent(ZombieStormPassiveType passive)
+    {
+        switch (passive)
+        {
+            case ZombieStormPassiveType.Damage: return new Color(1f, 0.32f, 0.18f, 1f);
+            case ZombieStormPassiveType.FireRate: return new Color(1f, 0.78f, 0.18f, 1f);
+            case ZombieStormPassiveType.Area: return new Color(0.72f, 0.52f, 1f, 1f);
+            case ZombieStormPassiveType.MoveSpeed: return new Color(0.42f, 1f, 0.58f, 1f);
+            case ZombieStormPassiveType.PickupRange: return new Color(0.32f, 0.86f, 1f, 1f);
+            case ZombieStormPassiveType.Crit: return new Color(1f, 0.42f, 0.72f, 1f);
+            case ZombieStormPassiveType.MaxHealth: return new Color(0.38f, 1f, 0.38f, 1f);
+            case ZombieStormPassiveType.CoinGain: return new Color(1f, 0.9f, 0.25f, 1f);
+            default: return new Color(0.78f, 0.86f, 0.92f, 1f);
         }
     }
 
@@ -1691,17 +1786,6 @@ public sealed class ZombieStormGameController : MonoBehaviour
         kenneyEliteZombieSprite = LoadRawSpriteFromPng(Path.Combine(root, "Zombie 1", "zoimbie1_gun.png"), 22f, false);
         kenneyBossSprite = LoadRawSpriteFromPng(Path.Combine(root, "Zombie 1", "zoimbie1_reload.png"), 18f, false);
 
-        Sprite gun = LoadRawSpriteFromPng(Path.Combine(root, "weapon_gun.png"), 32f, false);
-        if (gun != null)
-        {
-            bulletSprite = gun;
-        }
-
-        Sprite machine = LoadRawSpriteFromPng(Path.Combine(root, "weapon_machine.png"), 32f, false);
-        if (machine != null)
-        {
-            sawSprite = machine;
-        }
     }
 
     private void AddSpriteIfExists(List<Sprite> target, string path, float pixelsPerUnit, bool removeCheckerBackground)
@@ -2097,16 +2181,18 @@ public sealed class ZombieStormUpgradeOption
     public string Key;
     public string Title;
     public string Description;
+    public string Category;
+    public Color Accent;
     public Action Apply;
 
-    public static ZombieStormUpgradeOption Weapon(string key, string title, string description, Action apply)
+    public static ZombieStormUpgradeOption Skill(string key, string title, string description, Color accent, Action apply)
     {
-        return new ZombieStormUpgradeOption { Key = key, Title = title, Description = description, Apply = apply };
+        return new ZombieStormUpgradeOption { Key = key, Title = title, Description = description, Category = "ACTIVE SKILL", Accent = accent, Apply = apply };
     }
 
-    public static ZombieStormUpgradeOption Passive(string key, string title, string description, Action apply)
+    public static ZombieStormUpgradeOption Passive(string key, string title, string description, Color accent, Action apply)
     {
-        return new ZombieStormUpgradeOption { Key = key, Title = title, Description = description, Apply = apply };
+        return new ZombieStormUpgradeOption { Key = key, Title = title, Description = description, Category = "PASSIVE STAT", Accent = accent, Apply = apply };
     }
 }
 
@@ -2122,6 +2208,9 @@ public struct ZombieStormDamagePopup
 
 public sealed class ZombieStormPlayer : MonoBehaviour
 {
+    private const float AnimatedPlayerVisualScale = 1.55f;
+    private const float FallbackPlayerVisualScale = 1.28f;
+
     private ZombieStormGameController game;
     private SpriteRenderer spriteRenderer;
     private Vector2 lastMove = Vector2.down;
@@ -2199,11 +2288,11 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         {
             spriteRenderer.flipX = false;
             float pulse = Mathf.Sin(Time.time * 12f) * 0.04f;
-            transform.localScale = Vector3.one * (0.95f + pulse);
+            transform.localScale = Vector3.one * (FallbackPlayerVisualScale + pulse);
             return;
         }
 
-        transform.localScale = Vector3.one * 1.18f;
+        transform.localScale = Vector3.one * AnimatedPlayerVisualScale;
         spriteRenderer.flipX = IsLeftFacingDirection(facingDirection);
         if (hurtAnimationTimer > 0f && game.HasPlayerHurtAnimation)
         {
@@ -2348,23 +2437,23 @@ public sealed class ZombieStormPlayer : MonoBehaviour
     }
 }
 
-public sealed class ZombieStormWeaponManager : MonoBehaviour
+public sealed class ZombieStormSkillManager : MonoBehaviour
 {
-    private readonly Dictionary<ZombieStormWeaponType, int> levels = new Dictionary<ZombieStormWeaponType, int>();
-    private readonly Dictionary<ZombieStormWeaponType, float> cooldowns = new Dictionary<ZombieStormWeaponType, float>();
-    private readonly HashSet<ZombieStormWeaponType> evolved = new HashSet<ZombieStormWeaponType>();
-    private readonly List<GameObject> sawBlades = new List<GameObject>();
+    private readonly Dictionary<ZombieStormSkillType, int> levels = new Dictionary<ZombieStormSkillType, int>();
+    private readonly Dictionary<ZombieStormSkillType, float> cooldowns = new Dictionary<ZombieStormSkillType, float>();
+    private readonly HashSet<ZombieStormSkillType> evolved = new HashSet<ZombieStormSkillType>();
+    private readonly List<GameObject> orbitingObjects = new List<GameObject>();
+    private readonly List<GameObject> drones = new List<GameObject>();
+    private readonly List<ZombieStormPendingSkillBlast> pendingBlasts = new List<ZombieStormPendingSkillBlast>();
 
     private ZombieStormGameController game;
     private ZombieStormPlayer player;
-    private Vector2 lastMinePosition;
-    private float mineStepDistance;
+    private float ultimateCooldown;
 
     public void Initialize(ZombieStormGameController owner, ZombieStormPlayer survivor)
     {
         game = owner;
         player = survivor;
-        lastMinePosition = transform.position;
     }
 
     private void Update()
@@ -2374,82 +2463,126 @@ public sealed class ZombieStormWeaponManager : MonoBehaviour
             return;
         }
 
-        TickWeapon(ZombieStormWeaponType.Pistol, FirePistol);
-        TickWeapon(ZombieStormWeaponType.Shotgun, FireShotgun);
-        TickWeapon(ZombieStormWeaponType.Molotov, FireMolotov);
-        TickWeapon(ZombieStormWeaponType.Lightning, FireLightning);
-        TickWeapon(ZombieStormWeaponType.Mine, DropMine);
-        UpdateSawRing();
+        TickSkill(ZombieStormSkillType.MagicBolt, CastMagicBolt);
+        TickSkill(ZombieStormSkillType.MeteorStorm, CastMeteorStorm);
+        TickSkill(ZombieStormSkillType.FireZone, CastFireZone);
+        TickSkill(ZombieStormSkillType.ChainLightning, CastChainLightning);
+        TickSkill(ZombieStormSkillType.ShieldBurst, CastShieldBurst);
+        UpdatePendingBlasts();
+        UpdateOrbitingKnives();
+        UpdateSummonDrones();
+        UpdateUltimateInput();
     }
 
-    public void UnlockWeapon(ZombieStormWeaponType weapon)
+    public void LearnSkill(ZombieStormSkillType weapon)
     {
-        if (GetWeaponLevel(weapon) <= 0)
+        if (GetSkillLevel(weapon) <= 0)
         {
             levels[weapon] = 1;
             cooldowns[weapon] = 0.05f;
-            if (weapon == ZombieStormWeaponType.SawRing)
+            if (weapon == ZombieStormSkillType.OrbitingKnife)
             {
-                RebuildSawRing();
+                RebuildOrbitingKnives();
+            }
+            else if (weapon == ZombieStormSkillType.SummonDrone)
+            {
+                RebuildDrones();
             }
         }
         else
         {
-            LevelUpWeapon(weapon);
+            LevelUpSkill(weapon);
         }
     }
 
-    public void LevelUpWeapon(ZombieStormWeaponType weapon)
+    public void LevelUpSkill(ZombieStormSkillType weapon)
     {
-        int next = Mathf.Min(5, GetWeaponLevel(weapon) + 1);
+        int next = Mathf.Min(5, GetSkillLevel(weapon) + 1);
         levels[weapon] = next;
-        if (weapon == ZombieStormWeaponType.SawRing)
+        if (weapon == ZombieStormSkillType.OrbitingKnife)
         {
-            RebuildSawRing();
+            RebuildOrbitingKnives();
+        }
+        else if (weapon == ZombieStormSkillType.SummonDrone)
+        {
+            RebuildDrones();
         }
     }
 
-    public int GetWeaponLevel(ZombieStormWeaponType weapon)
+    public int GetSkillLevel(ZombieStormSkillType weapon)
     {
         int level;
         return levels.TryGetValue(weapon, out level) ? level : 0;
     }
 
-    public bool IsEvolved(ZombieStormWeaponType weapon)
+    public bool IsEvolved(ZombieStormSkillType weapon)
     {
         return evolved.Contains(weapon);
     }
 
-    public void Evolve(ZombieStormWeaponType weapon)
+    public void Evolve(ZombieStormSkillType weapon)
     {
         evolved.Add(weapon);
-        if (weapon == ZombieStormWeaponType.SawRing)
+        if (weapon == ZombieStormSkillType.OrbitingKnife)
         {
-            RebuildSawRing();
+            RebuildOrbitingKnives();
+        }
+        else if (weapon == ZombieStormSkillType.SummonDrone)
+        {
+            RebuildDrones();
         }
     }
 
     public string GetLoadoutText()
     {
-        string text = "Weapons\n";
+        string text = "Skills";
+        int ultimateLevel = GetSkillLevel(ZombieStormSkillType.UltimateStorm);
+        if (ultimateLevel > 0)
+        {
+            text += "   F " + Mathf.Max(0f, ultimateCooldown).ToString("0.0") + "s";
+        }
+
+        text += "\n";
         if (levels.Count == 0)
         {
             return text + "None";
         }
 
-        foreach (KeyValuePair<ZombieStormWeaponType, int> pair in levels)
+        foreach (KeyValuePair<ZombieStormSkillType, int> pair in levels)
         {
-            text += pair.Key + " Lv." + pair.Value + (IsEvolved(pair.Key) ? " Evolved" : "") + "\n";
+            if (pair.Key == ZombieStormSkillType.UltimateStorm)
+            {
+                text += "Ultimate Lv." + pair.Value + "\n";
+                continue;
+            }
+
+            text += SkillLabel(pair.Key) + " Lv." + pair.Value + (IsEvolved(pair.Key) ? " Evolved" : "") + "\n";
         }
 
         return text;
     }
 
-    private delegate void WeaponAction(int level);
-
-    private void TickWeapon(ZombieStormWeaponType weapon, WeaponAction action)
+    private static string SkillLabel(ZombieStormSkillType weapon)
     {
-        int level = GetWeaponLevel(weapon);
+        switch (weapon)
+        {
+            case ZombieStormSkillType.MagicBolt: return "Magic Bolt";
+            case ZombieStormSkillType.OrbitingKnife: return "Orbit Knives";
+            case ZombieStormSkillType.MeteorStorm: return "Meteor";
+            case ZombieStormSkillType.FireZone: return "Fire Zone";
+            case ZombieStormSkillType.SummonDrone: return "Drone";
+            case ZombieStormSkillType.ChainLightning: return "Lightning";
+            case ZombieStormSkillType.ShieldBurst: return "Shield";
+            case ZombieStormSkillType.UltimateStorm: return "Ultimate";
+            default: return weapon.ToString();
+        }
+    }
+
+    private delegate void SkillAction(int level);
+
+    private void TickSkill(ZombieStormSkillType weapon, SkillAction action)
+    {
+        int level = GetSkillLevel(weapon);
         if (level <= 0)
         {
             return;
@@ -2468,126 +2601,151 @@ public sealed class ZombieStormWeaponManager : MonoBehaviour
         }
     }
 
-    private void FirePistol(int level)
+    private void CastMagicBolt(int level)
     {
-        ZombieStormEnemy target = game.FindNearestEnemy(transform.position, IsEvolved(ZombieStormWeaponType.Pistol) ? 18f : 14f);
+        ZombieStormEnemy target = game.FindNearestEnemy(transform.position, IsEvolved(ZombieStormSkillType.MagicBolt) ? 18f : 14f);
         if (target == null)
         {
-            cooldowns[ZombieStormWeaponType.Pistol] = 0.15f;
+            cooldowns[ZombieStormSkillType.MagicBolt] = 0.15f;
             return;
         }
 
         Vector2 direction = ((Vector2)target.transform.position - (Vector2)transform.position).normalized;
-        int shots = IsEvolved(ZombieStormWeaponType.Pistol) ? 3 : level >= 4 ? 2 : 1;
+        Vector2 origin = (Vector2)transform.position + direction * 0.42f;
+        int shots = IsEvolved(ZombieStormSkillType.MagicBolt) ? 3 : level >= 4 ? 2 : 1;
+        game.SpawnHitSpark(origin, new Color(0.48f, 0.95f, 1f, 0.88f), 0.24f + level * 0.025f);
         for (int i = 0; i < shots; i++)
         {
-            float angle = shots == 1 ? 0f : -7f + i * 7f;
-            game.SpawnPlayerProjectile(transform.position, ZombieStormGameController.Rotate(direction, angle), RollDamage(10f + level * 3.4f), 13.5f, 1.4f, level >= 3 ? 1 : 0, new Color(1f, 0.92f, 0.25f), 0.28f);
+            float angle = shots == 1 ? 0f : -9f + i * 9f;
+            game.SpawnPlayerProjectile(origin, ZombieStormGameController.Rotate(direction, angle), RollDamage(10f + level * 3.4f), 13.5f, 1.4f, level >= 3 ? 1 : 0, new Color(0.56f, 0.92f, 1f), 0.34f + level * 0.015f);
         }
 
-        float baseCooldown = IsEvolved(ZombieStormWeaponType.Pistol) ? 0.18f : 0.62f - level * 0.055f;
-        cooldowns[ZombieStormWeaponType.Pistol] = baseCooldown * game.CooldownMultiplier;
+        float baseCooldown = IsEvolved(ZombieStormSkillType.MagicBolt) ? 0.18f : 0.62f - level * 0.055f;
+        cooldowns[ZombieStormSkillType.MagicBolt] = baseCooldown * game.CooldownMultiplier;
     }
 
-    private void FireShotgun(int level)
+    private void CastMeteorStorm(int level)
     {
-        ZombieStormEnemy target = game.FindNearestEnemy(transform.position, 10f);
-        Vector2 forward = target != null ? ((Vector2)target.transform.position - (Vector2)transform.position).normalized : UnityEngine.Random.insideUnitCircle.normalized;
-        if (forward.sqrMagnitude < 0.01f)
+        int impacts = 1 + Mathf.FloorToInt(level * 0.55f) + (IsEvolved(ZombieStormSkillType.MeteorStorm) ? 2 : 0);
+        for (int i = 0; i < impacts; i++)
         {
-            forward = Vector2.up;
+            ZombieStormEnemy target = game.FindRandomEnemy();
+            Vector2 position = target != null ? (Vector2)target.transform.position : (Vector2)transform.position + UnityEngine.Random.insideUnitCircle * 5.5f;
+            float radius = (0.95f + level * 0.18f) * game.AreaMultiplier;
+            game.SpawnAreaEffect(position, radius * 1.35f, 0f, 0.48f, 1f, new Color(1f, 0.75f, 0.18f, 0.3f), "meteor_warning");
+            game.SpawnAreaEffect(position, radius * 0.36f, 0f, 0.48f, 1f, new Color(1f, 0.92f, 0.3f, 0.52f), "meteor_warning");
+            pendingBlasts.Add(new ZombieStormPendingSkillBlast
+            {
+                Position = position,
+                Radius = radius,
+                Damage = RollDamage(20f + level * 5.5f),
+                Delay = 0.42f,
+                Color = new Color(1f, 0.28f, 0.05f, 0.72f),
+                Key = "meteor_blast"
+            });
         }
 
-        int pelletCount = 4 + level + (IsEvolved(ZombieStormWeaponType.Shotgun) ? 4 : 0);
-        float arc = 46f + level * 5f;
-        for (int i = 0; i < pelletCount; i++)
-        {
-            float t = pelletCount == 1 ? 0.5f : i / (float)(pelletCount - 1);
-            float angle = Mathf.Lerp(-arc * 0.5f, arc * 0.5f, t);
-            game.SpawnPlayerProjectile(transform.position, ZombieStormGameController.Rotate(forward, angle), RollDamage(7f + level * 2f), 10.5f, 0.75f, 0, new Color(1f, 0.55f, 0.22f), 0.24f);
-        }
-
-        cooldowns[ZombieStormWeaponType.Shotgun] = (2.2f - level * 0.16f) * game.CooldownMultiplier;
+        cooldowns[ZombieStormSkillType.MeteorStorm] = (4.2f - level * 0.24f) * game.CooldownMultiplier;
     }
 
-    private void FireMolotov(int level)
+    private void CastFireZone(int level)
     {
-        int pools = IsEvolved(ZombieStormWeaponType.Molotov) ? 3 : 1;
+        int pools = IsEvolved(ZombieStormSkillType.FireZone) ? 3 : 1 + level / 4;
         for (int i = 0; i < pools; i++)
         {
             Vector2 offset = UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(2.4f, 7.0f);
             Vector2 position = (Vector2)transform.position + offset;
-            float radius = (1.25f + level * 0.22f) * game.AreaMultiplier * (IsEvolved(ZombieStormWeaponType.Molotov) ? 1.22f : 1f);
+            float radius = (1.25f + level * 0.22f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.FireZone) ? 1.22f : 1f);
             float duration = 2.5f + level * 0.36f;
             game.SpawnAreaEffect(position, radius, RollDamage(4.2f + level * 1.3f), duration, 0.28f, new Color(1f, 0.25f, 0.05f, 0.62f), "fire_pool");
-        }
-
-        cooldowns[ZombieStormWeaponType.Molotov] = (4.1f - level * 0.25f) * game.CooldownMultiplier;
-    }
-
-    private void FireLightning(int level)
-    {
-        int strikes = 1 + Mathf.FloorToInt(level * 0.8f) + (IsEvolved(ZombieStormWeaponType.Lightning) ? 4 : 0);
-        for (int i = 0; i < strikes; i++)
-        {
-            ZombieStormEnemy target = game.FindRandomEnemy();
-            if (target != null)
+            for (int spark = 0; spark < 4; spark++)
             {
-                target.TakeDamage(RollDamage(18f + level * 5f), ((Vector2)target.transform.position - (Vector2)transform.position).normalized);
-                game.SpawnAreaEffect(target.transform.position, 0.65f * game.AreaMultiplier, 0f, 0.18f, 1f, new Color(0.25f, 0.85f, 1f, 0.78f), "lightning_flash");
+                game.SpawnHitSpark(position + UnityEngine.Random.insideUnitCircle * radius * 0.65f, new Color(1f, 0.68f, 0.12f, 0.78f), 0.16f);
             }
         }
 
-        cooldowns[ZombieStormWeaponType.Lightning] = (3.6f - level * 0.22f) * game.CooldownMultiplier;
+        cooldowns[ZombieStormSkillType.FireZone] = (4.1f - level * 0.25f) * game.CooldownMultiplier;
     }
 
-    private void DropMine(int level)
+    private void CastChainLightning(int level)
     {
-        mineStepDistance += Vector2.Distance(transform.position, lastMinePosition);
-        lastMinePosition = transform.position;
-        float required = Mathf.Max(0.85f, 2.35f - level * 0.22f);
-        if (mineStepDistance < required)
+        ZombieStormEnemy current = game.FindRandomEnemy();
+        if (current == null)
         {
-            cooldowns[ZombieStormWeaponType.Mine] = 0.12f;
+            cooldowns[ZombieStormSkillType.ChainLightning] = 0.25f;
             return;
         }
 
-        mineStepDistance = 0f;
-        int count = IsEvolved(ZombieStormWeaponType.Mine) ? 3 : 1;
-        for (int i = 0; i < count; i++)
+        int jumps = 2 + level + (IsEvolved(ZombieStormSkillType.ChainLightning) ? 4 : 0);
+        HashSet<ZombieStormEnemy> hit = new HashSet<ZombieStormEnemy>();
+        Vector2 previous = transform.position;
+        for (int i = 0; i < jumps && current != null; i++)
         {
-            Vector2 offset = count == 1 ? Vector2.zero : UnityEngine.Random.insideUnitCircle * 0.9f;
-            float radius = (1.1f + level * 0.25f) * game.AreaMultiplier;
-            game.SpawnAreaEffect((Vector2)transform.position + offset, radius, RollDamage(18f + level * 4f), 8f, 99f, new Color(1f, 0.7f, 0.1f, 0.45f), "mine_blast");
+            Vector2 currentPosition = current.transform.position;
+            hit.Add(current);
+            SpawnLightningSegment(previous, currentPosition, level);
+            current.TakeDamage(RollDamage(13f + level * 4f), (currentPosition - (Vector2)transform.position).normalized);
+            game.SpawnAreaEffect(currentPosition, 0.6f * game.AreaMultiplier, 0f, 0.18f, 1f, new Color(0.25f, 0.85f, 1f, 0.86f), "lightning_flash");
+            previous = currentPosition;
+            current = FindNearestUnhitEnemy(currentPosition, 4.2f + level * 0.35f, hit);
         }
 
-        cooldowns[ZombieStormWeaponType.Mine] = (1.2f - level * 0.1f) * game.CooldownMultiplier;
+        cooldowns[ZombieStormSkillType.ChainLightning] = (3.5f - level * 0.22f) * game.CooldownMultiplier;
     }
 
-    private void UpdateSawRing()
+    private void CastShieldBurst(int level)
     {
-        int level = GetWeaponLevel(ZombieStormWeaponType.SawRing);
+        float radius = (1.35f + level * 0.24f) * game.AreaMultiplier;
+        if (CountEnemiesNear(transform.position, radius + 0.35f) <= 0)
+        {
+            cooldowns[ZombieStormSkillType.ShieldBurst] = 0.18f;
+            return;
+        }
+
+        game.SpawnAreaEffect(transform.position, radius, RollDamage(12f + level * 4f), 0.18f, 99f, new Color(0.75f, 0.95f, 1f, 0.55f), "shield_burst");
+        game.SpawnAreaEffect(transform.position, radius * 1.38f, 0f, 0.24f, 1f, new Color(0.4f, 0.92f, 1f, 0.32f), "shield_burst");
+        game.ShakeCamera(0.06f, 0.1f);
+        cooldowns[ZombieStormSkillType.ShieldBurst] = (2.4f - level * 0.16f) * game.CooldownMultiplier;
+    }
+
+    private void SpawnLightningSegment(Vector2 from, Vector2 to, int level)
+    {
+        float distance = Vector2.Distance(from, to);
+        int steps = Mathf.Clamp(Mathf.CeilToInt(distance / 0.42f), 2, 12);
+        for (int i = 1; i <= steps; i++)
+        {
+            float t = i / (float)steps;
+            Vector2 point = Vector2.Lerp(from, to, t);
+            point += UnityEngine.Random.insideUnitCircle * 0.06f;
+            float radius = (0.12f + level * 0.012f) * game.AreaMultiplier;
+            game.SpawnAreaEffect(point, radius, 0f, 0.1f, 1f, new Color(0.35f, 0.9f, 1f, 0.72f), "lightning_flash");
+        }
+    }
+
+    private void UpdateOrbitingKnives()
+    {
+        int level = GetSkillLevel(ZombieStormSkillType.OrbitingKnife);
         if (level <= 0)
         {
             return;
         }
 
-        float radius = (1.45f + level * 0.18f) * game.AreaMultiplier * (IsEvolved(ZombieStormWeaponType.SawRing) ? 1.32f : 1f);
+        float radius = (1.45f + level * 0.18f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.32f : 1f);
         float speed = 120f + level * 28f;
-        for (int i = 0; i < sawBlades.Count; i++)
+        for (int i = 0; i < orbitingObjects.Count; i++)
         {
-            float angle = Time.time * speed + i * (360f / Mathf.Max(1, sawBlades.Count));
+            float angle = Time.time * speed + i * (360f / Mathf.Max(1, orbitingObjects.Count));
             Vector2 offset = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * radius;
-            sawBlades[i].transform.position = (Vector2)transform.position + offset;
-            sawBlades[i].transform.Rotate(0f, 0f, 420f * Time.deltaTime);
+            orbitingObjects[i].transform.position = (Vector2)transform.position + offset;
+            orbitingObjects[i].transform.Rotate(0f, 0f, 420f * Time.deltaTime);
         }
 
         float current;
-        cooldowns.TryGetValue(ZombieStormWeaponType.SawRing, out current);
+        cooldowns.TryGetValue(ZombieStormSkillType.OrbitingKnife, out current);
         current -= Time.deltaTime;
         if (current > 0f)
         {
-            cooldowns[ZombieStormWeaponType.SawRing] = current;
+            cooldowns[ZombieStormSkillType.OrbitingKnife] = current;
             return;
         }
 
@@ -2598,33 +2756,203 @@ public sealed class ZombieStormWeaponManager : MonoBehaviour
             if (enemy != null && !enemy.IsDead && Vector2.Distance(enemy.transform.position, transform.position) <= radius + enemy.Radius)
             {
                 enemy.TakeDamage(RollDamage(6f + level * 1.8f), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
+                game.SpawnHitSpark(enemy.transform.position, new Color(0.9f, 0.96f, 1f, 0.72f), 0.18f);
             }
         }
 
-        cooldowns[ZombieStormWeaponType.SawRing] = 0.24f * game.CooldownMultiplier;
+        cooldowns[ZombieStormSkillType.OrbitingKnife] = 0.24f * game.CooldownMultiplier;
     }
 
-    private void RebuildSawRing()
+    private void RebuildOrbitingKnives()
     {
-        for (int i = 0; i < sawBlades.Count; i++)
+        for (int i = 0; i < orbitingObjects.Count; i++)
         {
-            if (sawBlades[i] != null)
+            if (orbitingObjects[i] != null)
             {
-                Destroy(sawBlades[i]);
+                Destroy(orbitingObjects[i]);
             }
         }
 
-        sawBlades.Clear();
-        int level = GetWeaponLevel(ZombieStormWeaponType.SawRing);
-        int count = 2 + Mathf.FloorToInt(level * 0.75f) + (IsEvolved(ZombieStormWeaponType.SawRing) ? 3 : 0);
+        orbitingObjects.Clear();
+        int level = GetSkillLevel(ZombieStormSkillType.OrbitingKnife);
+        int count = 2 + Mathf.FloorToInt(level * 0.75f) + (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 3 : 0);
         for (int i = 0; i < count; i++)
         {
-            GameObject blade = new GameObject("Saw Ring Blade");
-            blade.transform.localScale = Vector3.one * 0.38f;
+            GameObject blade = new GameObject("Orbiting Skill Blade");
+            blade.transform.localScale = Vector3.one * 0.5f;
             SpriteRenderer spriteRenderer = blade.AddComponent<SpriteRenderer>();
-            spriteRenderer.sprite = game.GetWeaponSprite(ZombieStormWeaponType.SawRing);
+            spriteRenderer.sprite = game.GetSkillSprite(ZombieStormSkillType.OrbitingKnife);
+            spriteRenderer.color = new Color(0.9f, 0.98f, 1f, 1f);
             spriteRenderer.sortingOrder = 35;
-            sawBlades.Add(blade);
+            orbitingObjects.Add(blade);
+        }
+    }
+
+    private void RebuildDrones()
+    {
+        for (int i = 0; i < drones.Count; i++)
+        {
+            if (drones[i] != null)
+            {
+                Destroy(drones[i]);
+            }
+        }
+
+        drones.Clear();
+        int level = GetSkillLevel(ZombieStormSkillType.SummonDrone);
+        int count = 1 + level / 2 + (IsEvolved(ZombieStormSkillType.SummonDrone) ? 2 : 0);
+        for (int i = 0; i < count; i++)
+        {
+            GameObject drone = new GameObject("Summoned Drone");
+            drone.transform.localScale = Vector3.one * 0.56f;
+            SpriteRenderer spriteRenderer = drone.AddComponent<SpriteRenderer>();
+            spriteRenderer.sprite = game.GetSkillSprite(ZombieStormSkillType.SummonDrone);
+            spriteRenderer.color = new Color(0.5f, 0.92f, 1f);
+            spriteRenderer.sortingOrder = 34;
+            drones.Add(drone);
+        }
+    }
+
+    private void UpdateSummonDrones()
+    {
+        int level = GetSkillLevel(ZombieStormSkillType.SummonDrone);
+        if (level <= 0)
+        {
+            return;
+        }
+
+        if (drones.Count == 0)
+        {
+            RebuildDrones();
+        }
+
+        for (int i = 0; i < drones.Count; i++)
+        {
+            float angle = Time.time * 92f + i * (360f / Mathf.Max(1, drones.Count));
+            Vector2 desired = (Vector2)transform.position + new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * 1.15f;
+            drones[i].transform.position = Vector2.Lerp(drones[i].transform.position, desired, 9f * Time.deltaTime);
+        }
+
+        float current;
+        cooldowns.TryGetValue(ZombieStormSkillType.SummonDrone, out current);
+        current -= Time.deltaTime;
+        if (current > 0f)
+        {
+            cooldowns[ZombieStormSkillType.SummonDrone] = current;
+            return;
+        }
+
+        for (int i = 0; i < drones.Count; i++)
+        {
+            ZombieStormEnemy target = game.FindNearestEnemy(drones[i].transform.position, 9f);
+            if (target == null)
+            {
+                continue;
+            }
+
+            Vector2 direction = ((Vector2)target.transform.position - (Vector2)drones[i].transform.position).normalized;
+            Vector2 muzzle = (Vector2)drones[i].transform.position + direction * 0.26f;
+            game.SpawnHitSpark(muzzle, new Color(0.35f, 0.9f, 1f, 0.78f), 0.16f);
+            game.SpawnPlayerProjectile(muzzle, direction, RollDamage(7f + level * 2.4f), 12f, 1.1f, 0, new Color(0.4f, 0.92f, 1f), 0.26f);
+        }
+
+        cooldowns[ZombieStormSkillType.SummonDrone] = (0.92f - level * 0.06f) * game.CooldownMultiplier;
+    }
+
+    private void UpdateUltimateInput()
+    {
+        if (ultimateCooldown > 0f)
+        {
+            ultimateCooldown -= Time.deltaTime;
+        }
+
+        int level = GetSkillLevel(ZombieStormSkillType.UltimateStorm);
+        if (level <= 0 || ultimateCooldown > 0f || !Input.GetKeyDown(KeyCode.F))
+        {
+            return;
+        }
+
+        IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
+        for (int i = 0; i < activeEnemies.Count; i++)
+        {
+            ZombieStormEnemy enemy = activeEnemies[i];
+            if (enemy == null || enemy.IsDead)
+            {
+                continue;
+            }
+
+            enemy.TakeDamage(RollDamage(42f + level * 18f), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
+            game.SpawnAreaEffect(enemy.transform.position, 0.62f, 0f, 0.22f, 1f, new Color(0.45f, 0.85f, 1f, 0.78f), "ultimate_spark");
+        }
+
+        game.SpawnAreaEffect(transform.position, 7.5f, RollDamage(25f + level * 8f), 0.35f, 99f, new Color(0.7f, 0.92f, 1f, 0.42f), "ultimate_storm");
+        game.ShakeCamera(0.34f, 0.48f);
+        game.FlashScreen(0.9f);
+        ultimateCooldown = Mathf.Max(18f, 42f - level * 4f);
+    }
+
+    private ZombieStormEnemy FindNearestUnhitEnemy(Vector2 origin, float maxDistance, HashSet<ZombieStormEnemy> hit)
+    {
+        ZombieStormEnemy best = null;
+        float bestDistance = maxDistance * maxDistance;
+        IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
+        for (int i = 0; i < activeEnemies.Count; i++)
+        {
+            ZombieStormEnemy enemy = activeEnemies[i];
+            if (enemy == null || enemy.IsDead || hit.Contains(enemy))
+            {
+                continue;
+            }
+
+            float distance = ((Vector2)enemy.transform.position - origin).sqrMagnitude;
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = enemy;
+            }
+        }
+
+        return best;
+    }
+
+    private int CountEnemiesNear(Vector2 origin, float radius)
+    {
+        int count = 0;
+        float radiusSquared = radius * radius;
+        IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
+        for (int i = 0; i < activeEnemies.Count; i++)
+        {
+            ZombieStormEnemy enemy = activeEnemies[i];
+            if (enemy != null && !enemy.IsDead && ((Vector2)enemy.transform.position - origin).sqrMagnitude <= radiusSquared)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private void UpdatePendingBlasts()
+    {
+        for (int i = pendingBlasts.Count - 1; i >= 0; i--)
+        {
+            ZombieStormPendingSkillBlast blast = pendingBlasts[i];
+            blast.Delay -= Time.deltaTime;
+            if (blast.Delay > 0f)
+            {
+                pendingBlasts[i] = blast;
+                continue;
+            }
+
+            game.SpawnAreaEffect(blast.Position, blast.Radius, blast.Damage, 0.22f, 99f, blast.Color, blast.Key);
+            if (blast.Key == "meteor_blast")
+            {
+                game.SpawnHitSpark(blast.Position, new Color(1f, 0.9f, 0.25f, 0.9f), blast.Radius * 0.32f);
+                game.ShakeCamera(0.12f, 0.14f);
+                game.FlashScreen(blast.Color, 0.2f);
+            }
+
+            pendingBlasts.RemoveAt(i);
         }
     }
 
@@ -2638,6 +2966,16 @@ public sealed class ZombieStormWeaponManager : MonoBehaviour
 
         return damage;
     }
+}
+
+public struct ZombieStormPendingSkillBlast
+{
+    public Vector2 Position;
+    public float Radius;
+    public float Damage;
+    public float Delay;
+    public Color Color;
+    public string Key;
 }
 
 public sealed class ZombieStormEnemy : MonoBehaviour
