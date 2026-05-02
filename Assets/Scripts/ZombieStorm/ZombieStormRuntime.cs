@@ -589,8 +589,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private void StartRun()
     {
         runTime = 0f;
-        spawnTimer = 0f;
-        eliteTimer = 32f;
+        spawnTimer = 1.15f;
+        eliteTimer = 70f;
         feedbackTimer = 0f;
         bossCount = 0;
         leveling = false;
@@ -688,10 +688,10 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private void UpdateDynamicDifficulty()
     {
-        float timeFactor = 1f + runTime / 58f;
-        float lowHealthMercy = Player != null && Player.Health / Player.MaxHealth < 0.3f ? 0.72f : 1f;
-        float dominance = Player != null && Player.Kills > runTime * 1.15f ? 1.22f : 1f;
-        difficultyScore = Mathf.Clamp(timeFactor * lowHealthMercy * dominance, 0.75f, 8f);
+        float timeFactor = 0.62f + runTime / 92f;
+        float lowHealthMercy = Player != null && Player.Health / Player.MaxHealth < 0.42f ? 0.68f : 1f;
+        float dominance = Player != null && runTime > 45f && Player.Kills > runTime * 1.15f ? 1.16f : 1f;
+        difficultyScore = Mathf.Clamp(timeFactor * lowHealthMercy * dominance, 0.55f, 8f);
     }
 
     private void UpdateSpawning()
@@ -701,8 +701,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         if (spawnTimer <= 0f)
         {
-            spawnTimer = Mathf.Max(0.18f, 1.25f - runTime / 250f);
-            int count = Mathf.Clamp(Mathf.RoundToInt(2f + difficultyScore * 1.15f), 2, 14);
+            spawnTimer = Mathf.Max(0.28f, 1.85f - runTime / 210f);
+            float earlyCount = runTime < 35f ? 1f : runTime < 75f ? 1.65f : 2f + difficultyScore * 0.9f;
+            int count = Mathf.Clamp(Mathf.RoundToInt(earlyCount), 1, 14);
             for (int i = 0; i < count; i++)
             {
                 SpawnEnemy(ChooseEnemyType());
@@ -711,12 +712,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         if (eliteTimer <= 0f)
         {
-            eliteTimer = Mathf.Max(24f, 48f - runTime / 12f);
+            eliteTimer = Mathf.Max(34f, 58f - runTime / 14f);
             SpawnEnemy(ZombieStormEnemyType.Elite);
             ShowFeedback("Elite zombie incoming. Kill it for a reward burst.", 2.5f);
         }
 
-        if ((bossCount == 0 && runTime >= 120f) || (bossCount == 1 && runTime >= 245f))
+        if ((bossCount == 0 && runTime >= 150f) || (bossCount == 1 && runTime >= 260f))
         {
             bossCount++;
             SpawnEnemy(ZombieStormEnemyType.Boss);
@@ -734,17 +735,17 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return ZombieStormEnemyType.Exploder;
         }
 
-        if (runTime > 80f && roll < (lowHealth ? 0.1f : 0.18f))
+        if (runTime > 95f && roll < (lowHealth ? 0.08f : 0.16f))
         {
             return ZombieStormEnemyType.Spitter;
         }
 
-        if (runTime > 55f && roll < 0.34f)
+        if (runTime > 70f && roll < 0.3f)
         {
             return ZombieStormEnemyType.Tank;
         }
 
-        if (runTime > 25f && roll < (lowHealth ? 0.28f : 0.45f))
+        if (runTime > 45f && roll < (lowHealth ? 0.22f : 0.38f))
         {
             return ZombieStormEnemyType.Fast;
         }
@@ -2237,7 +2238,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         Level = 1;
         Experience = 0f;
         ExperienceToNext = 12f;
-        MaxHealth = 100f;
+        MaxHealth = 115f;
         Health = MaxHealth;
         Coins = 0;
         Kills = 0;
@@ -3011,10 +3012,10 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         baseColor = Color.white;
         spriteRenderer.color = baseColor;
 
-        float hpScale = 1f + runTime / 145f;
+        float hpScale = 0.82f + runTime / 165f;
         Radius = 0.42f;
-        speed = 1.8f;
-        damagePerSecond = 9f;
+        speed = 1.55f;
+        damagePerSecond = 6.5f;
         maxHealth = 22f * hpScale;
         transform.localScale = Vector3.one * 0.95f;
         sprintTimer = 0.8f;
@@ -3022,23 +3023,23 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 
         if (Type == ZombieStormEnemyType.Fast)
         {
-            speed = 3.35f;
+            speed = 3.05f;
             maxHealth = 15f * hpScale;
-            damagePerSecond = 11f;
+            damagePerSecond = 8.5f;
             Radius = 0.34f;
             transform.localScale = Vector3.one * 0.78f;
         }
         else if (Type == ZombieStormEnemyType.Tank)
         {
-            speed = 1.12f;
+            speed = 1.02f;
             maxHealth = 82f * hpScale;
-            damagePerSecond = 13f;
+            damagePerSecond = 10f;
             Radius = 0.6f;
             transform.localScale = Vector3.one * 1.35f;
         }
         else if (Type == ZombieStormEnemyType.Exploder)
         {
-            speed = 2.12f;
+            speed = 1.92f;
             maxHealth = 34f * hpScale;
             damagePerSecond = 5f;
             Radius = 0.5f;
@@ -3057,9 +3058,9 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
         else if (Type == ZombieStormEnemyType.Elite)
         {
-            speed = 2.05f;
-            maxHealth = 180f * hpScale;
-            damagePerSecond = 18f;
+            speed = 1.82f;
+            maxHealth = 150f * hpScale;
+            damagePerSecond = 14f;
             Radius = 0.75f;
             transform.localScale = Vector3.one * 1.62f;
         }
