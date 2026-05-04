@@ -655,6 +655,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
             BuildFallbackNeonFloor();
         }
 
+        BuildCityBlockSilhouettes();
+        BuildAtmosphericDetails();
         BuildCityDebris();
         BuildNeonAccents();
     }
@@ -1485,68 +1487,218 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private void BuildKenneyCityFloor()
     {
         const float tileStep = 3.2f;
-        for (int y = -15; y <= 15; y++)
+        const int radius = 17;
+        for (int y = -radius; y <= radius; y++)
         {
-            for (int x = -15; x <= 15; x++)
+            for (int x = -radius; x <= radius; x++)
             {
-                bool roadStripe = x == 0 || y == 0 || Mathf.Abs(x) == 7 || Mathf.Abs(y) == 7;
+                bool road = IsCityRoadCell(x, y);
+                bool curb = !road && HasRoadNeighbor(x, y);
+                bool plaza = Mathf.Abs(x) <= 2 && Mathf.Abs(y) <= 2;
                 Sprite sprite = groundSprites[Mathf.Abs(x * 31 + y * 17) % groundSprites.Count];
-                Color color = roadStripe ? new Color(0.58f, 0.62f, 0.66f, 1f) : new Color(0.72f, 0.75f, 0.69f, 1f);
-                if ((x + y) % 5 == 0)
-                {
-                    color *= 0.92f;
-                    color.a = 1f;
-                }
+                Color color = ChooseCityTileColor(x, y, road, curb, plaza);
 
                 GameObject tile = CreateSpriteObject("City Floor Tile", sprite, color, new Vector3(x * tileStep, y * tileStep, 4f), Vector3.one * tileStep, -8);
                 tile.transform.SetParent(worldRoot, false);
             }
         }
 
-        for (int i = -15; i <= 15; i++)
+        AddRoadMarkings(tileStep, radius);
+        AddCrosswalk(new Vector2(-8f * tileStep, 0f), true);
+        AddCrosswalk(new Vector2(8f * tileStep, 0f), true);
+        AddCrosswalk(new Vector2(0f, -8f * tileStep), false);
+        AddCrosswalk(new Vector2(0f, 8f * tileStep), false);
+        AddCrosswalk(Vector2.zero, true);
+        AddCrosswalk(Vector2.zero, false);
+
+        GameObject plazaGlow = CreateSpriteObject("Last Stand Plaza Glow", softGlowSprite, new Color(0.18f, 0.75f, 1f, 0.16f), new Vector3(0f, 0f, 2.4f), new Vector3(8.5f, 8.5f, 1f), -5);
+        plazaGlow.transform.SetParent(worldRoot, false);
+        GameObject plazaRing = CreateSpriteObject("Last Stand Plaza Ring", tileSprite, new Color(0.8f, 0.9f, 1f, 0.28f), new Vector3(0f, 0f, 2.2f), new Vector3(7.5f, 0.08f, 1f), -4);
+        plazaRing.transform.SetParent(worldRoot, false);
+        GameObject plazaRingVertical = CreateSpriteObject("Last Stand Plaza Ring", tileSprite, new Color(0.8f, 0.9f, 1f, 0.22f), new Vector3(0f, 0f, 2.2f), new Vector3(0.08f, 7.5f, 1f), -4);
+        plazaRingVertical.transform.SetParent(worldRoot, false);
+    }
+
+    private Color ChooseCityTileColor(int x, int y, bool road, bool curb, bool plaza)
+    {
+        float tint = Hash01(x, y) * 0.08f - 0.04f;
+        Color color;
+        if (plaza)
         {
-            GameObject centerLine = CreateSpriteObject("Road Divider", tileSprite, new Color(1f, 0.86f, 0.32f, 0.55f), new Vector3(i * tileStep, 0f, 2f), new Vector3(1.25f, 0.08f, 1f), -6);
-            centerLine.transform.SetParent(worldRoot, false);
-            GameObject crossLine = CreateSpriteObject("Road Divider", tileSprite, new Color(0.18f, 0.75f, 1f, 0.34f), new Vector3(0f, i * tileStep, 2f), new Vector3(0.08f, 1.25f, 1f), -6);
-            crossLine.transform.SetParent(worldRoot, false);
+            color = new Color(0.2f, 0.27f, 0.28f, 1f);
+        }
+        else if (road)
+        {
+            color = new Color(0.11f, 0.12f, 0.125f, 1f);
+        }
+        else if (curb)
+        {
+            color = new Color(0.42f, 0.43f, 0.39f, 1f);
+        }
+        else
+        {
+            color = new Color(0.27f, 0.3f, 0.27f, 1f);
+        }
+
+        color.r = Mathf.Clamp01(color.r + tint);
+        color.g = Mathf.Clamp01(color.g + tint);
+        color.b = Mathf.Clamp01(color.b + tint);
+        return color;
+    }
+
+    private static bool IsCityRoadCell(int x, int y)
+    {
+        return Mathf.Abs(x) <= 1
+            || Mathf.Abs(y) <= 1
+            || Mathf.Abs(Mathf.Abs(x) - 8) <= 1
+            || Mathf.Abs(Mathf.Abs(y) - 8) <= 1
+            || (x == -14 && y > -12 && y < 12)
+            || (y == 14 && x > -12 && x < 12);
+    }
+
+    private static bool HasRoadNeighbor(int x, int y)
+    {
+        return IsCityRoadCell(x + 1, y)
+            || IsCityRoadCell(x - 1, y)
+            || IsCityRoadCell(x, y + 1)
+            || IsCityRoadCell(x, y - 1);
+    }
+
+    private static float Hash01(int x, int y)
+    {
+        int hash = x * 73856093 ^ y * 19349663;
+        hash = (hash << 13) ^ hash;
+        hash = (hash * (hash * hash * 15731 + 789221) + 1376312589) & 0x7fffffff;
+        return (hash % 10000) / 10000f;
+    }
+
+    private void AddRoadMarkings(float tileStep, int radius)
+    {
+        for (int i = -radius; i <= radius; i++)
+        {
+            if (i % 2 == 0)
+            {
+                AddRoadDash(new Vector3(i * tileStep, 0f, 2f), new Vector3(1.15f, 0.08f, 1f), new Color(1f, 0.82f, 0.25f, 0.58f));
+                AddRoadDash(new Vector3(0f, i * tileStep, 2f), new Vector3(0.08f, 1.15f, 1f), new Color(1f, 0.82f, 0.25f, 0.58f));
+            }
+
+            AddRoadDash(new Vector3(i * tileStep, 8f * tileStep, 2f), new Vector3(0.85f, 0.06f, 1f), new Color(0.78f, 0.86f, 0.9f, 0.26f));
+            AddRoadDash(new Vector3(i * tileStep, -8f * tileStep, 2f), new Vector3(0.85f, 0.06f, 1f), new Color(0.78f, 0.86f, 0.9f, 0.22f));
+            AddRoadDash(new Vector3(8f * tileStep, i * tileStep, 2f), new Vector3(0.06f, 0.85f, 1f), new Color(0.78f, 0.86f, 0.9f, 0.24f));
+            AddRoadDash(new Vector3(-8f * tileStep, i * tileStep, 2f), new Vector3(0.06f, 0.85f, 1f), new Color(0.78f, 0.86f, 0.9f, 0.2f));
+        }
+    }
+
+    private void AddRoadDash(Vector3 position, Vector3 scale, Color color)
+    {
+        GameObject dash = CreateSpriteObject("Road Paint", tileSprite, color, position, scale, -6);
+        dash.transform.SetParent(worldRoot, false);
+    }
+
+    private void AddCrosswalk(Vector2 center, bool horizontal)
+    {
+        for (int i = -3; i <= 3; i++)
+        {
+            Vector3 position = horizontal
+                ? new Vector3(center.x + i * 0.62f, center.y, 1.9f)
+                : new Vector3(center.x, center.y + i * 0.62f, 1.9f);
+            Vector3 scale = horizontal ? new Vector3(0.28f, 3.6f, 1f) : new Vector3(3.6f, 0.28f, 1f);
+            GameObject stripe = CreateSpriteObject("Faded Crosswalk", tileSprite, new Color(0.86f, 0.9f, 0.88f, 0.2f), position, scale, -5);
+            stripe.transform.SetParent(worldRoot, false);
         }
     }
 
     private void BuildFallbackNeonFloor()
     {
-        GameObject floor = CreateSpriteObject("Neon Asphalt", tileSprite, new Color(0.08f, 0.09f, 0.11f), Vector3.forward * 4f, new Vector3(96f, 96f, 1f), 0);
+        GameObject floor = CreateSpriteObject("Neon Asphalt", tileSprite, new Color(0.06f, 0.072f, 0.075f), Vector3.forward * 4f, new Vector3(110f, 110f, 1f), -8);
         floor.transform.SetParent(worldRoot, false);
 
-        for (int i = -12; i <= 12; i++)
+        for (int i = -14; i <= 14; i++)
         {
-            GameObject lineX = CreateSpriteObject("Road Line X", tileSprite, new Color(0.05f, 0.75f, 1f, 0.26f), new Vector3(i * 4f, 0f, 2f), new Vector3(0.08f, 96f, 1f), 1);
+            GameObject lineX = CreateSpriteObject("Road Line X", tileSprite, new Color(0.05f, 0.75f, 1f, 0.16f), new Vector3(i * 4f, 0f, 2f), new Vector3(0.06f, 110f, 1f), -6);
             lineX.transform.SetParent(worldRoot, false);
-            GameObject lineY = CreateSpriteObject("Road Line Y", tileSprite, new Color(1f, 0.18f, 0.45f, 0.18f), new Vector3(0f, i * 4f, 2f), new Vector3(96f, 0.08f, 1f), 1);
+            GameObject lineY = CreateSpriteObject("Road Line Y", tileSprite, new Color(1f, 0.18f, 0.45f, 0.12f), new Vector3(0f, i * 4f, 2f), new Vector3(110f, 0.06f, 1f), -6);
             lineY.transform.SetParent(worldRoot, false);
+        }
+    }
+
+    private void BuildCityBlockSilhouettes()
+    {
+        AddBuildingFootprint(new Vector2(-31f, 29f), new Vector2(13f, 7f), new Color(0.055f, 0.06f, 0.065f, 0.92f), new Color(0.2f, 0.9f, 1f, 0.3f));
+        AddBuildingFootprint(new Vector2(29f, 30f), new Vector2(10f, 9f), new Color(0.065f, 0.055f, 0.06f, 0.92f), new Color(1f, 0.28f, 0.48f, 0.28f));
+        AddBuildingFootprint(new Vector2(-30f, -27f), new Vector2(11f, 8f), new Color(0.06f, 0.065f, 0.055f, 0.92f), new Color(1f, 0.78f, 0.2f, 0.26f));
+        AddBuildingFootprint(new Vector2(31f, -28f), new Vector2(12f, 6.5f), new Color(0.045f, 0.052f, 0.06f, 0.94f), new Color(0.25f, 0.85f, 1f, 0.24f));
+        AddBuildingFootprint(new Vector2(-43f, 4f), new Vector2(8f, 18f), new Color(0.052f, 0.055f, 0.06f, 0.9f), new Color(1f, 0.22f, 0.62f, 0.22f));
+        AddBuildingFootprint(new Vector2(43f, -2f), new Vector2(8.5f, 19f), new Color(0.05f, 0.057f, 0.055f, 0.9f), new Color(0.2f, 0.95f, 0.72f, 0.2f));
+    }
+
+    private void AddBuildingFootprint(Vector2 center, Vector2 size, Color bodyColor, Color accentColor)
+    {
+        GameObject shadow = CreateSpriteObject("Building Shadow", softShadowSprite, new Color(0f, 0f, 0f, 0.38f), new Vector3(center.x + 0.45f, center.y - 0.45f, 2.5f), new Vector3(size.x * 1.22f, size.y * 1.22f, 1f), -5);
+        shadow.transform.SetParent(worldRoot, false);
+        GameObject body = CreateSpriteObject("Burned Building Footprint", tileSprite, bodyColor, new Vector3(center.x, center.y, 1.7f), new Vector3(size.x, size.y, 1f), -3);
+        body.transform.SetParent(worldRoot, false);
+        GameObject rimTop = CreateSpriteObject("Building Rim", tileSprite, accentColor, new Vector3(center.x, center.y + size.y * 0.5f, 1.6f), new Vector3(size.x, 0.1f, 1f), -2);
+        rimTop.transform.SetParent(worldRoot, false);
+        GameObject rimSide = CreateSpriteObject("Building Rim", tileSprite, new Color(accentColor.r, accentColor.g, accentColor.b, accentColor.a * 0.65f), new Vector3(center.x - size.x * 0.5f, center.y, 1.6f), new Vector3(0.1f, size.y, 1f), -2);
+        rimSide.transform.SetParent(worldRoot, false);
+
+        for (int i = 0; i < 3; i++)
+        {
+            float offset = (i - 1) * size.x * 0.24f;
+            GameObject window = CreateSpriteObject("Dead Window Glow", tileSprite, new Color(accentColor.r, accentColor.g, accentColor.b, accentColor.a * 0.55f), new Vector3(center.x + offset, center.y + size.y * 0.12f, 1.5f), new Vector3(size.x * 0.12f, 0.22f, 1f), -1);
+            window.transform.SetParent(worldRoot, false);
+        }
+    }
+
+    private void BuildAtmosphericDetails()
+    {
+        for (int i = 0; i < 34; i++)
+        {
+            Vector2 position = UnityEngine.Random.insideUnitCircle * UnityEngine.Random.Range(9f, 48f);
+            if (position.magnitude < 7f)
+            {
+                position += position.normalized * 7f;
+            }
+
+            Color puddleColor = i % 3 == 0 ? new Color(0.07f, 0.18f, 0.2f, 0.2f) : new Color(0f, 0f, 0f, 0.18f);
+            GameObject puddle = CreateSpriteObject("Oil Puddle", softGlowSprite, puddleColor, new Vector3(position.x, position.y, 2.1f), new Vector3(UnityEngine.Random.Range(1.5f, 3.8f), UnityEngine.Random.Range(0.45f, 1.1f), 1f), -5);
+            puddle.transform.rotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
+            puddle.transform.SetParent(worldRoot, false);
+        }
+
+        for (int i = 0; i < 46; i++)
+        {
+            Vector2 position = UnityEngine.Random.insideUnitCircle * UnityEngine.Random.Range(12f, 50f);
+            GameObject crack = CreateSpriteObject("Asphalt Crack", tileSprite, new Color(0f, 0f, 0f, 0.24f), new Vector3(position.x, position.y, 2f), new Vector3(UnityEngine.Random.Range(1.2f, 3.8f), 0.05f, 1f), -4);
+            crack.transform.rotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 180f));
+            crack.transform.SetParent(worldRoot, false);
         }
     }
 
     private void BuildCityDebris()
     {
-        int count = debrisSprites.Count > 0 ? 120 : 96;
+        int count = debrisSprites.Count > 0 ? 150 : 120;
         for (int i = 0; i < count; i++)
         {
-            Vector2 position = UnityEngine.Random.insideUnitCircle * 43f;
+            Vector2 position = UnityEngine.Random.insideUnitCircle * 49f;
             if (position.magnitude < 5f)
             {
-                position += position.normalized * 5f;
+                position += position.normalized * 8f;
             }
 
             if (debrisSprites.Count > 0)
             {
                 Sprite sprite = debrisSprites[UnityEngine.Random.Range(0, debrisSprites.Count)];
-                GameObject prop = CreateSpriteObject("Street Prop", sprite, Color.white, new Vector3(position.x, position.y, 1f), Vector3.one * UnityEngine.Random.Range(1.15f, 2.1f), 3);
+                Color tint = UnityEngine.Random.value > 0.74f ? new Color(0.72f, 0.78f, 0.72f, 1f) : new Color(0.58f, 0.6f, 0.56f, 1f);
+                GameObject prop = CreateSpriteObject("Street Prop", sprite, tint, new Vector3(position.x, position.y, 1f), Vector3.one * UnityEngine.Random.Range(0.95f, 1.75f), 3);
                 prop.transform.rotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
                 prop.transform.SetParent(worldRoot, false);
+                AddShadow(prop.transform, new Vector3(1.15f, 0.42f, 1f), -0.18f, 2);
             }
             else
             {
-                Color color = UnityEngine.Random.value > 0.5f ? new Color(0.16f, 0.18f, 0.22f) : new Color(0.13f, 0.08f, 0.11f);
+                Color color = UnityEngine.Random.value > 0.5f ? new Color(0.12f, 0.14f, 0.16f) : new Color(0.14f, 0.08f, 0.1f);
                 GameObject ruin = CreateSpriteObject("Pixel Ruin", ruinSprite, color, position, new Vector3(UnityEngine.Random.Range(0.7f, 2.2f), UnityEngine.Random.Range(0.7f, 2.8f), 1f), 2);
                 ruin.transform.SetParent(worldRoot, false);
             }
@@ -1555,16 +1707,30 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private void BuildNeonAccents()
     {
-        for (int i = 0; i < 18; i++)
+        Vector2[] anchors =
         {
-            Vector2 position = UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(16f, 43f);
+            new Vector2(-31f, 24f),
+            new Vector2(28f, 25f),
+            new Vector2(-29f, -22f),
+            new Vector2(33f, -23f),
+            new Vector2(-43f, 11f),
+            new Vector2(43f, -9f),
+            new Vector2(-12f, 31f),
+            new Vector2(13f, -31f),
+            new Vector2(-23f, -2f),
+            new Vector2(24f, 2f)
+        };
+
+        for (int i = 0; i < anchors.Length; i++)
+        {
+            Vector2 position = anchors[i] + UnityEngine.Random.insideUnitCircle * 2.2f;
             Color color = i % 3 == 0 ? new Color(0.2f, 0.9f, 1f, 0.82f) : i % 3 == 1 ? new Color(1f, 0.18f, 0.55f, 0.82f) : new Color(1f, 0.75f, 0.18f, 0.78f);
-            GameObject glow = CreateSpriteObject("Neon Spill Light", softGlowSprite, new Color(color.r, color.g, color.b, 0.18f), new Vector3(position.x, position.y, 2.2f), Vector3.one * UnityEngine.Random.Range(4f, 7f), -4);
+            GameObject glow = CreateSpriteObject("Neon Spill Light", softGlowSprite, new Color(color.r, color.g, color.b, 0.2f), new Vector3(position.x, position.y, 2.2f), Vector3.one * UnityEngine.Random.Range(5f, 8f), -4);
             glow.transform.SetParent(worldRoot, false);
 
             if (neonSignSprite != null)
             {
-                GameObject sign = CreateSpriteObject("Broken Neon Sign", neonSignSprite, color, new Vector3(position.x, position.y, 1.8f), new Vector3(UnityEngine.Random.Range(1.2f, 2.3f), UnityEngine.Random.Range(0.55f, 1.0f), 1f), 5);
+                GameObject sign = CreateSpriteObject("Broken Neon Sign", neonSignSprite, color, new Vector3(position.x, position.y, 1.8f), new Vector3(UnityEngine.Random.Range(1.5f, 2.6f), UnityEngine.Random.Range(0.65f, 1.05f), 1f), 5);
                 sign.transform.rotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(-18f, 18f));
                 sign.transform.SetParent(worldRoot, false);
             }
