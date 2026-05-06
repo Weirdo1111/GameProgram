@@ -59,6 +59,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private readonly List<ZombieStormUpgradeOption> currentChoices = new List<ZombieStormUpgradeOption>(3);
     private readonly HashSet<string> choiceKeys = new HashSet<string>();
     private readonly Dictionary<string, Sprite[]> playerWalkFrames = new Dictionary<string, Sprite[]>();
+    private readonly Dictionary<string, Sprite[]> effectFrames = new Dictionary<string, Sprite[]>();
     private readonly List<ZombieStormDamagePopup> damagePopups = new List<ZombieStormDamagePopup>();
     private Sprite[] playerHurtFrames = new Sprite[0];
     private readonly List<Sprite> groundSprites = new List<Sprite>();
@@ -76,6 +77,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Sprite eliteSprite;
     private Sprite bossSprite;
     private Sprite bulletSprite;
+    private Sprite projectileFxSprite;
     private Sprite xpSprite;
     private Sprite coinSprite;
     private Sprite fireSprite;
@@ -360,6 +362,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         projectileObject.transform.position = position;
         projectileObject.transform.localScale = Vector3.one * size;
         SpriteRenderer spriteRenderer = projectileObject.GetComponent<SpriteRenderer>();
+        spriteRenderer.sprite = GetProjectileEffectSprite();
         spriteRenderer.color = color;
         ZombieStormProjectile projectile = projectileObject.GetComponent<ZombieStormProjectile>();
         projectile.Initialize(this, direction, damage, speed, life, pierce);
@@ -573,6 +576,50 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return softShadowSprite;
     }
 
+    public Sprite GetHealthBarSprite()
+    {
+        return tileSprite;
+    }
+
+    public Sprite GetProjectileEffectSprite()
+    {
+        return projectileFxSprite != null ? projectileFxSprite : bulletSprite;
+    }
+
+    public Sprite[] GetEffectFrames(string effectKey)
+    {
+        if (effectFrames.Count == 0)
+        {
+            return null;
+        }
+
+        string sequenceKey = "spark";
+        if (effectKey == "fire_pool" || effectKey == "toxic_pool" || effectKey == "meteor_blast" || effectKey == "meteor_warning")
+        {
+            sequenceKey = "fire";
+        }
+        else if (effectKey == "lightning_flash" || effectKey == "ultimate_spark" || effectKey == "ultimate_storm")
+        {
+            sequenceKey = "lightning";
+        }
+        else if (effectKey == "zombie_explosion" || effectKey == "mine_blast")
+        {
+            sequenceKey = "explosion";
+        }
+        else if (effectKey == "shield_burst" || effectKey == "upgrade_pulse" || effectKey == "upgrade_ring")
+        {
+            sequenceKey = "burst";
+        }
+
+        Sprite[] frames;
+        if (effectFrames.TryGetValue(sequenceKey, out frames) && frames != null && frames.Length > 0)
+        {
+            return frames;
+        }
+
+        return null;
+    }
+
     public static Vector2 Rotate(Vector2 value, float degrees)
     {
         float radians = degrees * Mathf.Deg2Rad;
@@ -686,6 +733,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         bloodSplatSprite = CreateBloodSplatSprite();
         neonSignSprite = CreateNeonSignSprite();
         LoadKenneyTopdownArt();
+        LoadMikodrakSpellEffects();
     }
 
     private void UpdateDynamicDifficulty()
@@ -853,7 +901,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     {
         GameObject item = new GameObject("Player Bullet");
         SpriteRenderer spriteRenderer = item.AddComponent<SpriteRenderer>();
-        spriteRenderer.sprite = bulletSprite;
+        spriteRenderer.sprite = GetProjectileEffectSprite();
         spriteRenderer.sortingOrder = 40;
         item.AddComponent<ZombieStormProjectile>();
         return item;
@@ -915,20 +963,39 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private void BuildUpgradeChoices()
     {
         choiceKeys.Clear();
+        if (Skills != null && Skills.KnownSkillCount > 0)
+        {
+            AddUpgradeChoice(CreateKnownSkillOption());
+        }
+
         int guard = 0;
         while (currentChoices.Count < 3 && guard < 80)
         {
             guard++;
             ZombieStormUpgradeOption option = CreateRandomUpgradeOption();
-            if (option != null && choiceKeys.Add(option.Key))
-            {
-                currentChoices.Add(option);
-            }
+            AddUpgradeChoice(option);
         }
 
-        while (currentChoices.Count < 3)
+        ZombieStormPassiveType[] fallbackPassives =
         {
-            AddFallbackPassive(ZombieStormPassiveType.Damage);
+            ZombieStormPassiveType.Damage,
+            ZombieStormPassiveType.FireRate,
+            ZombieStormPassiveType.Area,
+            ZombieStormPassiveType.MoveSpeed,
+            ZombieStormPassiveType.MaxHealth,
+            ZombieStormPassiveType.Crit
+        };
+        for (int i = 0; currentChoices.Count < 3 && i < fallbackPassives.Length; i++)
+        {
+            AddFallbackPassive(fallbackPassives[i]);
+        }
+    }
+
+    private void AddUpgradeChoice(ZombieStormUpgradeOption option)
+    {
+        if (option != null && choiceKeys.Add(option.Key))
+        {
+            currentChoices.Add(option);
         }
     }
 
@@ -939,23 +1006,140 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return null;
         }
 
-        if (UnityEngine.Random.value < 0.58f)
+        if (Skills.KnownSkillCount > 0 && UnityEngine.Random.value < 0.62f)
         {
-            ZombieStormSkillType weaponType = (ZombieStormSkillType)UnityEngine.Random.Range(0, Enum.GetValues(typeof(ZombieStormSkillType)).Length);
-            int level = Skills.GetSkillLevel(weaponType);
-            if (level <= 0)
-            {
-                return ZombieStormUpgradeOption.Skill("unlock_" + weaponType, "Learn " + SkillName(weaponType), SkillSummary(weaponType), SkillAccent(weaponType), delegate { Skills.LearnSkill(weaponType); });
-            }
+            return CreateKnownSkillOption();
+        }
 
-            if (level < 5)
-            {
-                return ZombieStormUpgradeOption.Skill("level_" + weaponType, SkillName(weaponType) + " Lv." + (level + 1), SkillLevelSummary(weaponType, level + 1), SkillAccent(weaponType), delegate { Skills.LevelUpSkill(weaponType); });
-            }
+        if (UnityEngine.Random.value < 0.46f)
+        {
+            return CreateUnlockSkillOption();
         }
 
         ZombieStormPassiveType passive = (ZombieStormPassiveType)UnityEngine.Random.Range(0, Enum.GetValues(typeof(ZombieStormPassiveType)).Length);
         return CreatePassiveOption(passive);
+    }
+
+    private ZombieStormUpgradeOption CreateKnownSkillOption()
+    {
+        for (int guard = 0; guard < 32; guard++)
+        {
+            ZombieStormSkillType weaponType;
+            if (!TryGetRandomKnownSkill(out weaponType))
+            {
+                return null;
+            }
+
+            if (UnityEngine.Random.value < 0.72f)
+            {
+                ZombieStormUpgradeOption specialization = CreateSkillSpecializationOption(weaponType);
+                if (specialization != null)
+                {
+                    return specialization;
+                }
+            }
+
+            ZombieStormUpgradeOption levelOption = CreateSkillLevelOption(weaponType);
+            if (levelOption != null)
+            {
+                return levelOption;
+            }
+
+            ZombieStormUpgradeOption fallbackSpecialization = CreateSkillSpecializationOption(weaponType);
+            if (fallbackSpecialization != null)
+            {
+                return fallbackSpecialization;
+            }
+        }
+
+        return null;
+    }
+
+    private bool TryGetRandomKnownSkill(out ZombieStormSkillType weaponType)
+    {
+        Array values = Enum.GetValues(typeof(ZombieStormSkillType));
+        int count = 0;
+        for (int i = 0; i < values.Length; i++)
+        {
+            ZombieStormSkillType candidate = (ZombieStormSkillType)values.GetValue(i);
+            if (Skills.GetSkillLevel(candidate) > 0)
+            {
+                count++;
+            }
+        }
+
+        if (count == 0)
+        {
+            weaponType = ZombieStormSkillType.MagicBolt;
+            return false;
+        }
+
+        int pick = UnityEngine.Random.Range(0, count);
+        for (int i = 0; i < values.Length; i++)
+        {
+            ZombieStormSkillType candidate = (ZombieStormSkillType)values.GetValue(i);
+            if (Skills.GetSkillLevel(candidate) <= 0)
+            {
+                continue;
+            }
+
+            if (pick == 0)
+            {
+                weaponType = candidate;
+                return true;
+            }
+
+            pick--;
+        }
+
+        weaponType = ZombieStormSkillType.MagicBolt;
+        return false;
+    }
+
+    private ZombieStormUpgradeOption CreateUnlockSkillOption()
+    {
+        Array values = Enum.GetValues(typeof(ZombieStormSkillType));
+        for (int guard = 0; guard < 24; guard++)
+        {
+            ZombieStormSkillType weaponType = (ZombieStormSkillType)values.GetValue(UnityEngine.Random.Range(0, values.Length));
+            if (Skills.GetSkillLevel(weaponType) <= 0)
+            {
+                return ZombieStormUpgradeOption.Skill("unlock_" + weaponType, "Learn " + SkillName(weaponType), SkillSummary(weaponType), SkillAccent(weaponType), delegate { Skills.LearnSkill(weaponType); });
+            }
+        }
+
+        return null;
+    }
+
+    private ZombieStormUpgradeOption CreateSkillLevelOption(ZombieStormSkillType weaponType)
+    {
+        int level = Skills.GetSkillLevel(weaponType);
+        if (level <= 0 || level >= 5)
+        {
+            return null;
+        }
+
+        return ZombieStormUpgradeOption.Skill("level_" + weaponType, SkillName(weaponType) + " Lv." + (level + 1), SkillLevelSummary(weaponType, level + 1), SkillAccent(weaponType), delegate { Skills.LevelUpSkill(weaponType); });
+    }
+
+    private ZombieStormUpgradeOption CreateSkillSpecializationOption(ZombieStormSkillType weaponType)
+    {
+        string[] keys = SkillUpgradeKeys(weaponType);
+        for (int guard = 0; guard < 18; guard++)
+        {
+            string key = keys[UnityEngine.Random.Range(0, keys.Length)];
+            int level = Skills.GetSkillUpgradeLevel(key);
+            if (level >= 3)
+            {
+                continue;
+            }
+
+            int nextLevel = level + 1;
+            string category = SkillName(weaponType).ToUpperInvariant() + " BUILD";
+            return ZombieStormUpgradeOption.Custom("special_" + key, SkillUpgradeName(key) + " Lv." + nextLevel, SkillUpgradeSummary(key, nextLevel), category, SkillAccent(weaponType), delegate { Skills.AddSkillUpgrade(key); });
+        }
+
+        return null;
     }
 
     private ZombieStormUpgradeOption CreatePassiveOption(ZombieStormPassiveType passive)
@@ -972,7 +1156,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private void AddFallbackPassive(ZombieStormPassiveType passive)
     {
         ZombieStormUpgradeOption option = CreatePassiveOption(passive);
-        if (option != null)
+        if (option != null && choiceKeys.Add(option.Key))
         {
             currentChoices.Add(option);
         }
@@ -1369,6 +1553,88 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case ZombieStormSkillType.ShieldBurst: return "Lv." + nextLevel + ": larger defensive ring and harder hit.";
             case ZombieStormSkillType.UltimateStorm: return "Lv." + nextLevel + ": stronger F ultimate, shorter cooldown.";
             default: return "Lv." + nextLevel + ": improves this automatic skill.";
+        }
+    }
+
+    private static string[] SkillUpgradeKeys(ZombieStormSkillType weapon)
+    {
+        switch (weapon)
+        {
+            case ZombieStormSkillType.MagicBolt: return new[] { "magic_force", "magic_split", "magic_pierce" };
+            case ZombieStormSkillType.OrbitingKnife: return new[] { "knife_blades", "knife_reach", "knife_edge" };
+            case ZombieStormSkillType.MeteorStorm: return new[] { "meteor_impacts", "meteor_blast", "meteor_heat" };
+            case ZombieStormSkillType.FireZone: return new[] { "fire_spread", "fire_linger", "fire_heat" };
+            case ZombieStormSkillType.SummonDrone: return new[] { "drone_swarm", "drone_focus", "drone_overclock" };
+            case ZombieStormSkillType.ChainLightning: return new[] { "lightning_jumps", "lightning_reach", "lightning_voltage", "lightning_tempo" };
+            case ZombieStormSkillType.ShieldBurst: return new[] { "shield_radius", "shield_force", "shield_recharge" };
+            case ZombieStormSkillType.UltimateStorm: return new[] { "ultimate_voltage", "ultimate_radius", "ultimate_recharge" };
+            default: return new[] { "magic_force" };
+        }
+    }
+
+    private static string SkillUpgradeName(string key)
+    {
+        switch (key)
+        {
+            case "magic_force": return "Focused Mana";
+            case "magic_split": return "Split Casting";
+            case "magic_pierce": return "Piercing Glyph";
+            case "knife_blades": return "Extra Blades";
+            case "knife_reach": return "Wide Orbit";
+            case "knife_edge": return "Sharper Edge";
+            case "meteor_impacts": return "Meteor Shower";
+            case "meteor_blast": return "Impact Crater";
+            case "meteor_heat": return "Molten Core";
+            case "fire_spread": return "Wildfire";
+            case "fire_linger": return "Lingering Flame";
+            case "fire_heat": return "Hotter Burn";
+            case "drone_swarm": return "Drone Bay";
+            case "drone_focus": return "Targeting Lens";
+            case "drone_overclock": return "Overclock";
+            case "lightning_jumps": return "Forked Current";
+            case "lightning_reach": return "Arc Range";
+            case "lightning_voltage": return "High Voltage";
+            case "lightning_tempo": return "Fast Charge";
+            case "shield_radius": return "Wider Guard";
+            case "shield_force": return "Repulsion Core";
+            case "shield_recharge": return "Quick Recharge";
+            case "ultimate_voltage": return "Storm Voltage";
+            case "ultimate_radius": return "Eye of the Storm";
+            case "ultimate_recharge": return "Storm Battery";
+            default: return "Specialized Upgrade";
+        }
+    }
+
+    private static string SkillUpgradeSummary(string key, int nextLevel)
+    {
+        switch (key)
+        {
+            case "lightning_jumps": return "Lv." + nextLevel + ": Chain Lightning jumps to one more enemy.";
+            case "lightning_reach": return "Lv." + nextLevel + ": Chain Lightning links farther and flashes wider.";
+            case "lightning_voltage": return "Lv." + nextLevel + ": Chain Lightning deals 18% more damage.";
+            case "lightning_tempo": return "Lv." + nextLevel + ": Chain Lightning cooldown is reduced.";
+            case "magic_force": return "Lv." + nextLevel + ": Magic Bolt deals more damage.";
+            case "magic_split": return "Lv." + nextLevel + ": Magic Bolt can fire additional angled shots.";
+            case "magic_pierce": return "Lv." + nextLevel + ": Magic Bolt pierces more enemies.";
+            case "knife_blades": return "Lv." + nextLevel + ": Orbiting Knives adds another blade.";
+            case "knife_reach": return "Lv." + nextLevel + ": Orbiting Knives circle farther out.";
+            case "knife_edge": return "Lv." + nextLevel + ": Orbiting Knives hit harder.";
+            case "meteor_impacts": return "Lv." + nextLevel + ": Meteor Storm drops one more impact.";
+            case "meteor_blast": return "Lv." + nextLevel + ": Meteor blast radius grows.";
+            case "meteor_heat": return "Lv." + nextLevel + ": Meteor impacts deal more damage.";
+            case "fire_spread": return "Lv." + nextLevel + ": Fire Zone creates another burning pool.";
+            case "fire_linger": return "Lv." + nextLevel + ": Fire Zone lasts longer.";
+            case "fire_heat": return "Lv." + nextLevel + ": Fire Zone tick damage increases.";
+            case "drone_swarm": return "Lv." + nextLevel + ": Summon Drone adds another drone.";
+            case "drone_focus": return "Lv." + nextLevel + ": Drone bullets hit harder.";
+            case "drone_overclock": return "Lv." + nextLevel + ": Drone firing cooldown is reduced.";
+            case "shield_radius": return "Lv." + nextLevel + ": Shield Burst covers more space.";
+            case "shield_force": return "Lv." + nextLevel + ": Shield Burst deals more damage.";
+            case "shield_recharge": return "Lv." + nextLevel + ": Shield Burst cooldown is reduced.";
+            case "ultimate_voltage": return "Lv." + nextLevel + ": Ultimate storm damage increases.";
+            case "ultimate_radius": return "Lv." + nextLevel + ": Ultimate storm reaches farther.";
+            case "ultimate_recharge": return "Lv." + nextLevel + ": Ultimate cooldown is reduced.";
+            default: return "Lv." + nextLevel + ": improves this skill's behavior.";
         }
     }
 
@@ -1812,25 +2078,17 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return false;
         }
 
-        Sprite[] downFrames = LoadCowboySplitRow(root, 1, 6);
-        Sprite[] upFrames = LoadCowboySplitRow(root, 6, 6);
         Sprite[] rightFrames = MakeWalkCycle(LoadCowboySplitColumns(root, 8, 4, 6));
 
-        if (downFrames.Length == 0 || upFrames.Length == 0 || rightFrames.Length == 0)
+        if (rightFrames.Length == 0)
         {
             playerWalkFrames.Clear();
             return false;
         }
 
-        playerWalkFrames["walk_down"] = downFrames;
-        playerWalkFrames["walk_up"] = upFrames;
         playerWalkFrames["walk_right"] = rightFrames;
         playerWalkFrames["walk_left"] = rightFrames;
-        playerWalkFrames["walk_down_right"] = rightFrames;
-        playerWalkFrames["walk_up_right"] = rightFrames;
-        playerWalkFrames["walk_down_left"] = rightFrames;
-        playerWalkFrames["walk_up_left"] = rightFrames;
-        playerSprite = downFrames[0];
+        playerSprite = rightFrames[0];
         return true;
     }
 
@@ -1885,10 +2143,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (rightFrames != null && rightFrames.Length > 0)
         {
             playerWalkFrames["walk_left"] = rightFrames;
-            playerWalkFrames["walk_down_left"] = rightFrames;
-            playerWalkFrames["walk_up_left"] = rightFrames;
-            playerWalkFrames["walk_down_right"] = rightFrames;
-            playerWalkFrames["walk_up_right"] = rightFrames;
+            playerSprite = rightFrames[0];
         }
     }
 
@@ -1953,6 +2208,85 @@ public sealed class ZombieStormGameController : MonoBehaviour
         kenneyEliteZombieSprite = LoadRawSpriteFromPng(Path.Combine(root, "Zombie 1", "zoimbie1_gun.png"), 22f, false);
         kenneyBossSprite = LoadRawSpriteFromPng(Path.Combine(root, "Zombie 1", "zoimbie1_reload.png"), 18f, false);
 
+    }
+
+    private void LoadMikodrakSpellEffects()
+    {
+        effectFrames.Clear();
+        projectileFxSprite = null;
+
+        string root = Path.Combine(Application.dataPath, "ExternalArt", "MikodrakSpellEffects");
+        if (!Directory.Exists(root))
+        {
+            return;
+        }
+
+        AddEffectSequence(root, "spark", "fx1_blue_topEffect", 240f);
+        AddEffectSequence(root, "fire", "fx3_fireBall", 240f);
+        AddEffectSequence(root, "burst", "fx7_energyBall", 240f);
+        AddEffectSequence(root, "lightning", "fx8_lighteningBall", 240f);
+        AddEffectSequence(root, "explosion", "fx10_blackExplosion", 240f);
+
+        Sprite[] projectileFrames;
+        if (effectFrames.TryGetValue("burst", out projectileFrames) && projectileFrames != null && projectileFrames.Length > 0)
+        {
+            projectileFxSprite = projectileFrames[Mathf.Min(2, projectileFrames.Length - 1)];
+        }
+    }
+
+    private void AddEffectSequence(string root, string key, string folderName, float pixelsPerUnit)
+    {
+        string folder = Path.Combine(root, folderName);
+        if (!Directory.Exists(folder))
+        {
+            return;
+        }
+
+        string[] files = Directory.GetFiles(folder, "*.png");
+        Array.Sort(files, CompareFrameFileNames);
+        List<Sprite> frames = new List<Sprite>(files.Length);
+        for (int i = 0; i < files.Length; i++)
+        {
+            Sprite sprite = LoadRawSpriteFromPng(files[i], pixelsPerUnit, false);
+            if (sprite != null)
+            {
+                frames.Add(sprite);
+            }
+        }
+
+        if (frames.Count > 0)
+        {
+            effectFrames[key] = frames.ToArray();
+        }
+    }
+
+    private static int CompareFrameFileNames(string left, string right)
+    {
+        int leftNumber = ExtractTrailingFrameNumber(Path.GetFileNameWithoutExtension(left));
+        int rightNumber = ExtractTrailingFrameNumber(Path.GetFileNameWithoutExtension(right));
+        int numberCompare = leftNumber.CompareTo(rightNumber);
+        return numberCompare != 0 ? numberCompare : string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int ExtractTrailingFrameNumber(string name)
+    {
+        int value = 0;
+        int multiplier = 1;
+        bool foundDigit = false;
+        for (int i = name.Length - 1; i >= 0; i--)
+        {
+            char character = name[i];
+            if (character < '0' || character > '9')
+            {
+                break;
+            }
+
+            foundDigit = true;
+            value += (character - '0') * multiplier;
+            multiplier *= 10;
+        }
+
+        return foundDigit ? value : 0;
     }
 
     private void AddSpriteIfExists(List<Sprite> target, string path, float pixelsPerUnit, bool removeCheckerBackground)
@@ -2361,6 +2695,11 @@ public sealed class ZombieStormUpgradeOption
     {
         return new ZombieStormUpgradeOption { Key = key, Title = title, Description = description, Category = "PASSIVE STAT", Accent = accent, Apply = apply };
     }
+
+    public static ZombieStormUpgradeOption Custom(string key, string title, string description, string category, Color accent, Action apply)
+    {
+        return new ZombieStormUpgradeOption { Key = key, Title = title, Description = description, Category = category, Accent = accent, Apply = apply };
+    }
 }
 
 public struct ZombieStormDamagePopup
@@ -2377,9 +2716,13 @@ public sealed class ZombieStormPlayer : MonoBehaviour
 {
     private const float AnimatedPlayerVisualScale = 1.55f;
     private const float FallbackPlayerVisualScale = 1.28f;
+    private const float HealthBarWidth = 1.18f;
+    private const float HealthBarHeight = 0.1f;
 
     private ZombieStormGameController game;
     private SpriteRenderer spriteRenderer;
+    private SpriteRenderer healthBarFill;
+    private Transform healthBarFillTransform;
     private Vector2 lastMove = Vector2.down;
     private float hurtCooldown;
     private float hurtAnimationTimer;
@@ -2408,6 +2751,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         Health = MaxHealth;
         Coins = 0;
         Kills = 0;
+        BuildHealthBar();
     }
 
     private void Update()
@@ -2431,7 +2775,11 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         if (input.sqrMagnitude > 0.01f)
         {
             lastMove = input.normalized;
-            facingDirection = DirectionToAnimation(lastMove);
+            if (Mathf.Abs(lastMove.x) > 0.08f)
+            {
+                facingDirection = DirectionToAnimation(lastMove);
+            }
+
             if (!game.HasPlayerWalkAnimation)
             {
                 transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(lastMove.y, lastMove.x) * Mathf.Rad2Deg - 90f);
@@ -2447,6 +2795,52 @@ public sealed class ZombieStormPlayer : MonoBehaviour
             spriteRenderer.color = Color.Lerp(spriteRenderer.color, Color.white, 6f * Time.deltaTime);
             UpdatePlayerAnimation(input.sqrMagnitude > 0.01f);
         }
+
+        UpdateHealthBar();
+    }
+
+    private void BuildHealthBar()
+    {
+        Sprite barSprite = game.GetHealthBarSprite();
+        if (barSprite == null)
+        {
+            return;
+        }
+
+        GameObject root = new GameObject("Underfoot Health Bar");
+        root.transform.SetParent(transform, false);
+        root.transform.localPosition = new Vector3(0f, -0.78f, 0f);
+
+        GameObject background = new GameObject("Health Bar Back");
+        background.transform.SetParent(root.transform, false);
+        background.transform.localScale = new Vector3(HealthBarWidth + 0.08f, HealthBarHeight + 0.05f, 1f);
+        SpriteRenderer backgroundRenderer = background.AddComponent<SpriteRenderer>();
+        backgroundRenderer.sprite = barSprite;
+        backgroundRenderer.color = new Color(0.04f, 0.03f, 0.025f, 0.86f);
+        backgroundRenderer.sortingOrder = 52;
+
+        GameObject fill = new GameObject("Health Bar Fill");
+        fill.transform.SetParent(root.transform, false);
+        fill.transform.localScale = new Vector3(HealthBarWidth, HealthBarHeight, 1f);
+        healthBarFillTransform = fill.transform;
+        healthBarFill = fill.AddComponent<SpriteRenderer>();
+        healthBarFill.sprite = barSprite;
+        healthBarFill.color = new Color(0.92f, 0.08f, 0.08f, 0.96f);
+        healthBarFill.sortingOrder = 53;
+    }
+
+    private void UpdateHealthBar()
+    {
+        if (healthBarFill == null || healthBarFillTransform == null)
+        {
+            return;
+        }
+
+        float value = MaxHealth <= 0f ? 0f : Mathf.Clamp01(Health / MaxHealth);
+        float width = Mathf.Max(0.02f, HealthBarWidth * value);
+        healthBarFillTransform.localScale = new Vector3(width, HealthBarHeight, 1f);
+        healthBarFillTransform.localPosition = new Vector3(-HealthBarWidth * 0.5f + width * 0.5f, 0f, 0f);
+        healthBarFill.color = value > 0.5f ? new Color(0.92f, 0.08f, 0.08f, 0.96f) : new Color(1f, 0.58f, 0.08f, 0.98f);
     }
 
     private void UpdatePlayerAnimation(bool moving)
@@ -2494,53 +2888,12 @@ public sealed class ZombieStormPlayer : MonoBehaviour
 
     private static bool IsLeftFacingDirection(string direction)
     {
-        return direction == "walk_left" || direction == "walk_up_left" || direction == "walk_down_left";
+        return direction == "walk_left";
     }
 
     private static string DirectionToAnimation(Vector2 direction)
     {
-        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-        if (angle < 0f)
-        {
-            angle += 360f;
-        }
-
-        if (angle >= 337.5f || angle < 22.5f)
-        {
-            return "walk_right";
-        }
-
-        if (angle < 67.5f)
-        {
-            return "walk_up_right";
-        }
-
-        if (angle < 112.5f)
-        {
-            return "walk_up";
-        }
-
-        if (angle < 157.5f)
-        {
-            return "walk_up_left";
-        }
-
-        if (angle < 202.5f)
-        {
-            return "walk_left";
-        }
-
-        if (angle < 247.5f)
-        {
-            return "walk_down_left";
-        }
-
-        if (angle < 292.5f)
-        {
-            return "walk_down";
-        }
-
-        return "walk_down_right";
+        return direction.x < -0.08f ? "walk_left" : "walk_right";
     }
 
     public void AddExperience(int amount)
@@ -2608,6 +2961,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 {
     private readonly Dictionary<ZombieStormSkillType, int> levels = new Dictionary<ZombieStormSkillType, int>();
     private readonly Dictionary<ZombieStormSkillType, float> cooldowns = new Dictionary<ZombieStormSkillType, float>();
+    private readonly Dictionary<string, int> skillUpgrades = new Dictionary<string, int>();
     private readonly HashSet<ZombieStormSkillType> evolved = new HashSet<ZombieStormSkillType>();
     private readonly List<GameObject> orbitingObjects = new List<GameObject>();
     private readonly List<GameObject> drones = new List<GameObject>();
@@ -2616,6 +2970,11 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
     private ZombieStormGameController game;
     private ZombieStormPlayer player;
     private float ultimateCooldown;
+
+    public int KnownSkillCount
+    {
+        get { return levels.Count; }
+    }
 
     public void Initialize(ZombieStormGameController owner, ZombieStormPlayer survivor)
     {
@@ -2680,6 +3039,26 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
     {
         int level;
         return levels.TryGetValue(weapon, out level) ? level : 0;
+    }
+
+    public int GetSkillUpgradeLevel(string key)
+    {
+        int level;
+        return skillUpgrades.TryGetValue(key, out level) ? level : 0;
+    }
+
+    public void AddSkillUpgrade(string key)
+    {
+        int next = Mathf.Min(3, GetSkillUpgradeLevel(key) + 1);
+        skillUpgrades[key] = next;
+        if (key == "knife_blades")
+        {
+            RebuildOrbitingKnives();
+        }
+        else if (key == "drone_swarm")
+        {
+            RebuildDrones();
+        }
     }
 
     public bool IsEvolved(ZombieStormSkillType weapon)
@@ -2768,6 +3147,11 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
     }
 
+    private int Mod(string key)
+    {
+        return GetSkillUpgradeLevel(key);
+    }
+
     private void CastMagicBolt(int level)
     {
         ZombieStormEnemy target = game.FindNearestEnemy(transform.position, IsEvolved(ZombieStormSkillType.MagicBolt) ? 18f : 14f);
@@ -2779,12 +3163,15 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         Vector2 direction = ((Vector2)target.transform.position - (Vector2)transform.position).normalized;
         Vector2 origin = (Vector2)transform.position + direction * 0.42f;
-        int shots = IsEvolved(ZombieStormSkillType.MagicBolt) ? 3 : level >= 4 ? 2 : 1;
+        int shots = (IsEvolved(ZombieStormSkillType.MagicBolt) ? 3 : level >= 4 ? 2 : 1) + Mod("magic_split");
+        float damage = (10f + level * 3.4f) * (1f + Mod("magic_force") * 0.16f);
+        int pierce = (level >= 3 ? 1 : 0) + Mod("magic_pierce");
         game.SpawnHitSpark(origin, new Color(0.48f, 0.95f, 1f, 0.88f), 0.24f + level * 0.025f);
         for (int i = 0; i < shots; i++)
         {
-            float angle = shots == 1 ? 0f : -9f + i * 9f;
-            game.SpawnPlayerProjectile(origin, ZombieStormGameController.Rotate(direction, angle), RollDamage(10f + level * 3.4f), 13.5f, 1.4f, level >= 3 ? 1 : 0, new Color(0.56f, 0.92f, 1f), 0.34f + level * 0.015f);
+            float spreadStep = shots <= 3 ? 9f : 7f;
+            float angle = shots == 1 ? 0f : -(shots - 1) * spreadStep * 0.5f + i * spreadStep;
+            game.SpawnPlayerProjectile(origin, ZombieStormGameController.Rotate(direction, angle), RollDamage(damage), 13.5f, 1.4f, pierce, new Color(0.56f, 0.92f, 1f), 0.34f + level * 0.015f);
         }
 
         float baseCooldown = IsEvolved(ZombieStormSkillType.MagicBolt) ? 0.18f : 0.62f - level * 0.055f;
@@ -2793,19 +3180,19 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
     private void CastMeteorStorm(int level)
     {
-        int impacts = 1 + Mathf.FloorToInt(level * 0.55f) + (IsEvolved(ZombieStormSkillType.MeteorStorm) ? 2 : 0);
+        int impacts = 1 + Mathf.FloorToInt(level * 0.55f) + Mod("meteor_impacts") + (IsEvolved(ZombieStormSkillType.MeteorStorm) ? 2 : 0);
         for (int i = 0; i < impacts; i++)
         {
             ZombieStormEnemy target = game.FindRandomEnemy();
             Vector2 position = target != null ? (Vector2)target.transform.position : (Vector2)transform.position + UnityEngine.Random.insideUnitCircle * 5.5f;
-            float radius = (0.95f + level * 0.18f) * game.AreaMultiplier;
+            float radius = (0.95f + level * 0.18f + Mod("meteor_blast") * 0.2f) * game.AreaMultiplier;
             game.SpawnAreaEffect(position, radius * 1.35f, 0f, 0.48f, 1f, new Color(1f, 0.75f, 0.18f, 0.3f), "meteor_warning");
             game.SpawnAreaEffect(position, radius * 0.36f, 0f, 0.48f, 1f, new Color(1f, 0.92f, 0.3f, 0.52f), "meteor_warning");
             pendingBlasts.Add(new ZombieStormPendingSkillBlast
             {
                 Position = position,
                 Radius = radius,
-                Damage = RollDamage(20f + level * 5.5f),
+                Damage = RollDamage((20f + level * 5.5f) * (1f + Mod("meteor_heat") * 0.16f)),
                 Delay = 0.42f,
                 Color = new Color(1f, 0.28f, 0.05f, 0.72f),
                 Key = "meteor_blast"
@@ -2817,14 +3204,14 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
     private void CastFireZone(int level)
     {
-        int pools = IsEvolved(ZombieStormSkillType.FireZone) ? 3 : 1 + level / 4;
+        int pools = (IsEvolved(ZombieStormSkillType.FireZone) ? 3 : 1 + level / 4) + Mod("fire_spread");
         for (int i = 0; i < pools; i++)
         {
             Vector2 offset = UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(2.4f, 7.0f);
             Vector2 position = (Vector2)transform.position + offset;
             float radius = (1.25f + level * 0.22f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.FireZone) ? 1.22f : 1f);
-            float duration = 2.5f + level * 0.36f;
-            game.SpawnAreaEffect(position, radius, RollDamage(4.2f + level * 1.3f), duration, 0.28f, new Color(1f, 0.25f, 0.05f, 0.62f), "fire_pool");
+            float duration = 2.5f + level * 0.36f + Mod("fire_linger") * 0.55f;
+            game.SpawnAreaEffect(position, radius, RollDamage((4.2f + level * 1.3f) * (1f + Mod("fire_heat") * 0.18f)), duration, 0.28f, new Color(1f, 0.25f, 0.05f, 0.62f), "fire_pool");
             for (int spark = 0; spark < 4; spark++)
             {
                 game.SpawnHitSpark(position + UnityEngine.Random.insideUnitCircle * radius * 0.65f, new Color(1f, 0.68f, 0.12f, 0.78f), 0.16f);
@@ -2843,7 +3230,9 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             return;
         }
 
-        int jumps = 2 + level + (IsEvolved(ZombieStormSkillType.ChainLightning) ? 4 : 0);
+        int jumps = 2 + level + Mod("lightning_jumps") + (IsEvolved(ZombieStormSkillType.ChainLightning) ? 4 : 0);
+        float chainReach = 4.2f + level * 0.35f + Mod("lightning_reach") * 0.8f;
+        float lightningDamage = (13f + level * 4f) * (1f + Mod("lightning_voltage") * 0.18f);
         HashSet<ZombieStormEnemy> hit = new HashSet<ZombieStormEnemy>();
         Vector2 previous = transform.position;
         for (int i = 0; i < jumps && current != null; i++)
@@ -2851,28 +3240,28 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             Vector2 currentPosition = current.transform.position;
             hit.Add(current);
             SpawnLightningSegment(previous, currentPosition, level);
-            current.TakeDamage(RollDamage(13f + level * 4f), (currentPosition - (Vector2)transform.position).normalized);
-            game.SpawnAreaEffect(currentPosition, 0.6f * game.AreaMultiplier, 0f, 0.18f, 1f, new Color(0.25f, 0.85f, 1f, 0.86f), "lightning_flash");
+            current.TakeDamage(RollDamage(lightningDamage), (currentPosition - (Vector2)transform.position).normalized);
+            game.SpawnAreaEffect(currentPosition, (0.6f + Mod("lightning_reach") * 0.08f) * game.AreaMultiplier, 0f, 0.18f, 1f, new Color(0.25f, 0.85f, 1f, 0.86f), "lightning_flash");
             previous = currentPosition;
-            current = FindNearestUnhitEnemy(currentPosition, 4.2f + level * 0.35f, hit);
+            current = FindNearestUnhitEnemy(currentPosition, chainReach, hit);
         }
 
-        cooldowns[ZombieStormSkillType.ChainLightning] = (3.5f - level * 0.22f) * game.CooldownMultiplier;
+        cooldowns[ZombieStormSkillType.ChainLightning] = Mathf.Max(0.82f, 3.5f - level * 0.22f - Mod("lightning_tempo") * 0.24f) * game.CooldownMultiplier;
     }
 
     private void CastShieldBurst(int level)
     {
-        float radius = (1.35f + level * 0.24f) * game.AreaMultiplier;
+        float radius = (1.35f + level * 0.24f + Mod("shield_radius") * 0.22f) * game.AreaMultiplier;
         if (CountEnemiesNear(transform.position, radius + 0.35f) <= 0)
         {
             cooldowns[ZombieStormSkillType.ShieldBurst] = 0.18f;
             return;
         }
 
-        game.SpawnAreaEffect(transform.position, radius, RollDamage(12f + level * 4f), 0.18f, 99f, new Color(0.75f, 0.95f, 1f, 0.55f), "shield_burst");
+        game.SpawnAreaEffect(transform.position, radius, RollDamage((12f + level * 4f) * (1f + Mod("shield_force") * 0.18f)), 0.18f, 99f, new Color(0.75f, 0.95f, 1f, 0.55f), "shield_burst");
         game.SpawnAreaEffect(transform.position, radius * 1.38f, 0f, 0.24f, 1f, new Color(0.4f, 0.92f, 1f, 0.32f), "shield_burst");
         game.ShakeCamera(0.06f, 0.1f);
-        cooldowns[ZombieStormSkillType.ShieldBurst] = (2.4f - level * 0.16f) * game.CooldownMultiplier;
+        cooldowns[ZombieStormSkillType.ShieldBurst] = Mathf.Max(0.65f, 2.4f - level * 0.16f - Mod("shield_recharge") * 0.18f) * game.CooldownMultiplier;
     }
 
     private void SpawnLightningSegment(Vector2 from, Vector2 to, int level)
@@ -2884,7 +3273,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             float t = i / (float)steps;
             Vector2 point = Vector2.Lerp(from, to, t);
             point += UnityEngine.Random.insideUnitCircle * 0.06f;
-            float radius = (0.12f + level * 0.012f) * game.AreaMultiplier;
+            float radius = (0.12f + level * 0.012f + Mod("lightning_reach") * 0.01f + Mod("lightning_voltage") * 0.006f) * game.AreaMultiplier;
             game.SpawnAreaEffect(point, radius, 0f, 0.1f, 1f, new Color(0.35f, 0.9f, 1f, 0.72f), "lightning_flash");
         }
     }
@@ -2897,7 +3286,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             return;
         }
 
-        float radius = (1.45f + level * 0.18f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.32f : 1f);
+        float radius = (1.45f + level * 0.18f + Mod("knife_reach") * 0.22f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.32f : 1f);
         float speed = 120f + level * 28f;
         for (int i = 0; i < orbitingObjects.Count; i++)
         {
@@ -2922,7 +3311,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             ZombieStormEnemy enemy = activeEnemies[i];
             if (enemy != null && !enemy.IsDead && Vector2.Distance(enemy.transform.position, transform.position) <= radius + enemy.Radius)
             {
-                enemy.TakeDamage(RollDamage(6f + level * 1.8f), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
+                enemy.TakeDamage(RollDamage((6f + level * 1.8f) * (1f + Mod("knife_edge") * 0.18f)), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
                 game.SpawnHitSpark(enemy.transform.position, new Color(0.9f, 0.96f, 1f, 0.72f), 0.18f);
             }
         }
@@ -2942,7 +3331,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         orbitingObjects.Clear();
         int level = GetSkillLevel(ZombieStormSkillType.OrbitingKnife);
-        int count = 2 + Mathf.FloorToInt(level * 0.75f) + (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 3 : 0);
+        int count = 2 + Mathf.FloorToInt(level * 0.75f) + Mod("knife_blades") + (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 3 : 0);
         for (int i = 0; i < count; i++)
         {
             GameObject blade = new GameObject("Orbiting Skill Blade");
@@ -2967,7 +3356,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         drones.Clear();
         int level = GetSkillLevel(ZombieStormSkillType.SummonDrone);
-        int count = 1 + level / 2 + (IsEvolved(ZombieStormSkillType.SummonDrone) ? 2 : 0);
+        int count = 1 + level / 2 + Mod("drone_swarm") + (IsEvolved(ZombieStormSkillType.SummonDrone) ? 2 : 0);
         for (int i = 0; i < count; i++)
         {
             GameObject drone = new GameObject("Summoned Drone");
@@ -3020,10 +3409,10 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             Vector2 direction = ((Vector2)target.transform.position - (Vector2)drones[i].transform.position).normalized;
             Vector2 muzzle = (Vector2)drones[i].transform.position + direction * 0.26f;
             game.SpawnHitSpark(muzzle, new Color(0.35f, 0.9f, 1f, 0.78f), 0.16f);
-            game.SpawnPlayerProjectile(muzzle, direction, RollDamage(7f + level * 2.4f), 12f, 1.1f, 0, new Color(0.4f, 0.92f, 1f), 0.26f);
+            game.SpawnPlayerProjectile(muzzle, direction, RollDamage((7f + level * 2.4f) * (1f + Mod("drone_focus") * 0.18f)), 12f, 1.1f, 0, new Color(0.4f, 0.92f, 1f), 0.26f);
         }
 
-        cooldowns[ZombieStormSkillType.SummonDrone] = (0.92f - level * 0.06f) * game.CooldownMultiplier;
+        cooldowns[ZombieStormSkillType.SummonDrone] = Mathf.Max(0.22f, 0.92f - level * 0.06f - Mod("drone_overclock") * 0.08f) * game.CooldownMultiplier;
     }
 
     private void UpdateUltimateInput()
@@ -3048,14 +3437,15 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
                 continue;
             }
 
-            enemy.TakeDamage(RollDamage(42f + level * 18f), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
+            enemy.TakeDamage(RollDamage((42f + level * 18f) * (1f + Mod("ultimate_voltage") * 0.18f)), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
             game.SpawnAreaEffect(enemy.transform.position, 0.62f, 0f, 0.22f, 1f, new Color(0.45f, 0.85f, 1f, 0.78f), "ultimate_spark");
         }
 
-        game.SpawnAreaEffect(transform.position, 7.5f, RollDamage(25f + level * 8f), 0.35f, 99f, new Color(0.7f, 0.92f, 1f, 0.42f), "ultimate_storm");
+        float stormRadius = (7.5f + Mod("ultimate_radius") * 0.85f) * game.AreaMultiplier;
+        game.SpawnAreaEffect(transform.position, stormRadius, RollDamage((25f + level * 8f) * (1f + Mod("ultimate_voltage") * 0.18f)), 0.35f, 99f, new Color(0.7f, 0.92f, 1f, 0.42f), "ultimate_storm");
         game.ShakeCamera(0.34f, 0.48f);
         game.FlashScreen(0.9f);
-        ultimateCooldown = Mathf.Max(18f, 42f - level * 4f);
+        ultimateCooldown = Mathf.Max(12f, 42f - level * 4f - Mod("ultimate_recharge") * 3.5f);
     }
 
     private ZombieStormEnemy FindNearestUnhitEnemy(Vector2 origin, float maxDistance, HashSet<ZombieStormEnemy> hit)
@@ -3495,6 +3885,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
     private ZombieStormGameController game;
     private string poolKey;
     private SpriteRenderer spriteRenderer;
+    private Sprite[] frames;
     private Color initialColor;
     private Vector3 initialScale;
     private float radius;
@@ -3503,6 +3894,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
     private float maxLife;
     private float tickRate;
     private float tickTimer;
+    private float frameDuration;
     private bool mineTriggered;
 
     public void Initialize(ZombieStormGameController owner, string key, float areaRadius, float hitDamage, float duration, float rate)
@@ -3517,8 +3909,15 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
         tickTimer = 0f;
         mineTriggered = false;
         spriteRenderer = GetComponent<SpriteRenderer>();
+        frames = game.GetEffectFrames(poolKey);
+        if (spriteRenderer != null && frames != null && frames.Length > 0)
+        {
+            spriteRenderer.sprite = frames[0];
+        }
+
         initialColor = spriteRenderer != null ? spriteRenderer.color : Color.white;
         initialScale = transform.localScale;
+        frameDuration = frames != null && frames.Length > 0 ? Mathf.Clamp(maxLife / frames.Length, 0.028f, 0.06f) : 0.05f;
     }
 
     private void Update()
@@ -3576,6 +3975,21 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
         float t = Mathf.Clamp01(life / maxLife);
         if (spriteRenderer != null)
         {
+            if (frames != null && frames.Length > 0)
+            {
+                int frameIndex = Mathf.FloorToInt((maxLife - life) / frameDuration);
+                if (life > 0.08f && (poolKey == "fire_pool" || poolKey == "toxic_pool" || poolKey == "ultimate_storm"))
+                {
+                    frameIndex %= frames.Length;
+                }
+                else
+                {
+                    frameIndex = Mathf.Clamp(frameIndex, 0, frames.Length - 1);
+                }
+
+                spriteRenderer.sprite = frames[frameIndex];
+            }
+
             Color color = initialColor;
             color.a *= Mathf.SmoothStep(0f, 1f, t);
             spriteRenderer.color = color;
