@@ -38,6 +38,15 @@ public enum ZombieStormPassiveType
     CoinGain
 }
 
+public enum ZombieStormWave
+{
+    Sine,
+    Square,
+    Triangle,
+    Saw,
+    Noise
+}
+
 [DefaultExecutionOrder(-100)]
 public sealed class ZombieStormGameController : MonoBehaviour
 {
@@ -56,6 +65,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private readonly List<ZombieStormEnemy> enemies = new List<ZombieStormEnemy>(256);
     private readonly Dictionary<string, Queue<GameObject>> pools = new Dictionary<string, Queue<GameObject>>();
     private readonly Dictionary<ZombieStormPassiveType, int> passives = new Dictionary<ZombieStormPassiveType, int>();
+    private readonly Dictionary<string, AudioClip> sfx = new Dictionary<string, AudioClip>();
+    private readonly Dictionary<string, float> sfxLastPlayed = new Dictionary<string, float>();
     private readonly List<ZombieStormUpgradeOption> currentChoices = new List<ZombieStormUpgradeOption>(3);
     private readonly HashSet<string> choiceKeys = new HashSet<string>();
     private readonly Dictionary<string, Sprite[]> playerWalkFrames = new Dictionary<string, Sprite[]>();
@@ -68,6 +79,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Transform worldRoot;
     private Transform poolRoot;
     private Camera mainCamera;
+    private AudioSource audioSource;
     private Sprite playerSprite;
     private Sprite zombieSprite;
     private Sprite fastZombieSprite;
@@ -144,6 +156,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         CreateSprites();
         BuildScene();
+        CreateAudioClips();
         StartRun();
     }
 
@@ -366,6 +379,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         spriteRenderer.color = color;
         ZombieStormProjectile projectile = projectileObject.GetComponent<ZombieStormProjectile>();
         projectile.Initialize(this, direction, damage, speed, life, pierce);
+        PlaySfx("shoot", 0.28f, 0.055f);
     }
 
     public void SpawnEnemyProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life)
@@ -394,6 +408,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     public void SpawnHitSpark(Vector2 position, Color color, float radius = 0.36f)
     {
         SpawnAreaEffect(position, radius, 0f, 0.12f, 1f, color, "hit_spark");
+        PlaySfx("hit", 0.2f + Mathf.Clamp01(radius) * 0.18f, 0.045f);
     }
 
     public void SpawnDamageNumber(Vector2 position, float amount, bool critical)
@@ -476,6 +491,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
             Player.Kills++;
         }
 
+        if (enemy.Type == ZombieStormEnemyType.Elite || enemy.Type == ZombieStormEnemyType.Boss)
+        {
+            PlaySfx(enemy.Type == ZombieStormEnemyType.Boss ? "boss_down" : "elite_down", 0.75f, 0.1f);
+        }
+
         int xp = enemy.Type == ZombieStormEnemyType.Boss ? 55 : enemy.Type == ZombieStormEnemyType.Elite ? 24 : enemy.Type == ZombieStormEnemyType.Tank ? 7 : enemy.Type == ZombieStormEnemyType.Spitter ? 6 : 3;
         int coins = enemy.Type == ZombieStormEnemyType.Boss ? 45 : enemy.Type == ZombieStormEnemyType.Elite ? 18 : UnityEngine.Random.value < 0.24f ? 1 : 0;
         SpawnBloodSplat(enemy.transform.position, enemy.Type == ZombieStormEnemyType.Boss ? 2.8f : enemy.Type == ZombieStormEnemyType.Elite ? 1.8f : 1.0f);
@@ -504,6 +524,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Time.timeScale = 0f;
         currentChoices.Clear();
         BuildUpgradeChoices();
+        PlaySfx("level_up", 0.86f, 0.1f);
         ShowFeedback("Level up. Pick a build direction.", 2f);
     }
 
@@ -517,6 +538,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         won = victory;
         finished = true;
         Time.timeScale = 0f;
+        PlaySfx(victory ? "victory" : "fail", 0.9f, 0.1f);
         ShowFeedback(message, 999f);
     }
 
@@ -633,6 +655,31 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return new Color(color.r, color.g, color.b, alpha);
     }
 
+    public void PlaySfx(string key, float volume = 1f, float minInterval = 0.02f)
+    {
+        if (audioSource == null)
+        {
+            return;
+        }
+
+        AudioClip clip;
+        if (!sfx.TryGetValue(key, out clip) || clip == null)
+        {
+            return;
+        }
+
+        float now = Time.unscaledTime;
+        float last;
+        if (sfxLastPlayed.TryGetValue(key, out last) && now - last < minInterval)
+        {
+            return;
+        }
+
+        sfxLastPlayed[key] = now;
+        audioSource.pitch = UnityEngine.Random.Range(0.96f, 1.04f);
+        audioSource.PlayOneShot(clip, Mathf.Clamp01(volume));
+    }
+
     private void StartRun()
     {
         runTime = 0f;
@@ -667,6 +714,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Skills.LearnSkill(ZombieStormSkillType.MagicBolt);
 
         FollowPlayer(true);
+        PlaySfx("start", 0.56f, 0.1f);
         ShowFeedback("Wave 1: Magic Bolt online. Move, kite, collect XP.", 3f);
     }
 
@@ -689,6 +737,16 @@ public sealed class ZombieStormGameController : MonoBehaviour
         mainCamera.orthographicSize = 8f;
         mainCamera.clearFlags = CameraClearFlags.SolidColor;
         mainCamera.backgroundColor = new Color(0.035f, 0.04f, 0.052f);
+
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        audioSource.playOnAwake = false;
+        audioSource.spatialBlend = 0f;
+        audioSource.volume = 0.62f;
     }
 
     private void BuildEnvironment()
@@ -734,6 +792,107 @@ public sealed class ZombieStormGameController : MonoBehaviour
         neonSignSprite = CreateNeonSignSprite();
         LoadKenneyTopdownArt();
         LoadMikodrakSpellEffects();
+    }
+
+    private void CreateAudioClips()
+    {
+        sfx.Clear();
+        sfx["shoot"] = CreateSynthClip("zs_shoot", 0.075f, 820f, 1180f, 0.45f, 0.08f, ZombieStormWave.Square);
+        sfx["hit"] = CreateSynthClip("zs_hit", 0.07f, 190f, 82f, 0.55f, 0.42f, ZombieStormWave.Noise);
+        sfx["pickup"] = CreateSynthClip("zs_pickup", 0.105f, 620f, 1240f, 0.35f, 0.02f, ZombieStormWave.Triangle);
+        sfx["coin"] = CreateSynthClip("zs_coin", 0.12f, 980f, 1680f, 0.36f, 0.01f, ZombieStormWave.Sine);
+        sfx["hurt"] = CreateSynthClip("zs_hurt", 0.16f, 190f, 74f, 0.62f, 0.24f, ZombieStormWave.Saw);
+        sfx["level_up"] = CreateArpeggioClip("zs_level_up", new[] { 520f, 780f, 1040f, 1560f }, 0.34f, 0.48f);
+        sfx["upgrade"] = CreateArpeggioClip("zs_upgrade", new[] { 440f, 660f, 990f }, 0.24f, 0.42f);
+        sfx["boom"] = CreateSynthClip("zs_boom", 0.28f, 110f, 38f, 0.8f, 0.58f, ZombieStormWave.Noise);
+        sfx["lightning"] = CreateSynthClip("zs_lightning", 0.16f, 1380f, 420f, 0.46f, 0.22f, ZombieStormWave.Saw);
+        sfx["ultimate"] = CreateSynthClip("zs_ultimate", 0.46f, 180f, 58f, 0.74f, 0.32f, ZombieStormWave.Saw);
+        sfx["elite_down"] = CreateArpeggioClip("zs_elite_down", new[] { 760f, 570f, 380f }, 0.2f, 0.48f);
+        sfx["boss_down"] = CreateArpeggioClip("zs_boss_down", new[] { 360f, 540f, 720f, 1080f }, 0.42f, 0.56f);
+        sfx["victory"] = CreateArpeggioClip("zs_victory", new[] { 520f, 660f, 780f, 1040f, 1320f }, 0.62f, 0.58f);
+        sfx["fail"] = CreateArpeggioClip("zs_fail", new[] { 330f, 247f, 196f }, 0.42f, 0.62f);
+        sfx["start"] = CreateArpeggioClip("zs_start", new[] { 330f, 495f, 660f }, 0.26f, 0.34f);
+    }
+
+    private AudioClip CreateSynthClip(string clipName, float duration, float startFrequency, float endFrequency, float volume, float noiseAmount, ZombieStormWave wave)
+    {
+        const int sampleRate = 44100;
+        int sampleCount = Mathf.Max(1, Mathf.CeilToInt(duration * sampleRate));
+        float[] samples = new float[sampleCount];
+        float phase = 0f;
+        uint noiseState = 22222u;
+
+        for (int i = 0; i < sampleCount; i++)
+        {
+            float t = i / (float)(sampleCount - 1);
+            float frequency = Mathf.Lerp(startFrequency, endFrequency, t);
+            phase += frequency / sampleRate;
+            phase -= Mathf.Floor(phase);
+            float envelope = Mathf.Pow(1f - t, 1.7f) * Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, t * 24f));
+            float tone = EvaluateWave(wave, phase);
+            float noise = NextNoise(ref noiseState);
+            samples[i] = Mathf.Clamp((tone * (1f - noiseAmount) + noise * noiseAmount) * envelope * volume, -1f, 1f);
+        }
+
+        AudioClip clip = AudioClip.Create(clipName, sampleCount, 1, sampleRate, false);
+        clip.SetData(samples, 0);
+        return clip;
+    }
+
+    private AudioClip CreateArpeggioClip(string clipName, float[] notes, float duration, float volume)
+    {
+        const int sampleRate = 44100;
+        int sampleCount = Mathf.Max(1, Mathf.CeilToInt(duration * sampleRate));
+        float[] samples = new float[sampleCount];
+        float phase = 0f;
+        int noteCount = Mathf.Max(1, notes.Length);
+
+        for (int i = 0; i < sampleCount; i++)
+        {
+            float t = i / (float)(sampleCount - 1);
+            int noteIndex = Mathf.Clamp(Mathf.FloorToInt(t * noteCount), 0, noteCount - 1);
+            float noteT = (t * noteCount) - noteIndex;
+            float frequency = notes[noteIndex];
+            phase += frequency / sampleRate;
+            phase -= Mathf.Floor(phase);
+            float envelope = Mathf.Pow(1f - noteT, 1.25f) * Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, noteT * 18f)) * Mathf.Pow(1f - t * 0.2f, 1.1f);
+            samples[i] = EvaluateWave(ZombieStormWave.Triangle, phase) * envelope * volume;
+        }
+
+        AudioClip clip = AudioClip.Create(clipName, sampleCount, 1, sampleRate, false);
+        clip.SetData(samples, 0);
+        return clip;
+    }
+
+    private static float EvaluateWave(ZombieStormWave wave, float phase)
+    {
+        if (wave == ZombieStormWave.Square)
+        {
+            return phase < 0.5f ? 1f : -1f;
+        }
+
+        if (wave == ZombieStormWave.Triangle)
+        {
+            return 1f - Mathf.Abs(phase * 4f - 2f);
+        }
+
+        if (wave == ZombieStormWave.Saw)
+        {
+            return phase * 2f - 1f;
+        }
+
+        if (wave == ZombieStormWave.Noise)
+        {
+            return 0f;
+        }
+
+        return Mathf.Sin(phase * Mathf.PI * 2f);
+    }
+
+    private static float NextNoise(ref uint state)
+    {
+        state = state * 1664525u + 1013904223u;
+        return ((state >> 8) / 16777215f) * 2f - 1f;
     }
 
     private void UpdateDynamicDifficulty()
@@ -1186,6 +1345,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         currentChoices.Clear();
         leveling = false;
         Time.timeScale = 1f;
+        PlaySfx("upgrade", 0.9f, 0.1f);
         PlayUpgradeBurst(option);
         ShowFeedback(option.Title + " acquired.", 2.2f);
     }
@@ -2904,6 +3064,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         }
 
         Experience += amount;
+        game.PlaySfx("pickup", 0.3f, 0.06f);
         while (Experience >= ExperienceToNext)
         {
             Experience -= ExperienceToNext;
@@ -2917,6 +3078,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
     public void AddCoins(int amount)
     {
         Coins += Mathf.Max(0, amount);
+        game.PlaySfx("coin", 0.34f, 0.055f);
     }
 
     public void TakeDamage(float amount)
@@ -2931,6 +3093,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         hurtAnimationTimer = 0.24f;
         hurtAnimationFrame = 1;
         animationTimer = 0f;
+        game.PlaySfx("hurt", 0.48f, 0.18f);
         game.ShakeCamera(0.08f, 0.12f);
         game.FlashScreen(0.8f);
         if (spriteRenderer != null)
@@ -3233,6 +3396,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         int jumps = 2 + level + Mod("lightning_jumps") + (IsEvolved(ZombieStormSkillType.ChainLightning) ? 4 : 0);
         float chainReach = 4.2f + level * 0.35f + Mod("lightning_reach") * 0.8f;
         float lightningDamage = (13f + level * 4f) * (1f + Mod("lightning_voltage") * 0.18f);
+        game.PlaySfx("lightning", 0.48f, 0.12f);
         HashSet<ZombieStormEnemy> hit = new HashSet<ZombieStormEnemy>();
         Vector2 previous = transform.position;
         for (int i = 0; i < jumps && current != null; i++)
@@ -3443,6 +3607,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         float stormRadius = (7.5f + Mod("ultimate_radius") * 0.85f) * game.AreaMultiplier;
         game.SpawnAreaEffect(transform.position, stormRadius, RollDamage((25f + level * 8f) * (1f + Mod("ultimate_voltage") * 0.18f)), 0.35f, 99f, new Color(0.7f, 0.92f, 1f, 0.42f), "ultimate_storm");
+        game.PlaySfx("ultimate", 0.92f, 0.2f);
         game.ShakeCamera(0.34f, 0.48f);
         game.FlashScreen(0.9f);
         ultimateCooldown = Mathf.Max(12f, 42f - level * 4f - Mod("ultimate_recharge") * 3.5f);
@@ -3505,6 +3670,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             if (blast.Key == "meteor_blast")
             {
                 game.SpawnHitSpark(blast.Position, new Color(1f, 0.9f, 0.25f, 0.9f), blast.Radius * 0.32f);
+                game.PlaySfx("boom", 0.58f, 0.08f);
                 game.ShakeCamera(0.12f, 0.14f);
                 game.FlashScreen(blast.Color, 0.2f);
             }
@@ -3679,6 +3845,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             if (Type == ZombieStormEnemyType.Exploder)
             {
                 game.SpawnAreaEffect(transform.position, 2.2f, 30f, 0.22f, 99f, new Color(1f, 0.35f, 0.05f, 0.65f), "zombie_explosion");
+                game.PlaySfx("boom", 0.54f, 0.08f);
                 game.ShakeCamera(0.16f, 0.16f);
                 game.Player.TakeDamage(22f);
                 Die(false);
