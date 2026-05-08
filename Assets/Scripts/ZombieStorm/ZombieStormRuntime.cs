@@ -1283,19 +1283,24 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private ZombieStormUpgradeOption CreateSkillSpecializationOption(ZombieStormSkillType weaponType)
     {
+        int skillLevel = Skills.GetSkillLevel(weaponType);
+        if (skillLevel <= 0 || skillLevel >= 5)
+        {
+            return null;
+        }
+
         string[] keys = SkillUpgradeKeys(weaponType);
         for (int guard = 0; guard < 18; guard++)
         {
             string key = keys[UnityEngine.Random.Range(0, keys.Length)];
-            int level = Skills.GetSkillUpgradeLevel(key);
-            if (level >= 3)
+            if (Skills.GetSkillUpgradeLevel(key) >= 3)
             {
                 continue;
             }
 
-            int nextLevel = level + 1;
+            int nextLevel = skillLevel + 1;
             string category = SkillName(weaponType).ToUpperInvariant() + " BUILD";
-            return ZombieStormUpgradeOption.Custom("special_" + key, SkillUpgradeName(key) + " Lv." + nextLevel, SkillUpgradeSummary(key, nextLevel), category, SkillAccent(weaponType), delegate { Skills.AddSkillUpgrade(key); });
+            return ZombieStormUpgradeOption.Custom("special_" + weaponType + "_" + key, SkillUpgradeName(key) + " Lv." + nextLevel, SkillUpgradeSummary(key, nextLevel), category, SkillAccent(weaponType), delegate { Skills.LevelUpSkill(weaponType); Skills.AddSkillUpgrade(key); });
         }
 
         return null;
@@ -3214,7 +3219,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
     {
         int next = Mathf.Min(3, GetSkillUpgradeLevel(key) + 1);
         skillUpgrades[key] = next;
-        if (key == "knife_blades")
+        if (key == "knife_blades" || key == "knife_reach")
         {
             RebuildOrbitingKnives();
         }
