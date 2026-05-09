@@ -1,55 +1,21 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-public enum ZombieStormSkillType
-{
-    MagicBolt,
-    OrbitingKnife,
-    MeteorStorm,
-    FireZone,
-    SummonDrone,
-    ChainLightning,
-    ShieldBurst,
-    UltimateStorm
-}
-
-public enum ZombieStormEnemyType
-{
-    Grunt,
-    Fast,
-    Tank,
-    Exploder,
-    Spitter,
-    Elite,
-    Boss
-}
-
-public enum ZombieStormPassiveType
-{
-    Damage,
-    FireRate,
-    Area,
-    MoveSpeed,
-    PickupRange,
-    Crit,
-    MaxHealth,
-    CoinGain
-}
-
-public enum ZombieStormWave
-{
-    Sine,
-    Square,
-    Triangle,
-    Saw,
-    Noise
-}
-
 [DefaultExecutionOrder(-100)]
 public sealed class ZombieStormGameController : MonoBehaviour
 {
+    private enum ZombieStormFlowState
+    {
+        MainMenu,
+        Running,
+        Paused,
+        Settings,
+        LevelUp,
+        Results
+    }
+
     public static ZombieStormGameController Instance { get; private set; }
 
     private const string Title = "\u50f5\u5c38\u5272\u8349\u5927\u4f5c\u6218";
@@ -121,6 +87,10 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private bool finished;
     private bool won;
     private int bossCount;
+    private ZombieStormFlowState flowState = ZombieStormFlowState.MainMenu;
+    private ZombieStormFlowState settingsReturnState = ZombieStormFlowState.MainMenu;
+    private float masterVolume = 0.62f;
+    private bool sfxMuted;
     private string feedbackText = "WASD move. Skills cast automatically. Press F for ultimate.";
 
     public float DamageMultiplier { get { return 1f + GetPassiveLevel(ZombieStormPassiveType.Damage) * 0.18f; } }
@@ -157,12 +127,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
         CreateSprites();
         BuildScene();
         CreateAudioClips();
-        StartRun();
+        Time.timeScale = 0f;
     }
 
     private void Update()
     {
-        if (finished)
+        if (flowState == ZombieStormFlowState.MainMenu)
         {
             if (Input.GetKeyDown(KeyCode.Return))
             {
@@ -172,7 +142,47 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return;
         }
 
-        if (leveling)
+        if (flowState == ZombieStormFlowState.Settings)
+        {
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                CloseSettings();
+            }
+
+            return;
+        }
+
+        if (flowState == ZombieStormFlowState.Results)
+        {
+            if (Input.GetKeyDown(KeyCode.Return))
+            {
+                StartRun();
+            }
+            else if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                ReturnToMainMenu();
+            }
+
+            return;
+        }
+
+        if (flowState == ZombieStormFlowState.Paused)
+        {
+            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P))
+            {
+                ResumeRun();
+            }
+
+            return;
+        }
+
+        if (flowState == ZombieStormFlowState.Running && (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P)))
+        {
+            PauseRun();
+            return;
+        }
+
+        if (flowState == ZombieStormFlowState.LevelUp)
         {
             HandleUpgradeHotkeys();
             return;
@@ -202,12 +212,26 @@ public sealed class ZombieStormGameController : MonoBehaviour
     {
         DrawAtmosphereOverlay();
         GUI.skin.label.fontSize = 18;
+        GUI.skin.button.fontSize = 16;
         GUI.color = Color.white;
+
+        if (flowState == ZombieStormFlowState.MainMenu)
+        {
+            DrawMainMenu();
+            return;
+        }
+
+        if (flowState == ZombieStormFlowState.Settings && settingsReturnState == ZombieStormFlowState.MainMenu)
+        {
+            DrawSettingsPanel();
+            return;
+        }
+
         DrawPanel(new Rect(12f, 10f, 430f, 158f), new Color(0.035f, 0.045f, 0.055f, 0.82f), new Color(0.2f, 0.75f, 1f, 0.32f));
         GUI.Label(new Rect(24f, 18f, 760f, 28f), Title + " / Zombie Storm");
         GUI.skin.label.fontSize = 14;
         GUI.color = new Color(0.78f, 0.86f, 0.92f, 1f);
-        GUI.Label(new Rect(24f, 45f, 420f, 24f), "WASD move | Auto skills | F ultimate | 1/2/3 upgrade | Enter restart");
+        GUI.Label(new Rect(24f, 45f, 420f, 24f), "WASD move | Auto skills | F ultimate | 1/2/3 upgrade | Esc/P pause");
         GUI.color = Color.white;
         GUI.skin.label.fontSize = 18;
 
@@ -244,7 +268,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             GUI.color = Color.white;
         }
 
-        if (leveling)
+        if (flowState == ZombieStormFlowState.LevelUp)
         {
             DrawUpgradePanel();
         }
@@ -254,20 +278,17 @@ public sealed class ZombieStormGameController : MonoBehaviour
         DrawDamagePopups();
         DrawScreenFlash();
 
-        if (finished)
+        if (flowState == ZombieStormFlowState.Paused)
         {
-            GUI.color = new Color(0f, 0f, 0f, 0.74f);
-            GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GUI.skin.label.fontSize = 36;
-            GUI.Label(new Rect(Screen.width * 0.5f - 210f, Screen.height * 0.5f - 86f, 520f, 60f), won ? "Survival Victory" : "Run Failed");
-            GUI.skin.label.fontSize = 20;
-            int kills = Player != null ? Player.Kills : 0;
-            int coins = Player != null ? Player.Coins : 0;
-            int level = Player != null ? Player.Level : 1;
-            GUI.Label(new Rect(Screen.width * 0.5f - 250f, Screen.height * 0.5f - 28f, 620f, 100f), "Kills " + kills + " | Coins " + coins + " | Level " + level);
-            GUI.Label(new Rect(Screen.width * 0.5f - 200f, Screen.height * 0.5f + 40f, 460f, 40f), "Press Enter to restart.");
-            GUI.skin.label.fontSize = 18;
+            DrawPausePanel();
+        }
+        else if (flowState == ZombieStormFlowState.Settings)
+        {
+            DrawSettingsPanel();
+        }
+        else if (flowState == ZombieStormFlowState.Results)
+        {
+            DrawResultsPanel();
         }
     }
 
@@ -515,12 +536,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     public void RequestLevelUp()
     {
-        if (leveling || finished)
+        if (leveling || finished || flowState != ZombieStormFlowState.Running)
         {
             return;
         }
 
         leveling = true;
+        flowState = ZombieStormFlowState.LevelUp;
         Time.timeScale = 0f;
         currentChoices.Clear();
         BuildUpgradeChoices();
@@ -537,6 +559,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         won = victory;
         finished = true;
+        flowState = ZombieStormFlowState.Results;
         Time.timeScale = 0f;
         PlaySfx(victory ? "victory" : "fail", 0.9f, 0.1f);
         ShowFeedback(message, 999f);
@@ -677,7 +700,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         sfxLastPlayed[key] = now;
         audioSource.pitch = UnityEngine.Random.Range(0.96f, 1.04f);
-        audioSource.PlayOneShot(clip, Mathf.Clamp01(volume));
+        audioSource.PlayOneShot(clip, sfxMuted ? 0f : Mathf.Clamp01(volume * masterVolume));
     }
 
     private void StartRun()
@@ -691,6 +714,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         finished = false;
         won = false;
         difficultyScore = 1f;
+        flowState = ZombieStormFlowState.Running;
         Time.timeScale = 1f;
 
         ClearActiveObjects();
@@ -716,6 +740,58 @@ public sealed class ZombieStormGameController : MonoBehaviour
         FollowPlayer(true);
         PlaySfx("start", 0.56f, 0.1f);
         ShowFeedback("Wave 1: Magic Bolt online. Move, kite, collect XP.", 3f);
+    }
+
+    private void PauseRun()
+    {
+        if (flowState != ZombieStormFlowState.Running)
+        {
+            return;
+        }
+
+        flowState = ZombieStormFlowState.Paused;
+        Time.timeScale = 0f;
+        ShowFeedback("Run paused.", 1.6f);
+    }
+
+    private void ResumeRun()
+    {
+        if (finished)
+        {
+            return;
+        }
+
+        flowState = ZombieStormFlowState.Running;
+        Time.timeScale = 1f;
+        ShowFeedback("Back to the street.", 1.6f);
+    }
+
+    private void OpenSettings(ZombieStormFlowState returnState)
+    {
+        settingsReturnState = returnState;
+        flowState = ZombieStormFlowState.Settings;
+        Time.timeScale = 0f;
+    }
+
+    private void CloseSettings()
+    {
+        flowState = settingsReturnState;
+        Time.timeScale = flowState == ZombieStormFlowState.Running ? 1f : 0f;
+    }
+
+    private void ReturnToMainMenu()
+    {
+        ClearActiveObjects();
+        Player = null;
+        Skills = null;
+        currentChoices.Clear();
+        damagePopups.Clear();
+        leveling = false;
+        finished = false;
+        won = false;
+        flowState = ZombieStormFlowState.MainMenu;
+        settingsReturnState = ZombieStormFlowState.MainMenu;
+        Time.timeScale = 0f;
     }
 
     private void BuildScene()
@@ -746,7 +822,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         audioSource.playOnAwake = false;
         audioSource.spatialBlend = 0f;
-        audioSource.volume = 0.62f;
+        audioSource.volume = 1f;
     }
 
     private void BuildEnvironment()
@@ -1349,6 +1425,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         CheckEvolutions();
         currentChoices.Clear();
         leveling = false;
+        flowState = ZombieStormFlowState.Running;
         Time.timeScale = 1f;
         PlaySfx("upgrade", 0.9f, 0.1f);
         PlayUpgradeBurst(option);
@@ -1414,6 +1491,173 @@ public sealed class ZombieStormGameController : MonoBehaviour
         {
             ApplyUpgrade(2);
         }
+    }
+
+    private void DrawMainMenu()
+    {
+        DrawOverlayBackdrop(0.48f);
+        Rect panel = new Rect(Screen.width * 0.5f - 260f, Screen.height * 0.5f - 190f, 520f, 360f);
+        DrawPanel(panel, new Color(0.025f, 0.032f, 0.044f, 0.94f), new Color(0.2f, 0.75f, 1f, 0.58f));
+
+        GUI.color = new Color(1f, 0.92f, 0.36f, 1f);
+        GUI.skin.label.fontSize = 34;
+        GUI.Label(new Rect(panel.x + 34f, panel.y + 28f, panel.width - 68f, 46f), Title);
+        GUI.color = Color.white;
+        GUI.skin.label.fontSize = 20;
+        GUI.Label(new Rect(panel.x + 36f, panel.y + 76f, panel.width - 72f, 30f), "Zombie Storm");
+        GUI.skin.label.fontSize = 15;
+        GUI.color = new Color(0.78f, 0.86f, 0.92f, 1f);
+        GUI.Label(new Rect(panel.x + 36f, panel.y + 116f, panel.width - 72f, 70f), "Survive five minutes, grow a coherent build, and break the city horde.");
+        GUI.color = Color.white;
+
+        if (GUI.Button(new Rect(panel.x + 110f, panel.y + 198f, 300f, 38f), "Start Run"))
+        {
+            StartRun();
+        }
+
+        if (GUI.Button(new Rect(panel.x + 110f, panel.y + 248f, 300f, 34f), "Settings"))
+        {
+            OpenSettings(ZombieStormFlowState.MainMenu);
+        }
+
+        GUI.skin.label.fontSize = 13;
+        GUI.color = new Color(0.68f, 0.76f, 0.84f, 1f);
+        GUI.Label(new Rect(panel.x + 118f, panel.y + 302f, 300f, 24f), "Enter also starts a run");
+        GUI.color = Color.white;
+        GUI.skin.label.fontSize = 18;
+    }
+
+    private void DrawPausePanel()
+    {
+        DrawOverlayBackdrop(0.68f);
+        Rect panel = new Rect(Screen.width * 0.5f - 220f, Screen.height * 0.5f - 160f, 440f, 300f);
+        DrawPanel(panel, new Color(0.025f, 0.032f, 0.044f, 0.96f), new Color(1f, 0.78f, 0.22f, 0.58f));
+
+        GUI.skin.label.fontSize = 34;
+        GUI.color = new Color(1f, 0.86f, 0.26f, 1f);
+        GUI.Label(new Rect(panel.x + 118f, panel.y + 28f, 260f, 46f), "PAUSED");
+        GUI.color = Color.white;
+
+        if (GUI.Button(new Rect(panel.x + 90f, panel.y + 96f, 260f, 36f), "Resume"))
+        {
+            ResumeRun();
+        }
+
+        if (GUI.Button(new Rect(panel.x + 90f, panel.y + 142f, 260f, 36f), "Settings"))
+        {
+            OpenSettings(ZombieStormFlowState.Paused);
+        }
+
+        if (GUI.Button(new Rect(panel.x + 90f, panel.y + 188f, 260f, 36f), "Restart Run"))
+        {
+            StartRun();
+        }
+
+        if (GUI.Button(new Rect(panel.x + 90f, panel.y + 234f, 260f, 34f), "Main Menu"))
+        {
+            ReturnToMainMenu();
+        }
+
+        GUI.skin.label.fontSize = 18;
+        GUI.color = Color.white;
+    }
+
+    private void DrawSettingsPanel()
+    {
+        DrawOverlayBackdrop(settingsReturnState == ZombieStormFlowState.MainMenu ? 0.52f : 0.72f);
+        Rect panel = new Rect(Screen.width * 0.5f - 240f, Screen.height * 0.5f - 170f, 480f, 330f);
+        DrawPanel(panel, new Color(0.025f, 0.032f, 0.044f, 0.97f), new Color(0.2f, 0.75f, 1f, 0.58f));
+
+        GUI.skin.label.fontSize = 30;
+        GUI.color = new Color(0.74f, 0.9f, 1f, 1f);
+        GUI.Label(new Rect(panel.x + 36f, panel.y + 28f, 260f, 38f), "SETTINGS");
+        GUI.color = Color.white;
+
+        GUI.skin.label.fontSize = 16;
+        GUI.Label(new Rect(panel.x + 42f, panel.y + 86f, 180f, 24f), "SFX Volume");
+        masterVolume = GUI.HorizontalSlider(new Rect(panel.x + 170f, panel.y + 92f, 220f, 20f), masterVolume, 0f, 1f);
+        GUI.Label(new Rect(panel.x + 402f, panel.y + 86f, 48f, 24f), Mathf.RoundToInt(masterVolume * 100f).ToString() + "%");
+
+        sfxMuted = GUI.Toggle(new Rect(panel.x + 42f, panel.y + 124f, 180f, 24f), sfxMuted, "Mute SFX");
+
+        GUI.Label(new Rect(panel.x + 42f, panel.y + 170f, 160f, 24f), "Frame Rate");
+        if (GUI.Button(new Rect(panel.x + 170f, panel.y + 166f, 70f, 30f), "60"))
+        {
+            SetTargetFrameRate(60);
+        }
+
+        if (GUI.Button(new Rect(panel.x + 252f, panel.y + 166f, 70f, 30f), "120"))
+        {
+            SetTargetFrameRate(120);
+        }
+
+        if (GUI.Button(new Rect(panel.x + 334f, panel.y + 166f, 70f, 30f), "144"))
+        {
+            SetTargetFrameRate(144);
+        }
+
+        GUI.color = new Color(0.72f, 0.8f, 0.88f, 1f);
+        GUI.Label(new Rect(panel.x + 170f, panel.y + 204f, 220f, 24f), "Current: " + targetFrameRate + " FPS");
+        GUI.color = Color.white;
+
+        if (GUI.Button(new Rect(panel.x + 110f, panel.y + 258f, 260f, 36f), "Back"))
+        {
+            CloseSettings();
+        }
+
+        GUI.skin.label.fontSize = 18;
+        GUI.color = Color.white;
+    }
+
+    private void DrawResultsPanel()
+    {
+        DrawOverlayBackdrop(0.74f);
+        Rect panel = new Rect(Screen.width * 0.5f - 260f, Screen.height * 0.5f - 178f, 520f, 340f);
+        DrawPanel(panel, new Color(0.025f, 0.032f, 0.044f, 0.97f), won ? new Color(0.2f, 0.9f, 0.72f, 0.58f) : new Color(1f, 0.18f, 0.12f, 0.58f));
+
+        GUI.color = won ? new Color(0.46f, 1f, 0.78f, 1f) : new Color(1f, 0.32f, 0.24f, 1f);
+        GUI.skin.label.fontSize = 34;
+        GUI.Label(new Rect(panel.x + 52f, panel.y + 26f, panel.width - 90f, 46f), won ? "SURVIVAL VICTORY" : "RUN FAILED");
+        GUI.color = Color.white;
+
+        int kills = Player != null ? Player.Kills : 0;
+        int coins = Player != null ? Player.Coins : 0;
+        int level = Player != null ? Player.Level : 1;
+        GUI.skin.label.fontSize = 20;
+        GUI.Label(new Rect(panel.x + 74f, panel.y + 96f, 390f, 34f), "Kills " + kills + "     Coins " + coins + "     Level " + level);
+        GUI.skin.label.fontSize = 16;
+        GUI.color = new Color(0.78f, 0.86f, 0.92f, 1f);
+        GUI.Label(new Rect(panel.x + 74f, panel.y + 136f, 390f, 46f), feedbackText);
+        GUI.color = Color.white;
+
+        if (GUI.Button(new Rect(panel.x + 110f, panel.y + 204f, 300f, 36f), "Restart Run"))
+        {
+            StartRun();
+        }
+
+        if (GUI.Button(new Rect(panel.x + 110f, panel.y + 252f, 300f, 34f), "Main Menu"))
+        {
+            ReturnToMainMenu();
+        }
+
+        GUI.skin.label.fontSize = 13;
+        GUI.color = new Color(0.68f, 0.76f, 0.84f, 1f);
+        GUI.Label(new Rect(panel.x + 142f, panel.y + 296f, 260f, 24f), "Enter restarts | Esc returns");
+        GUI.skin.label.fontSize = 18;
+        GUI.color = Color.white;
+    }
+
+    private void DrawOverlayBackdrop(float alpha)
+    {
+        GUI.color = new Color(0f, 0f, 0f, alpha);
+        GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+    }
+
+    private void SetTargetFrameRate(int frameRate)
+    {
+        targetFrameRate = frameRate;
+        Application.targetFrameRate = targetFrameRate;
     }
 
     private void DrawUpgradePanel()
@@ -2839,1444 +3083,5 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         texture.SetPixel(x, y, color);
-    }
-}
-
-public sealed class ZombieStormUpgradeOption
-{
-    public string Key;
-    public string Title;
-    public string Description;
-    public string Category;
-    public Color Accent;
-    public Action Apply;
-
-    public static ZombieStormUpgradeOption Skill(string key, string title, string description, Color accent, Action apply)
-    {
-        return new ZombieStormUpgradeOption { Key = key, Title = title, Description = description, Category = "ACTIVE SKILL", Accent = accent, Apply = apply };
-    }
-
-    public static ZombieStormUpgradeOption Passive(string key, string title, string description, Color accent, Action apply)
-    {
-        return new ZombieStormUpgradeOption { Key = key, Title = title, Description = description, Category = "PASSIVE STAT", Accent = accent, Apply = apply };
-    }
-
-    public static ZombieStormUpgradeOption Custom(string key, string title, string description, string category, Color accent, Action apply)
-    {
-        return new ZombieStormUpgradeOption { Key = key, Title = title, Description = description, Category = category, Accent = accent, Apply = apply };
-    }
-}
-
-public struct ZombieStormDamagePopup
-{
-    public string Text;
-    public Vector2 WorldPosition;
-    public Vector2 Velocity;
-    public Color Color;
-    public float TimeLeft;
-    public int Size;
-}
-
-public sealed class ZombieStormPlayer : MonoBehaviour
-{
-    private const float AnimatedPlayerVisualScale = 1.55f;
-    private const float FallbackPlayerVisualScale = 1.28f;
-    private const float HealthBarWidth = 1.18f;
-    private const float HealthBarHeight = 0.1f;
-
-    private ZombieStormGameController game;
-    private SpriteRenderer spriteRenderer;
-    private SpriteRenderer healthBarFill;
-    private Transform healthBarFillTransform;
-    private Vector2 lastMove = Vector2.down;
-    private float hurtCooldown;
-    private float hurtAnimationTimer;
-    private float animationTimer;
-    private int animationFrame;
-    private int hurtAnimationFrame;
-    private string facingDirection = "walk_down";
-
-    public int Level { get; private set; }
-    public float Experience { get; private set; }
-    public float ExperienceToNext { get; private set; }
-    public float Health { get; private set; }
-    public float MaxHealth { get; private set; }
-    public int Coins { get; private set; }
-    public int Kills { get; set; }
-    public float PickupRange { get { return 1.35f + game.GetPassiveLevel(ZombieStormPassiveType.PickupRange) * 0.35f; } }
-
-    public void Initialize(ZombieStormGameController owner, SpriteRenderer renderer)
-    {
-        game = owner;
-        spriteRenderer = renderer;
-        Level = 1;
-        Experience = 0f;
-        ExperienceToNext = 12f;
-        MaxHealth = 115f;
-        Health = MaxHealth;
-        Coins = 0;
-        Kills = 0;
-        BuildHealthBar();
-    }
-
-    private void Update()
-    {
-        if (game == null)
-        {
-            return;
-        }
-
-        hurtCooldown -= Time.deltaTime;
-        hurtAnimationTimer -= Time.deltaTime;
-        Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
-        if (input.sqrMagnitude > 1f)
-        {
-            input.Normalize();
-        }
-
-        float speed = 4.6f + game.GetPassiveLevel(ZombieStormPassiveType.MoveSpeed) * 0.36f;
-        transform.position += (Vector3)(input * speed * Time.deltaTime);
-
-        if (input.sqrMagnitude > 0.01f)
-        {
-            lastMove = input.normalized;
-            if (Mathf.Abs(lastMove.x) > 0.08f)
-            {
-                facingDirection = DirectionToAnimation(lastMove);
-            }
-
-            if (!game.HasPlayerWalkAnimation)
-            {
-                transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(lastMove.y, lastMove.x) * Mathf.Rad2Deg - 90f);
-            }
-            else
-            {
-                transform.rotation = Quaternion.identity;
-            }
-        }
-
-        if (spriteRenderer != null)
-        {
-            spriteRenderer.color = Color.Lerp(spriteRenderer.color, Color.white, 6f * Time.deltaTime);
-            UpdatePlayerAnimation(input.sqrMagnitude > 0.01f);
-        }
-
-        UpdateHealthBar();
-    }
-
-    private void BuildHealthBar()
-    {
-        Sprite barSprite = game.GetHealthBarSprite();
-        if (barSprite == null)
-        {
-            return;
-        }
-
-        GameObject root = new GameObject("Underfoot Health Bar");
-        root.transform.SetParent(transform, false);
-        root.transform.localPosition = new Vector3(0f, -0.78f, 0f);
-
-        GameObject background = new GameObject("Health Bar Back");
-        background.transform.SetParent(root.transform, false);
-        background.transform.localScale = new Vector3(HealthBarWidth + 0.08f, HealthBarHeight + 0.05f, 1f);
-        SpriteRenderer backgroundRenderer = background.AddComponent<SpriteRenderer>();
-        backgroundRenderer.sprite = barSprite;
-        backgroundRenderer.color = new Color(0.04f, 0.03f, 0.025f, 0.86f);
-        backgroundRenderer.sortingOrder = 52;
-
-        GameObject fill = new GameObject("Health Bar Fill");
-        fill.transform.SetParent(root.transform, false);
-        fill.transform.localScale = new Vector3(HealthBarWidth, HealthBarHeight, 1f);
-        healthBarFillTransform = fill.transform;
-        healthBarFill = fill.AddComponent<SpriteRenderer>();
-        healthBarFill.sprite = barSprite;
-        healthBarFill.color = new Color(0.92f, 0.08f, 0.08f, 0.96f);
-        healthBarFill.sortingOrder = 53;
-    }
-
-    private void UpdateHealthBar()
-    {
-        if (healthBarFill == null || healthBarFillTransform == null)
-        {
-            return;
-        }
-
-        float value = MaxHealth <= 0f ? 0f : Mathf.Clamp01(Health / MaxHealth);
-        float width = Mathf.Max(0.02f, HealthBarWidth * value);
-        healthBarFillTransform.localScale = new Vector3(width, HealthBarHeight, 1f);
-        healthBarFillTransform.localPosition = new Vector3(-HealthBarWidth * 0.5f + width * 0.5f, 0f, 0f);
-        healthBarFill.color = value > 0.5f ? new Color(0.92f, 0.08f, 0.08f, 0.96f) : new Color(1f, 0.58f, 0.08f, 0.98f);
-    }
-
-    private void UpdatePlayerAnimation(bool moving)
-    {
-        if (!game.HasPlayerWalkAnimation)
-        {
-            spriteRenderer.flipX = false;
-            float pulse = Mathf.Sin(Time.time * 12f) * 0.04f;
-            transform.localScale = Vector3.one * (FallbackPlayerVisualScale + pulse);
-            return;
-        }
-
-        transform.localScale = Vector3.one * AnimatedPlayerVisualScale;
-        spriteRenderer.flipX = IsLeftFacingDirection(facingDirection);
-        if (hurtAnimationTimer > 0f && game.HasPlayerHurtAnimation)
-        {
-            animationTimer += Time.deltaTime;
-            if (animationTimer >= 0.055f)
-            {
-                animationTimer = 0f;
-                hurtAnimationFrame++;
-            }
-
-            spriteRenderer.sprite = game.GetPlayerHurtFrame(hurtAnimationFrame);
-            return;
-        }
-
-        if (moving)
-        {
-            animationTimer += Time.deltaTime;
-            if (animationTimer >= 0.075f)
-            {
-                animationTimer = 0f;
-                animationFrame++;
-            }
-        }
-        else
-        {
-            animationTimer = 0f;
-            animationFrame = 0;
-        }
-
-        spriteRenderer.sprite = game.GetPlayerWalkFrame(facingDirection, animationFrame);
-    }
-
-    private static bool IsLeftFacingDirection(string direction)
-    {
-        return direction == "walk_left";
-    }
-
-    private static string DirectionToAnimation(Vector2 direction)
-    {
-        return direction.x < -0.08f ? "walk_left" : "walk_right";
-    }
-
-    public void AddExperience(int amount)
-    {
-        if (amount <= 0)
-        {
-            return;
-        }
-
-        Experience += amount;
-        game.PlaySfx("pickup", 0.3f, 0.06f);
-        while (Experience >= ExperienceToNext)
-        {
-            Experience -= ExperienceToNext;
-            Level++;
-            ExperienceToNext = Mathf.RoundToInt(ExperienceToNext * 1.28f + 8f);
-            game.RequestLevelUp();
-            break;
-        }
-    }
-
-    public void AddCoins(int amount)
-    {
-        Coins += Mathf.Max(0, amount);
-        game.PlaySfx("coin", 0.34f, 0.055f);
-    }
-
-    public void TakeDamage(float amount)
-    {
-        if (hurtCooldown > 0f)
-        {
-            amount *= 0.35f;
-        }
-
-        Health -= amount;
-        hurtCooldown = 0.12f;
-        hurtAnimationTimer = 0.24f;
-        hurtAnimationFrame = 1;
-        animationTimer = 0f;
-        game.PlaySfx("hurt", 0.48f, 0.18f);
-        game.ShakeCamera(0.08f, 0.12f);
-        game.FlashScreen(0.8f);
-        if (spriteRenderer != null)
-        {
-            spriteRenderer.color = new Color(1f, 0.55f, 0.55f);
-        }
-
-        if (Health <= 0f)
-        {
-            Health = 0f;
-            game.EndRun(false, "The survivor fell to the horde.");
-        }
-    }
-
-    public void Heal(float amount)
-    {
-        Health = Mathf.Min(MaxHealth, Health + amount);
-    }
-
-    public void IncreaseMaxHealth(float amount)
-    {
-        MaxHealth += amount;
-        Heal(amount);
-    }
-}
-
-public sealed class ZombieStormSkillManager : MonoBehaviour
-{
-    private readonly Dictionary<ZombieStormSkillType, int> levels = new Dictionary<ZombieStormSkillType, int>();
-    private readonly Dictionary<ZombieStormSkillType, float> cooldowns = new Dictionary<ZombieStormSkillType, float>();
-    private readonly Dictionary<string, int> skillUpgrades = new Dictionary<string, int>();
-    private readonly HashSet<ZombieStormSkillType> evolved = new HashSet<ZombieStormSkillType>();
-    private readonly List<GameObject> orbitingObjects = new List<GameObject>();
-    private readonly List<GameObject> drones = new List<GameObject>();
-    private readonly List<ZombieStormPendingSkillBlast> pendingBlasts = new List<ZombieStormPendingSkillBlast>();
-
-    private ZombieStormGameController game;
-    private ZombieStormPlayer player;
-    private float ultimateCooldown;
-
-    public int KnownSkillCount
-    {
-        get { return levels.Count; }
-    }
-
-    public void Initialize(ZombieStormGameController owner, ZombieStormPlayer survivor)
-    {
-        game = owner;
-        player = survivor;
-    }
-
-    private void Update()
-    {
-        if (game == null || player == null)
-        {
-            return;
-        }
-
-        TickSkill(ZombieStormSkillType.MagicBolt, CastMagicBolt);
-        TickSkill(ZombieStormSkillType.MeteorStorm, CastMeteorStorm);
-        TickSkill(ZombieStormSkillType.FireZone, CastFireZone);
-        TickSkill(ZombieStormSkillType.ChainLightning, CastChainLightning);
-        TickSkill(ZombieStormSkillType.ShieldBurst, CastShieldBurst);
-        UpdatePendingBlasts();
-        UpdateOrbitingKnives();
-        UpdateSummonDrones();
-        UpdateUltimateInput();
-    }
-
-    public void LearnSkill(ZombieStormSkillType weapon)
-    {
-        if (GetSkillLevel(weapon) <= 0)
-        {
-            levels[weapon] = 1;
-            cooldowns[weapon] = 0.05f;
-            if (weapon == ZombieStormSkillType.OrbitingKnife)
-            {
-                RebuildOrbitingKnives();
-            }
-            else if (weapon == ZombieStormSkillType.SummonDrone)
-            {
-                RebuildDrones();
-            }
-        }
-        else
-        {
-            LevelUpSkill(weapon);
-        }
-    }
-
-    public void LevelUpSkill(ZombieStormSkillType weapon)
-    {
-        int next = Mathf.Min(5, GetSkillLevel(weapon) + 1);
-        levels[weapon] = next;
-        if (weapon == ZombieStormSkillType.OrbitingKnife)
-        {
-            RebuildOrbitingKnives();
-        }
-        else if (weapon == ZombieStormSkillType.SummonDrone)
-        {
-            RebuildDrones();
-        }
-    }
-
-    public int GetSkillLevel(ZombieStormSkillType weapon)
-    {
-        int level;
-        return levels.TryGetValue(weapon, out level) ? level : 0;
-    }
-
-    public int GetSkillUpgradeLevel(string key)
-    {
-        int level;
-        return skillUpgrades.TryGetValue(key, out level) ? level : 0;
-    }
-
-    public void AddSkillUpgrade(string key)
-    {
-        int next = Mathf.Min(3, GetSkillUpgradeLevel(key) + 1);
-        skillUpgrades[key] = next;
-        if (key == "knife_blades" || key == "knife_reach")
-        {
-            RebuildOrbitingKnives();
-        }
-        else if (key == "drone_swarm")
-        {
-            RebuildDrones();
-        }
-    }
-
-    public bool IsEvolved(ZombieStormSkillType weapon)
-    {
-        return evolved.Contains(weapon);
-    }
-
-    public void Evolve(ZombieStormSkillType weapon)
-    {
-        evolved.Add(weapon);
-        if (weapon == ZombieStormSkillType.OrbitingKnife)
-        {
-            RebuildOrbitingKnives();
-        }
-        else if (weapon == ZombieStormSkillType.SummonDrone)
-        {
-            RebuildDrones();
-        }
-    }
-
-    public string GetLoadoutText()
-    {
-        string text = "Skills";
-        int ultimateLevel = GetSkillLevel(ZombieStormSkillType.UltimateStorm);
-        if (ultimateLevel > 0)
-        {
-            text += "   F " + Mathf.Max(0f, ultimateCooldown).ToString("0.0") + "s";
-        }
-
-        text += "\n";
-        if (levels.Count == 0)
-        {
-            return text + "None";
-        }
-
-        foreach (KeyValuePair<ZombieStormSkillType, int> pair in levels)
-        {
-            if (pair.Key == ZombieStormSkillType.UltimateStorm)
-            {
-                text += "Ultimate Lv." + pair.Value + "\n";
-                continue;
-            }
-
-            text += SkillLabel(pair.Key) + " Lv." + pair.Value + (IsEvolved(pair.Key) ? " Evolved" : "") + "\n";
-        }
-
-        return text;
-    }
-
-    private static string SkillLabel(ZombieStormSkillType weapon)
-    {
-        switch (weapon)
-        {
-            case ZombieStormSkillType.MagicBolt: return "Magic Bolt";
-            case ZombieStormSkillType.OrbitingKnife: return "Orbit Knives";
-            case ZombieStormSkillType.MeteorStorm: return "Meteor";
-            case ZombieStormSkillType.FireZone: return "Fire Zone";
-            case ZombieStormSkillType.SummonDrone: return "Drone";
-            case ZombieStormSkillType.ChainLightning: return "Lightning";
-            case ZombieStormSkillType.ShieldBurst: return "Shield";
-            case ZombieStormSkillType.UltimateStorm: return "Ultimate";
-            default: return weapon.ToString();
-        }
-    }
-
-    private delegate void SkillAction(int level);
-
-    private void TickSkill(ZombieStormSkillType weapon, SkillAction action)
-    {
-        int level = GetSkillLevel(weapon);
-        if (level <= 0)
-        {
-            return;
-        }
-
-        float current;
-        cooldowns.TryGetValue(weapon, out current);
-        current -= Time.deltaTime;
-        if (current <= 0f)
-        {
-            action(level);
-        }
-        else
-        {
-            cooldowns[weapon] = current;
-        }
-    }
-
-    private int Mod(string key)
-    {
-        return GetSkillUpgradeLevel(key);
-    }
-
-    private void CastMagicBolt(int level)
-    {
-        ZombieStormEnemy target = game.FindNearestEnemy(transform.position, IsEvolved(ZombieStormSkillType.MagicBolt) ? 18f : 14f);
-        if (target == null)
-        {
-            cooldowns[ZombieStormSkillType.MagicBolt] = 0.15f;
-            return;
-        }
-
-        Vector2 direction = ((Vector2)target.transform.position - (Vector2)transform.position).normalized;
-        Vector2 origin = (Vector2)transform.position + direction * 0.42f;
-        int shots = (IsEvolved(ZombieStormSkillType.MagicBolt) ? 3 : level >= 4 ? 2 : 1) + Mod("magic_split");
-        float damage = (10f + level * 3.4f) * (1f + Mod("magic_force") * 0.16f);
-        int pierce = (level >= 3 ? 1 : 0) + Mod("magic_pierce");
-        game.SpawnHitSpark(origin, new Color(0.48f, 0.95f, 1f, 0.88f), 0.24f + level * 0.025f);
-        for (int i = 0; i < shots; i++)
-        {
-            float spreadStep = shots <= 3 ? 9f : 7f;
-            float angle = shots == 1 ? 0f : -(shots - 1) * spreadStep * 0.5f + i * spreadStep;
-            game.SpawnPlayerProjectile(origin, ZombieStormGameController.Rotate(direction, angle), RollDamage(damage), 13.5f, 1.4f, pierce, new Color(0.56f, 0.92f, 1f), 0.34f + level * 0.015f);
-        }
-
-        float baseCooldown = IsEvolved(ZombieStormSkillType.MagicBolt) ? 0.18f : 0.62f - level * 0.055f;
-        cooldowns[ZombieStormSkillType.MagicBolt] = baseCooldown * game.CooldownMultiplier;
-    }
-
-    private void CastMeteorStorm(int level)
-    {
-        int impacts = 1 + Mathf.FloorToInt(level * 0.55f) + Mod("meteor_impacts") + (IsEvolved(ZombieStormSkillType.MeteorStorm) ? 2 : 0);
-        for (int i = 0; i < impacts; i++)
-        {
-            ZombieStormEnemy target = game.FindRandomEnemy();
-            Vector2 position = target != null ? (Vector2)target.transform.position : (Vector2)transform.position + UnityEngine.Random.insideUnitCircle * 5.5f;
-            float radius = (0.95f + level * 0.18f + Mod("meteor_blast") * 0.2f) * game.AreaMultiplier;
-            game.SpawnAreaEffect(position, radius * 1.35f, 0f, 0.48f, 1f, new Color(1f, 0.75f, 0.18f, 0.3f), "meteor_warning");
-            game.SpawnAreaEffect(position, radius * 0.36f, 0f, 0.48f, 1f, new Color(1f, 0.92f, 0.3f, 0.52f), "meteor_warning");
-            pendingBlasts.Add(new ZombieStormPendingSkillBlast
-            {
-                Position = position,
-                Radius = radius,
-                Damage = RollDamage((20f + level * 5.5f) * (1f + Mod("meteor_heat") * 0.16f)),
-                Delay = 0.42f,
-                Color = new Color(1f, 0.28f, 0.05f, 0.72f),
-                Key = "meteor_blast"
-            });
-        }
-
-        cooldowns[ZombieStormSkillType.MeteorStorm] = (4.2f - level * 0.24f) * game.CooldownMultiplier;
-    }
-
-    private void CastFireZone(int level)
-    {
-        int pools = (IsEvolved(ZombieStormSkillType.FireZone) ? 3 : 1 + level / 4) + Mod("fire_spread");
-        for (int i = 0; i < pools; i++)
-        {
-            Vector2 offset = UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(2.4f, 7.0f);
-            Vector2 position = (Vector2)transform.position + offset;
-            float radius = (1.25f + level * 0.22f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.FireZone) ? 1.22f : 1f);
-            float duration = 2.5f + level * 0.36f + Mod("fire_linger") * 0.55f;
-            game.SpawnAreaEffect(position, radius, RollDamage((4.2f + level * 1.3f) * (1f + Mod("fire_heat") * 0.18f)), duration, 0.28f, new Color(1f, 0.25f, 0.05f, 0.62f), "fire_pool");
-            for (int spark = 0; spark < 4; spark++)
-            {
-                game.SpawnHitSpark(position + UnityEngine.Random.insideUnitCircle * radius * 0.65f, new Color(1f, 0.68f, 0.12f, 0.78f), 0.16f);
-            }
-        }
-
-        cooldowns[ZombieStormSkillType.FireZone] = (4.1f - level * 0.25f) * game.CooldownMultiplier;
-    }
-
-    private void CastChainLightning(int level)
-    {
-        ZombieStormEnemy current = game.FindRandomEnemy();
-        if (current == null)
-        {
-            cooldowns[ZombieStormSkillType.ChainLightning] = 0.25f;
-            return;
-        }
-
-        int jumps = 2 + level + Mod("lightning_jumps") + (IsEvolved(ZombieStormSkillType.ChainLightning) ? 4 : 0);
-        float chainReach = 4.2f + level * 0.35f + Mod("lightning_reach") * 0.8f;
-        float lightningDamage = (13f + level * 4f) * (1f + Mod("lightning_voltage") * 0.18f);
-        game.PlaySfx("lightning", 0.48f, 0.12f);
-        HashSet<ZombieStormEnemy> hit = new HashSet<ZombieStormEnemy>();
-        Vector2 previous = transform.position;
-        for (int i = 0; i < jumps && current != null; i++)
-        {
-            Vector2 currentPosition = current.transform.position;
-            hit.Add(current);
-            SpawnLightningSegment(previous, currentPosition, level);
-            current.TakeDamage(RollDamage(lightningDamage), (currentPosition - (Vector2)transform.position).normalized);
-            game.SpawnAreaEffect(currentPosition, (0.6f + Mod("lightning_reach") * 0.08f) * game.AreaMultiplier, 0f, 0.18f, 1f, new Color(0.25f, 0.85f, 1f, 0.86f), "lightning_flash");
-            previous = currentPosition;
-            current = FindNearestUnhitEnemy(currentPosition, chainReach, hit);
-        }
-
-        cooldowns[ZombieStormSkillType.ChainLightning] = Mathf.Max(0.82f, 3.5f - level * 0.22f - Mod("lightning_tempo") * 0.24f) * game.CooldownMultiplier;
-    }
-
-    private void CastShieldBurst(int level)
-    {
-        float radius = (1.35f + level * 0.24f + Mod("shield_radius") * 0.22f) * game.AreaMultiplier;
-        if (CountEnemiesNear(transform.position, radius + 0.35f) <= 0)
-        {
-            cooldowns[ZombieStormSkillType.ShieldBurst] = 0.18f;
-            return;
-        }
-
-        game.SpawnAreaEffect(transform.position, radius, RollDamage((12f + level * 4f) * (1f + Mod("shield_force") * 0.18f)), 0.18f, 99f, new Color(0.75f, 0.95f, 1f, 0.55f), "shield_burst");
-        game.SpawnAreaEffect(transform.position, radius * 1.38f, 0f, 0.24f, 1f, new Color(0.4f, 0.92f, 1f, 0.32f), "shield_burst");
-        game.ShakeCamera(0.06f, 0.1f);
-        cooldowns[ZombieStormSkillType.ShieldBurst] = Mathf.Max(0.65f, 2.4f - level * 0.16f - Mod("shield_recharge") * 0.18f) * game.CooldownMultiplier;
-    }
-
-    private void SpawnLightningSegment(Vector2 from, Vector2 to, int level)
-    {
-        float distance = Vector2.Distance(from, to);
-        int steps = Mathf.Clamp(Mathf.CeilToInt(distance / 0.42f), 2, 12);
-        for (int i = 1; i <= steps; i++)
-        {
-            float t = i / (float)steps;
-            Vector2 point = Vector2.Lerp(from, to, t);
-            point += UnityEngine.Random.insideUnitCircle * 0.06f;
-            float radius = (0.12f + level * 0.012f + Mod("lightning_reach") * 0.01f + Mod("lightning_voltage") * 0.006f) * game.AreaMultiplier;
-            game.SpawnAreaEffect(point, radius, 0f, 0.1f, 1f, new Color(0.35f, 0.9f, 1f, 0.72f), "lightning_flash");
-        }
-    }
-
-    private void UpdateOrbitingKnives()
-    {
-        int level = GetSkillLevel(ZombieStormSkillType.OrbitingKnife);
-        if (level <= 0)
-        {
-            return;
-        }
-
-        float radius = (1.45f + level * 0.18f + Mod("knife_reach") * 0.22f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.32f : 1f);
-        float speed = 120f + level * 28f;
-        for (int i = 0; i < orbitingObjects.Count; i++)
-        {
-            float angle = Time.time * speed + i * (360f / Mathf.Max(1, orbitingObjects.Count));
-            Vector2 offset = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * radius;
-            orbitingObjects[i].transform.position = (Vector2)transform.position + offset;
-            orbitingObjects[i].transform.Rotate(0f, 0f, 420f * Time.deltaTime);
-        }
-
-        float current;
-        cooldowns.TryGetValue(ZombieStormSkillType.OrbitingKnife, out current);
-        current -= Time.deltaTime;
-        if (current > 0f)
-        {
-            cooldowns[ZombieStormSkillType.OrbitingKnife] = current;
-            return;
-        }
-
-        IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
-        for (int i = 0; i < activeEnemies.Count; i++)
-        {
-            ZombieStormEnemy enemy = activeEnemies[i];
-            if (enemy != null && !enemy.IsDead && Vector2.Distance(enemy.transform.position, transform.position) <= radius + enemy.Radius)
-            {
-                enemy.TakeDamage(RollDamage((6f + level * 1.8f) * (1f + Mod("knife_edge") * 0.18f)), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
-                game.SpawnHitSpark(enemy.transform.position, new Color(0.9f, 0.96f, 1f, 0.72f), 0.18f);
-            }
-        }
-
-        cooldowns[ZombieStormSkillType.OrbitingKnife] = 0.24f * game.CooldownMultiplier;
-    }
-
-    private void RebuildOrbitingKnives()
-    {
-        for (int i = 0; i < orbitingObjects.Count; i++)
-        {
-            if (orbitingObjects[i] != null)
-            {
-                Destroy(orbitingObjects[i]);
-            }
-        }
-
-        orbitingObjects.Clear();
-        int level = GetSkillLevel(ZombieStormSkillType.OrbitingKnife);
-        int count = 2 + Mathf.FloorToInt(level * 0.75f) + Mod("knife_blades") + (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 3 : 0);
-        for (int i = 0; i < count; i++)
-        {
-            GameObject blade = new GameObject("Orbiting Skill Blade");
-            blade.transform.localScale = Vector3.one * 0.5f;
-            SpriteRenderer spriteRenderer = blade.AddComponent<SpriteRenderer>();
-            spriteRenderer.sprite = game.GetSkillSprite(ZombieStormSkillType.OrbitingKnife);
-            spriteRenderer.color = new Color(0.9f, 0.98f, 1f, 1f);
-            spriteRenderer.sortingOrder = 35;
-            orbitingObjects.Add(blade);
-        }
-    }
-
-    private void RebuildDrones()
-    {
-        for (int i = 0; i < drones.Count; i++)
-        {
-            if (drones[i] != null)
-            {
-                Destroy(drones[i]);
-            }
-        }
-
-        drones.Clear();
-        int level = GetSkillLevel(ZombieStormSkillType.SummonDrone);
-        int count = 1 + level / 2 + Mod("drone_swarm") + (IsEvolved(ZombieStormSkillType.SummonDrone) ? 2 : 0);
-        for (int i = 0; i < count; i++)
-        {
-            GameObject drone = new GameObject("Summoned Drone");
-            drone.transform.localScale = Vector3.one * 0.56f;
-            SpriteRenderer spriteRenderer = drone.AddComponent<SpriteRenderer>();
-            spriteRenderer.sprite = game.GetSkillSprite(ZombieStormSkillType.SummonDrone);
-            spriteRenderer.color = new Color(0.5f, 0.92f, 1f);
-            spriteRenderer.sortingOrder = 34;
-            drones.Add(drone);
-        }
-    }
-
-    private void UpdateSummonDrones()
-    {
-        int level = GetSkillLevel(ZombieStormSkillType.SummonDrone);
-        if (level <= 0)
-        {
-            return;
-        }
-
-        if (drones.Count == 0)
-        {
-            RebuildDrones();
-        }
-
-        for (int i = 0; i < drones.Count; i++)
-        {
-            float angle = Time.time * 92f + i * (360f / Mathf.Max(1, drones.Count));
-            Vector2 desired = (Vector2)transform.position + new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * 1.15f;
-            drones[i].transform.position = Vector2.Lerp(drones[i].transform.position, desired, 9f * Time.deltaTime);
-        }
-
-        float current;
-        cooldowns.TryGetValue(ZombieStormSkillType.SummonDrone, out current);
-        current -= Time.deltaTime;
-        if (current > 0f)
-        {
-            cooldowns[ZombieStormSkillType.SummonDrone] = current;
-            return;
-        }
-
-        for (int i = 0; i < drones.Count; i++)
-        {
-            ZombieStormEnemy target = game.FindNearestEnemy(drones[i].transform.position, 9f);
-            if (target == null)
-            {
-                continue;
-            }
-
-            Vector2 direction = ((Vector2)target.transform.position - (Vector2)drones[i].transform.position).normalized;
-            Vector2 muzzle = (Vector2)drones[i].transform.position + direction * 0.26f;
-            game.SpawnHitSpark(muzzle, new Color(0.35f, 0.9f, 1f, 0.78f), 0.16f);
-            game.SpawnPlayerProjectile(muzzle, direction, RollDamage((7f + level * 2.4f) * (1f + Mod("drone_focus") * 0.18f)), 12f, 1.1f, 0, new Color(0.4f, 0.92f, 1f), 0.26f);
-        }
-
-        cooldowns[ZombieStormSkillType.SummonDrone] = Mathf.Max(0.22f, 0.92f - level * 0.06f - Mod("drone_overclock") * 0.08f) * game.CooldownMultiplier;
-    }
-
-    private void UpdateUltimateInput()
-    {
-        if (ultimateCooldown > 0f)
-        {
-            ultimateCooldown -= Time.deltaTime;
-        }
-
-        int level = GetSkillLevel(ZombieStormSkillType.UltimateStorm);
-        if (level <= 0 || ultimateCooldown > 0f || !Input.GetKeyDown(KeyCode.F))
-        {
-            return;
-        }
-
-        IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
-        for (int i = 0; i < activeEnemies.Count; i++)
-        {
-            ZombieStormEnemy enemy = activeEnemies[i];
-            if (enemy == null || enemy.IsDead)
-            {
-                continue;
-            }
-
-            enemy.TakeDamage(RollDamage((42f + level * 18f) * (1f + Mod("ultimate_voltage") * 0.18f)), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
-            game.SpawnAreaEffect(enemy.transform.position, 0.62f, 0f, 0.22f, 1f, new Color(0.45f, 0.85f, 1f, 0.78f), "ultimate_spark");
-        }
-
-        float stormRadius = (7.5f + Mod("ultimate_radius") * 0.85f) * game.AreaMultiplier;
-        game.SpawnAreaEffect(transform.position, stormRadius, RollDamage((25f + level * 8f) * (1f + Mod("ultimate_voltage") * 0.18f)), 0.35f, 99f, new Color(0.7f, 0.92f, 1f, 0.42f), "ultimate_storm");
-        game.PlaySfx("ultimate", 0.92f, 0.2f);
-        game.ShakeCamera(0.34f, 0.48f);
-        game.FlashScreen(0.9f);
-        ultimateCooldown = Mathf.Max(12f, 42f - level * 4f - Mod("ultimate_recharge") * 3.5f);
-    }
-
-    private ZombieStormEnemy FindNearestUnhitEnemy(Vector2 origin, float maxDistance, HashSet<ZombieStormEnemy> hit)
-    {
-        ZombieStormEnemy best = null;
-        float bestDistance = maxDistance * maxDistance;
-        IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
-        for (int i = 0; i < activeEnemies.Count; i++)
-        {
-            ZombieStormEnemy enemy = activeEnemies[i];
-            if (enemy == null || enemy.IsDead || hit.Contains(enemy))
-            {
-                continue;
-            }
-
-            float distance = ((Vector2)enemy.transform.position - origin).sqrMagnitude;
-            if (distance < bestDistance)
-            {
-                bestDistance = distance;
-                best = enemy;
-            }
-        }
-
-        return best;
-    }
-
-    private int CountEnemiesNear(Vector2 origin, float radius)
-    {
-        int count = 0;
-        float radiusSquared = radius * radius;
-        IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
-        for (int i = 0; i < activeEnemies.Count; i++)
-        {
-            ZombieStormEnemy enemy = activeEnemies[i];
-            if (enemy != null && !enemy.IsDead && ((Vector2)enemy.transform.position - origin).sqrMagnitude <= radiusSquared)
-            {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    private void UpdatePendingBlasts()
-    {
-        for (int i = pendingBlasts.Count - 1; i >= 0; i--)
-        {
-            ZombieStormPendingSkillBlast blast = pendingBlasts[i];
-            blast.Delay -= Time.deltaTime;
-            if (blast.Delay > 0f)
-            {
-                pendingBlasts[i] = blast;
-                continue;
-            }
-
-            game.SpawnAreaEffect(blast.Position, blast.Radius, blast.Damage, 0.22f, 99f, blast.Color, blast.Key);
-            if (blast.Key == "meteor_blast")
-            {
-                game.SpawnHitSpark(blast.Position, new Color(1f, 0.9f, 0.25f, 0.9f), blast.Radius * 0.32f);
-                game.PlaySfx("boom", 0.58f, 0.08f);
-                game.ShakeCamera(0.12f, 0.14f);
-                game.FlashScreen(blast.Color, 0.2f);
-            }
-
-            pendingBlasts.RemoveAt(i);
-        }
-    }
-
-    private float RollDamage(float baseDamage)
-    {
-        float damage = baseDamage * game.DamageMultiplier;
-        if (UnityEngine.Random.value < game.CritChance)
-        {
-            damage *= 2f;
-        }
-
-        return damage;
-    }
-}
-
-public struct ZombieStormPendingSkillBlast
-{
-    public Vector2 Position;
-    public float Radius;
-    public float Damage;
-    public float Delay;
-    public Color Color;
-    public string Key;
-}
-
-public sealed class ZombieStormEnemy : MonoBehaviour
-{
-    private ZombieStormGameController game;
-    private SpriteRenderer spriteRenderer;
-    private string poolKey;
-    private Color baseColor;
-    private float health;
-    private float maxHealth;
-    private float speed;
-    private float damagePerSecond;
-    private float bossActionTimer;
-    private float sprintTimer;
-    private float shootTimer;
-    private bool sprinting;
-
-    public ZombieStormEnemyType Type { get; private set; }
-    public bool IsDead { get; private set; }
-    public float Radius { get; private set; }
-    public float Health { get { return health; } }
-    public float MaxHealth { get { return maxHealth; } }
-    public float Health01 { get { return maxHealth <= 0f ? 0f : Mathf.Clamp01(health / maxHealth); } }
-
-    public void Initialize(ZombieStormGameController owner, ZombieStormEnemyType enemyType, string key, Sprite sprite, float runTime, float difficulty)
-    {
-        game = owner;
-        Type = enemyType;
-        poolKey = key;
-        IsDead = false;
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        spriteRenderer.sprite = sprite;
-        baseColor = Color.white;
-        spriteRenderer.color = baseColor;
-
-        float hpScale = 0.82f + runTime / 165f;
-        Radius = 0.42f;
-        speed = 1.55f;
-        damagePerSecond = 6.5f;
-        maxHealth = 22f * hpScale;
-        transform.localScale = Vector3.one * 0.95f;
-        sprintTimer = 0.8f;
-        shootTimer = UnityEngine.Random.Range(0.7f, 1.6f);
-
-        if (Type == ZombieStormEnemyType.Fast)
-        {
-            speed = 3.05f;
-            maxHealth = 15f * hpScale;
-            damagePerSecond = 8.5f;
-            Radius = 0.34f;
-            transform.localScale = Vector3.one * 0.78f;
-        }
-        else if (Type == ZombieStormEnemyType.Tank)
-        {
-            speed = 1.02f;
-            maxHealth = 82f * hpScale;
-            damagePerSecond = 10f;
-            Radius = 0.6f;
-            transform.localScale = Vector3.one * 1.35f;
-        }
-        else if (Type == ZombieStormEnemyType.Exploder)
-        {
-            speed = 1.92f;
-            maxHealth = 34f * hpScale;
-            damagePerSecond = 5f;
-            Radius = 0.5f;
-            baseColor = new Color(1f, 0.85f, 0.18f);
-            spriteRenderer.color = baseColor;
-            transform.localScale = Vector3.one * 1.05f;
-        }
-        else if (Type == ZombieStormEnemyType.Spitter)
-        {
-            speed = 1.45f;
-            maxHealth = 30f * hpScale;
-            damagePerSecond = 7f;
-            Radius = 0.42f;
-            baseColor = new Color(0.7f, 1f, 0.75f);
-            spriteRenderer.color = baseColor;
-        }
-        else if (Type == ZombieStormEnemyType.Elite)
-        {
-            speed = 1.82f;
-            maxHealth = 150f * hpScale;
-            damagePerSecond = 14f;
-            Radius = 0.75f;
-            transform.localScale = Vector3.one * 1.62f;
-        }
-        else if (Type == ZombieStormEnemyType.Boss)
-        {
-            speed = 1.22f;
-            maxHealth = 920f * Mathf.Max(1f, difficulty);
-            damagePerSecond = 26f;
-            Radius = 1.45f;
-            transform.localScale = Vector3.one * 3.1f;
-            bossActionTimer = 2.5f;
-        }
-
-        health = maxHealth;
-        game.RegisterEnemy(this);
-    }
-
-    private void Update()
-    {
-        if (game == null || game.Player == null || IsDead)
-        {
-            return;
-        }
-
-        if (spriteRenderer != null)
-        {
-            spriteRenderer.color = Color.Lerp(spriteRenderer.color, baseColor, 10f * Time.deltaTime);
-        }
-
-        Vector2 toPlayer = (Vector2)game.Player.transform.position - (Vector2)transform.position;
-        float distance = toPlayer.magnitude;
-        Vector2 direction = distance > 0.01f ? toPlayer / distance : Vector2.zero;
-
-        if (Type == ZombieStormEnemyType.Fast)
-        {
-            sprintTimer -= Time.deltaTime;
-            if (sprintTimer <= 0f)
-            {
-                sprinting = !sprinting;
-                sprintTimer = sprinting ? 0.55f : 1.05f;
-            }
-        }
-
-        if (Type == ZombieStormEnemyType.Boss)
-        {
-            UpdateBoss(direction);
-        }
-        else if (Type == ZombieStormEnemyType.Spitter)
-        {
-            UpdateSpitter(direction, distance);
-        }
-        else
-        {
-            float finalSpeed = speed * (sprinting ? 1.85f : 1f);
-            transform.position += (Vector3)(direction * finalSpeed * Time.deltaTime);
-        }
-
-        if (distance <= Radius + 0.45f)
-        {
-            if (Type == ZombieStormEnemyType.Exploder)
-            {
-                game.SpawnAreaEffect(transform.position, 2.2f, 30f, 0.22f, 99f, new Color(1f, 0.35f, 0.05f, 0.65f), "zombie_explosion");
-                game.PlaySfx("boom", 0.54f, 0.08f);
-                game.ShakeCamera(0.16f, 0.16f);
-                game.Player.TakeDamage(22f);
-                Die(false);
-            }
-            else
-            {
-                game.Player.TakeDamage(damagePerSecond * Time.deltaTime);
-            }
-        }
-
-        if (direction.sqrMagnitude > 0.01f)
-        {
-            transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f);
-        }
-    }
-
-    public void TakeDamage(float amount, Vector2 impulse)
-    {
-        if (IsDead)
-        {
-            return;
-        }
-
-        health -= amount;
-        if (amount >= 8f || UnityEngine.Random.value < 0.18f)
-        {
-            game.SpawnDamageNumber(transform.position, amount, amount >= 30f);
-        }
-
-        transform.position += (Vector3)(impulse.normalized * 0.035f);
-        if (spriteRenderer != null)
-        {
-            spriteRenderer.color = Color.Lerp(baseColor, Color.red, 0.55f);
-        }
-
-        if (health <= 0f)
-        {
-            game.SpawnHitSpark(transform.position, Type == ZombieStormEnemyType.Boss ? new Color(1f, 0.2f, 0.15f, 0.9f) : new Color(0.65f, 1f, 0.35f, 0.8f), Type == ZombieStormEnemyType.Boss ? 1.1f : 0.42f);
-            Die(true);
-        }
-    }
-
-    private void UpdateSpitter(Vector2 direction, float distance)
-    {
-        if (distance > 6.8f)
-        {
-            transform.position += (Vector3)(direction * speed * Time.deltaTime);
-        }
-        else if (distance < 4.2f)
-        {
-            transform.position -= (Vector3)(direction * speed * 0.7f * Time.deltaTime);
-        }
-
-        shootTimer -= Time.deltaTime;
-        if (shootTimer <= 0f)
-        {
-            shootTimer = 2.2f;
-            game.SpawnEnemyProjectile(transform.position, direction, 10f, 4.8f, 4.2f);
-        }
-    }
-
-    private void UpdateBoss(Vector2 direction)
-    {
-        bool enraged = health < maxHealth * 0.5f;
-        transform.position += (Vector3)(direction * speed * (enraged ? 1.35f : 1f) * Time.deltaTime);
-        bossActionTimer -= Time.deltaTime;
-        if (bossActionTimer > 0f)
-        {
-            return;
-        }
-
-        int action = UnityEngine.Random.Range(0, 3);
-        if (action == 0)
-        {
-            int shots = enraged ? 18 : 12;
-            for (int i = 0; i < shots; i++)
-            {
-                Vector2 shotDir = ZombieStormGameController.Rotate(Vector2.up, i * (360f / shots));
-                game.SpawnEnemyProjectile(transform.position, shotDir, enraged ? 16f : 10f, 4.2f, 4f);
-            }
-        }
-        else if (action == 1)
-        {
-            int pools = enraged ? 8 : 5;
-            for (int i = 0; i < pools; i++)
-            {
-                Vector2 offset = UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(1.8f, 3.8f);
-                game.SpawnAreaEffect((Vector2)transform.position + offset, 0.95f, 8f, 2.4f, 0.45f, new Color(0.55f, 1f, 0.15f, 0.38f), "toxic_pool");
-            }
-        }
-        else
-        {
-            transform.position += (Vector3)(direction * (enraged ? 4.1f : 2.7f));
-            game.ShakeCamera(0.11f, 0.14f);
-        }
-
-        bossActionTimer = enraged ? 2.15f : 3.1f;
-    }
-
-    private void Die(bool reward)
-    {
-        if (IsDead)
-        {
-            return;
-        }
-
-        IsDead = true;
-        game.UnregisterEnemy(this);
-        if (reward)
-        {
-            game.OnEnemyKilled(this);
-        }
-
-        game.ReturnPooled(poolKey, gameObject);
-    }
-}
-
-public sealed class ZombieStormProjectile : MonoBehaviour
-{
-    private ZombieStormGameController game;
-    private Vector2 direction;
-    private float damage;
-    private float speed;
-    private float life;
-    private int pierce;
-
-    public void Initialize(ZombieStormGameController owner, Vector2 fireDirection, float hitDamage, float moveSpeed, float seconds, int pierceCount)
-    {
-        game = owner;
-        direction = fireDirection.sqrMagnitude > 0.01f ? fireDirection.normalized : Vector2.up;
-        damage = hitDamage;
-        speed = moveSpeed;
-        life = seconds;
-        pierce = pierceCount;
-    }
-
-    private void Update()
-    {
-        transform.position += (Vector3)(direction * speed * Time.deltaTime);
-        life -= Time.deltaTime;
-        if (life <= 0f)
-        {
-            game.ReturnPooled("player_bullet", gameObject);
-            return;
-        }
-
-        IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
-        for (int i = 0; i < activeEnemies.Count; i++)
-        {
-            ZombieStormEnemy enemy = activeEnemies[i];
-            if (enemy != null && !enemy.IsDead && Vector2.Distance(transform.position, enemy.transform.position) <= enemy.Radius + 0.16f)
-            {
-                enemy.TakeDamage(damage, direction);
-                game.SpawnHitSpark(transform.position, new Color(1f, 0.9f, 0.28f, 0.9f), 0.26f);
-                pierce--;
-                if (pierce < 0)
-                {
-                    game.ReturnPooled("player_bullet", gameObject);
-                }
-
-                return;
-            }
-        }
-    }
-}
-
-public sealed class ZombieStormEnemyProjectile : MonoBehaviour
-{
-    private ZombieStormGameController game;
-    private Vector2 direction;
-    private float damage;
-    private float speed;
-    private float life;
-
-    public void Initialize(ZombieStormGameController owner, Vector2 fireDirection, float hitDamage, float moveSpeed, float seconds)
-    {
-        game = owner;
-        direction = fireDirection.sqrMagnitude > 0.01f ? fireDirection.normalized : Vector2.up;
-        damage = hitDamage;
-        speed = moveSpeed;
-        life = seconds;
-    }
-
-    private void Update()
-    {
-        transform.position += (Vector3)(direction * speed * Time.deltaTime);
-        life -= Time.deltaTime;
-        if (life <= 0f)
-        {
-            game.ReturnPooled("enemy_spit", gameObject);
-            return;
-        }
-
-        if (game.Player != null && Vector2.Distance(transform.position, game.Player.transform.position) <= 0.5f)
-        {
-            game.Player.TakeDamage(damage);
-            game.ReturnPooled("enemy_spit", gameObject);
-        }
-    }
-}
-
-public sealed class ZombieStormAreaEffect : MonoBehaviour
-{
-    private ZombieStormGameController game;
-    private string poolKey;
-    private SpriteRenderer spriteRenderer;
-    private Sprite[] frames;
-    private Color initialColor;
-    private Vector3 initialScale;
-    private float radius;
-    private float damage;
-    private float life;
-    private float maxLife;
-    private float tickRate;
-    private float tickTimer;
-    private float frameDuration;
-    private bool mineTriggered;
-
-    public void Initialize(ZombieStormGameController owner, string key, float areaRadius, float hitDamage, float duration, float rate)
-    {
-        game = owner;
-        poolKey = key;
-        radius = areaRadius;
-        damage = hitDamage;
-        life = duration;
-        maxLife = Mathf.Max(0.01f, duration);
-        tickRate = rate;
-        tickTimer = 0f;
-        mineTriggered = false;
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        frames = game.GetEffectFrames(poolKey);
-        if (spriteRenderer != null && frames != null && frames.Length > 0)
-        {
-            spriteRenderer.sprite = frames[0];
-        }
-
-        initialColor = spriteRenderer != null ? spriteRenderer.color : Color.white;
-        initialScale = transform.localScale;
-        frameDuration = frames != null && frames.Length > 0 ? Mathf.Clamp(maxLife / frames.Length, 0.028f, 0.06f) : 0.05f;
-    }
-
-    private void Update()
-    {
-        life -= Time.deltaTime;
-        tickTimer -= Time.deltaTime;
-        UpdateVisuals();
-
-        if (poolKey == "mine_blast" && !mineTriggered)
-        {
-            bool hasTarget = false;
-            IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
-            for (int i = 0; i < activeEnemies.Count; i++)
-            {
-                ZombieStormEnemy enemy = activeEnemies[i];
-                if (enemy != null && !enemy.IsDead && Vector2.Distance(transform.position, enemy.transform.position) <= radius + enemy.Radius)
-                {
-                    hasTarget = true;
-                    break;
-                }
-            }
-
-            if (!hasTarget)
-            {
-                if (life <= 0f)
-                {
-                    game.ReturnPooled(poolKey, gameObject);
-                }
-
-                return;
-            }
-
-            mineTriggered = true;
-            life = 0.18f;
-            tickTimer = 0f;
-            SpriteRenderer spriteRenderer = GetComponent<SpriteRenderer>();
-            spriteRenderer.color = new Color(1f, 0.4f, 0.05f, 0.74f);
-            initialColor = spriteRenderer.color;
-        }
-
-        if (tickTimer <= 0f)
-        {
-            tickTimer = tickRate;
-            DamageEnemies();
-        }
-
-        if (life <= 0f)
-        {
-            game.ReturnPooled(poolKey, gameObject);
-        }
-    }
-
-    private void UpdateVisuals()
-    {
-        float t = Mathf.Clamp01(life / maxLife);
-        if (spriteRenderer != null)
-        {
-            if (frames != null && frames.Length > 0)
-            {
-                int frameIndex = Mathf.FloorToInt((maxLife - life) / frameDuration);
-                if (life > 0.08f && (poolKey == "fire_pool" || poolKey == "toxic_pool" || poolKey == "ultimate_storm"))
-                {
-                    frameIndex %= frames.Length;
-                }
-                else
-                {
-                    frameIndex = Mathf.Clamp(frameIndex, 0, frames.Length - 1);
-                }
-
-                spriteRenderer.sprite = frames[frameIndex];
-            }
-
-            Color color = initialColor;
-            color.a *= Mathf.SmoothStep(0f, 1f, t);
-            spriteRenderer.color = color;
-        }
-
-        if (poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "zombie_explosion")
-        {
-            float grow = 1f + (1f - t) * 0.55f;
-            transform.localScale = initialScale * grow;
-        }
-    }
-
-    private void DamageEnemies()
-    {
-        if (damage <= 0f)
-        {
-            return;
-        }
-
-        IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
-        for (int i = activeEnemies.Count - 1; i >= 0; i--)
-        {
-            ZombieStormEnemy enemy = activeEnemies[i];
-            if (enemy != null && !enemy.IsDead && Vector2.Distance(transform.position, enemy.transform.position) <= radius + enemy.Radius)
-            {
-                enemy.TakeDamage(damage, ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
-            }
-        }
-    }
-}
-
-public sealed class ZombieStormTimedPooled : MonoBehaviour
-{
-    private ZombieStormGameController game;
-    private string poolKey;
-    private float life;
-    private float maxLife;
-    private SpriteRenderer spriteRenderer;
-    private Color initialColor;
-
-    public void Initialize(ZombieStormGameController owner, string key, float duration)
-    {
-        game = owner;
-        poolKey = key;
-        life = duration;
-        maxLife = Mathf.Max(0.01f, duration);
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        initialColor = spriteRenderer != null ? spriteRenderer.color : Color.white;
-    }
-
-    private void Update()
-    {
-        life -= Time.deltaTime;
-        if (spriteRenderer != null)
-        {
-            Color color = initialColor;
-            color.a *= Mathf.Clamp01(life / maxLife);
-            spriteRenderer.color = color;
-        }
-
-        if (life <= 0f && game != null)
-        {
-            game.ReturnPooled(poolKey, gameObject);
-        }
-    }
-}
-
-public sealed class ZombieStormPickup : MonoBehaviour
-{
-    private ZombieStormGameController game;
-    private string poolKey;
-    private int xp;
-    private int coins;
-    private float bobOffset;
-
-    public void Initialize(ZombieStormGameController owner, string key, int xpAmount, int coinAmount)
-    {
-        game = owner;
-        poolKey = key;
-        xp = xpAmount;
-        coins = coinAmount;
-        bobOffset = UnityEngine.Random.value * 10f;
-    }
-
-    private void Update()
-    {
-        if (game == null || game.Player == null)
-        {
-            return;
-        }
-
-        Vector2 toPlayer = (Vector2)game.Player.transform.position - (Vector2)transform.position;
-        float distance = toPlayer.magnitude;
-        float pickupRange = game.Player.PickupRange;
-        if (distance < pickupRange)
-        {
-            float pullSpeed = Mathf.Lerp(2f, 12f, 1f - distance / pickupRange);
-            transform.position += (Vector3)(toPlayer.normalized * pullSpeed * Time.deltaTime);
-        }
-
-        transform.localScale = Vector3.one * (0.32f + Mathf.Sin(Time.time * 6f + bobOffset) * 0.035f);
-
-        if (distance < 0.34f)
-        {
-            if (xp > 0)
-            {
-                game.Player.AddExperience(xp);
-            }
-
-            if (coins > 0)
-            {
-                game.Player.AddCoins(coins);
-            }
-
-            game.ReturnPooled(poolKey, gameObject);
-        }
     }
 }
