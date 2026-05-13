@@ -512,14 +512,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
             Player.Kills++;
         }
 
-        if (enemy.Type == ZombieStormEnemyType.Elite || enemy.Type == ZombieStormEnemyType.Boss)
+        if (enemy.Type == ZombieStormEnemyType.Elite || enemy.IsBoss)
         {
-            PlaySfx(enemy.Type == ZombieStormEnemyType.Boss ? "boss_down" : "elite_down", 0.75f, 0.1f);
+            PlaySfx(enemy.IsBoss ? "boss_down" : "elite_down", 0.75f, 0.1f);
         }
 
-        int xp = enemy.Type == ZombieStormEnemyType.Boss ? 55 : enemy.Type == ZombieStormEnemyType.Elite ? 24 : enemy.Type == ZombieStormEnemyType.Tank ? 7 : enemy.Type == ZombieStormEnemyType.Spitter ? 6 : 3;
-        int coins = enemy.Type == ZombieStormEnemyType.Boss ? 45 : enemy.Type == ZombieStormEnemyType.Elite ? 18 : UnityEngine.Random.value < 0.24f ? 1 : 0;
-        SpawnBloodSplat(enemy.transform.position, enemy.Type == ZombieStormEnemyType.Boss ? 2.8f : enemy.Type == ZombieStormEnemyType.Elite ? 1.8f : 1.0f);
+        int xp = enemy.IsBoss ? BossXpReward(enemy.Type) : enemy.Type == ZombieStormEnemyType.Elite ? 24 : enemy.Type == ZombieStormEnemyType.Tank ? 7 : enemy.Type == ZombieStormEnemyType.Spitter ? 6 : 3;
+        int coins = enemy.IsBoss ? BossCoinReward(enemy.Type) : enemy.Type == ZombieStormEnemyType.Elite ? 18 : UnityEngine.Random.value < 0.24f ? 1 : 0;
+        SpawnBloodSplat(enemy.transform.position, enemy.IsBoss ? 2.8f : enemy.Type == ZombieStormEnemyType.Elite ? 1.8f : 1.0f);
         SpawnPickup(enemy.transform.position, xp, coins);
 
         if (enemy.Type == ZombieStormEnemyType.Elite)
@@ -527,10 +527,10 @@ public sealed class ZombieStormGameController : MonoBehaviour
             ShowFeedback("Elite down. Big XP dropped.", 2.5f);
         }
 
-        if (enemy.Type == ZombieStormEnemyType.Boss && Player != null)
+        if (enemy.IsBoss && Player != null)
         {
-            Player.Heal(24f);
-            ShowFeedback("Boss defeated. The horde breaks for a moment.", 3f);
+            Player.Heal(enemy.Type == ZombieStormEnemyType.BruteBoss ? 32f : 24f);
+            ShowFeedback(enemy.DisplayName + " defeated. The horde breaks for a moment.", 3f);
         }
     }
 
@@ -1002,12 +1002,27 @@ public sealed class ZombieStormGameController : MonoBehaviour
             ShowFeedback("Elite zombie incoming. Kill it for a reward burst.", 2.5f);
         }
 
-        if ((bossCount == 0 && runTime >= 150f) || (bossCount == 1 && runTime >= 260f))
+        if (bossCount == 0 && runTime >= 120f)
         {
             bossCount++;
-            SpawnEnemy(ZombieStormEnemyType.Boss);
-            ShowFeedback("Boss wave. Watch the phase attacks.", 3f);
+            SpawnBossWave(ZombieStormEnemyType.BruteBoss);
         }
+        else if (bossCount == 1 && runTime >= 210f)
+        {
+            bossCount++;
+            SpawnBossWave(ZombieStormEnemyType.PlagueBoss);
+        }
+        else if (bossCount == 2 && runTime >= 275f)
+        {
+            bossCount++;
+            SpawnBossWave(ZombieStormEnemyType.StormBoss);
+        }
+    }
+
+    private void SpawnBossWave(ZombieStormEnemyType bossType)
+    {
+        SpawnEnemy(bossType);
+        ShowFeedback(BossWaveWarning(bossType), 3f);
     }
 
     private ZombieStormEnemyType ChooseEnemyType()
@@ -1086,6 +1101,21 @@ public sealed class ZombieStormGameController : MonoBehaviour
                 return kenneyBossSprite;
             }
 
+            if (enemyType == ZombieStormEnemyType.PlagueBoss && kenneyFastZombieSprite != null)
+            {
+                return kenneyFastZombieSprite;
+            }
+
+            if (enemyType == ZombieStormEnemyType.BruteBoss && kenneyTankZombieSprite != null)
+            {
+                return kenneyTankZombieSprite;
+            }
+
+            if (enemyType == ZombieStormEnemyType.StormBoss && kenneyEliteZombieSprite != null)
+            {
+                return kenneyEliteZombieSprite;
+            }
+
             return kenneyZombieSprite;
         }
 
@@ -1117,6 +1147,21 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (enemyType == ZombieStormEnemyType.Boss)
         {
             return bossSprite;
+        }
+
+        if (enemyType == ZombieStormEnemyType.PlagueBoss)
+        {
+            return spitterSprite;
+        }
+
+        if (enemyType == ZombieStormEnemyType.BruteBoss)
+        {
+            return tankZombieSprite;
+        }
+
+        if (enemyType == ZombieStormEnemyType.StormBoss)
+        {
+            return eliteSprite;
         }
 
         return zombieSprite;
@@ -1778,7 +1823,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ZombieStormEnemy boss = null;
         for (int i = 0; i < enemies.Count; i++)
         {
-            if (enemies[i] != null && enemies[i].Type == ZombieStormEnemyType.Boss && !enemies[i].IsDead)
+            if (enemies[i] != null && enemies[i].IsBoss && !enemies[i].IsDead)
             {
                 boss = enemies[i];
                 break;
@@ -1791,11 +1836,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         Rect rect = new Rect(Screen.width * 0.5f - 260f, Screen.height - 58f, 520f, 24f);
-        DrawPanel(new Rect(rect.x - 10f, rect.y - 28f, rect.width + 20f, 58f), new Color(0.04f, 0.018f, 0.018f, 0.82f), new Color(1f, 0.12f, 0.08f, 0.5f));
+        Color accent = BossUiAccent(boss.Type);
+        DrawPanel(new Rect(rect.x - 10f, rect.y - 28f, rect.width + 20f, 58f), new Color(0.04f, 0.018f, 0.018f, 0.82f), WithAlpha(accent, 0.5f));
         GUI.skin.label.fontSize = 16;
-        GUI.color = new Color(1f, 0.58f, 0.42f, 1f);
-        GUI.Label(new Rect(rect.x, rect.y - 24f, rect.width, 22f), "BOSS HORDE ALPHA");
-        DrawBar(rect, boss.Health01, new Color(0.9f, 0.08f, 0.05f), Mathf.CeilToInt(boss.Health) + " / " + Mathf.CeilToInt(boss.MaxHealth));
+        GUI.color = accent;
+        GUI.Label(new Rect(rect.x, rect.y - 24f, rect.width, 22f), "BOSS " + boss.DisplayName.ToUpperInvariant());
+        DrawBar(rect, boss.Health01, accent, Mathf.CeilToInt(boss.Health) + " / " + Mathf.CeilToInt(boss.MaxHealth));
         GUI.skin.label.fontSize = 18;
         GUI.color = Color.white;
     }
@@ -1910,6 +1956,86 @@ public sealed class ZombieStormGameController : MonoBehaviour
     {
         feedbackText = message;
         feedbackUntil = Time.unscaledTime + seconds;
+    }
+
+    private static int BossXpReward(ZombieStormEnemyType bossType)
+    {
+        if (bossType == ZombieStormEnemyType.BruteBoss)
+        {
+            return 62;
+        }
+
+        if (bossType == ZombieStormEnemyType.PlagueBoss)
+        {
+            return 70;
+        }
+
+        if (bossType == ZombieStormEnemyType.StormBoss)
+        {
+            return 82;
+        }
+
+        return 55;
+    }
+
+    private static int BossCoinReward(ZombieStormEnemyType bossType)
+    {
+        if (bossType == ZombieStormEnemyType.BruteBoss)
+        {
+            return 48;
+        }
+
+        if (bossType == ZombieStormEnemyType.PlagueBoss)
+        {
+            return 54;
+        }
+
+        if (bossType == ZombieStormEnemyType.StormBoss)
+        {
+            return 66;
+        }
+
+        return 45;
+    }
+
+    private static string BossWaveWarning(ZombieStormEnemyType bossType)
+    {
+        if (bossType == ZombieStormEnemyType.BruteBoss)
+        {
+            return "Ravager Brute incoming. Keep distance from charge slams.";
+        }
+
+        if (bossType == ZombieStormEnemyType.PlagueBoss)
+        {
+            return "Plague Matriarch incoming. Watch poison zones and volleys.";
+        }
+
+        if (bossType == ZombieStormEnemyType.StormBoss)
+        {
+            return "Storm Revenant incoming. Lightning tracks your position.";
+        }
+
+        return "Horde Alpha incoming. Watch the phase attacks.";
+    }
+
+    private static Color BossUiAccent(ZombieStormEnemyType bossType)
+    {
+        if (bossType == ZombieStormEnemyType.BruteBoss)
+        {
+            return new Color(1f, 0.38f, 0.1f, 1f);
+        }
+
+        if (bossType == ZombieStormEnemyType.PlagueBoss)
+        {
+            return new Color(0.58f, 1f, 0.22f, 1f);
+        }
+
+        if (bossType == ZombieStormEnemyType.StormBoss)
+        {
+            return new Color(0.38f, 0.78f, 1f, 1f);
+        }
+
+        return new Color(0.9f, 0.08f, 0.05f, 1f);
     }
 
     private static string FormatTime(int seconds)

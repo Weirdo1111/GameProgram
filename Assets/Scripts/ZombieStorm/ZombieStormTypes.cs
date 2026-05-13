@@ -23,7 +23,10 @@ public enum ZombieStormEnemyType
     Exploder,
     Spitter,
     Elite,
-    Boss
+    Boss,
+    PlagueBoss,
+    BruteBoss,
+    StormBoss
 }
 
 public enum ZombieStormPassiveType

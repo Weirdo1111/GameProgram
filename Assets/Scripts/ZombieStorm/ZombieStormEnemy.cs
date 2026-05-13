@@ -24,6 +24,8 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     public float Health { get { return health; } }
     public float MaxHealth { get { return maxHealth; } }
     public float Health01 { get { return maxHealth <= 0f ? 0f : Mathf.Clamp01(health / maxHealth); } }
+    public bool IsBoss { get { return IsBossType(Type); } }
+    public string DisplayName { get { return BossName(Type); } }
 
     public void Initialize(ZombieStormGameController owner, ZombieStormEnemyType enemyType, string key, Sprite sprite, float runTime, float difficulty)
     {
@@ -97,6 +99,39 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             transform.localScale = Vector3.one * 3.1f;
             bossActionTimer = 2.5f;
         }
+        else if (Type == ZombieStormEnemyType.PlagueBoss)
+        {
+            speed = 1.05f;
+            maxHealth = 820f * Mathf.Max(1f, difficulty * 0.92f);
+            damagePerSecond = 18f;
+            Radius = 1.32f;
+            baseColor = new Color(0.52f, 1f, 0.34f);
+            spriteRenderer.color = baseColor;
+            transform.localScale = Vector3.one * 2.9f;
+            bossActionTimer = 2.1f;
+        }
+        else if (Type == ZombieStormEnemyType.BruteBoss)
+        {
+            speed = 1.38f;
+            maxHealth = 1180f * Mathf.Max(1f, difficulty * 1.08f);
+            damagePerSecond = 34f;
+            Radius = 1.62f;
+            baseColor = new Color(1f, 0.46f, 0.18f);
+            spriteRenderer.color = baseColor;
+            transform.localScale = Vector3.one * 3.35f;
+            bossActionTimer = 1.85f;
+        }
+        else if (Type == ZombieStormEnemyType.StormBoss)
+        {
+            speed = 1.7f;
+            maxHealth = 980f * Mathf.Max(1f, difficulty * 1.18f);
+            damagePerSecond = 24f;
+            Radius = 1.38f;
+            baseColor = new Color(0.45f, 0.78f, 1f);
+            spriteRenderer.color = baseColor;
+            transform.localScale = Vector3.one * 3.05f;
+            bossActionTimer = 1.55f;
+        }
 
         health = maxHealth;
         game.RegisterEnemy(this);
@@ -128,7 +163,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             }
         }
 
-        if (Type == ZombieStormEnemyType.Boss)
+        if (IsBoss)
         {
             UpdateBoss(direction);
         }
@@ -185,7 +220,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 
         if (health <= 0f)
         {
-            game.SpawnHitSpark(transform.position, Type == ZombieStormEnemyType.Boss ? new Color(1f, 0.2f, 0.15f, 0.9f) : new Color(0.65f, 1f, 0.35f, 0.8f), Type == ZombieStormEnemyType.Boss ? 1.1f : 0.42f);
+            game.SpawnHitSpark(transform.position, IsBoss ? BossAccent(Type) : new Color(0.65f, 1f, 0.35f, 0.8f), IsBoss ? 1.1f : 0.42f);
             Die(true);
         }
     }
@@ -212,13 +247,36 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private void UpdateBoss(Vector2 direction)
     {
         bool enraged = health < maxHealth * 0.5f;
-        transform.position += (Vector3)(direction * speed * (enraged ? 1.35f : 1f) * Time.deltaTime);
+        float moveMultiplier = Type == ZombieStormEnemyType.BruteBoss ? (enraged ? 1.55f : 1.18f) : Type == ZombieStormEnemyType.StormBoss ? (enraged ? 1.65f : 1.25f) : enraged ? 1.35f : 1f;
+        transform.position += (Vector3)(direction * speed * moveMultiplier * Time.deltaTime);
         bossActionTimer -= Time.deltaTime;
         if (bossActionTimer > 0f)
         {
             return;
         }
 
+        if (Type == ZombieStormEnemyType.PlagueBoss)
+        {
+            CastPlagueBossSkill(direction, enraged);
+        }
+        else if (Type == ZombieStormEnemyType.BruteBoss)
+        {
+            CastBruteBossSkill(direction, enraged);
+        }
+        else if (Type == ZombieStormEnemyType.StormBoss)
+        {
+            CastStormBossSkill(direction, enraged);
+        }
+        else
+        {
+            CastAlphaBossSkill(direction, enraged);
+        }
+
+        bossActionTimer = GetBossActionCooldown(enraged);
+    }
+
+    private void CastAlphaBossSkill(Vector2 direction, bool enraged)
+    {
         int action = UnityEngine.Random.Range(0, 3);
         if (action == 0)
         {
@@ -243,8 +301,138 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             transform.position += (Vector3)(direction * (enraged ? 4.1f : 2.7f));
             game.ShakeCamera(0.11f, 0.14f);
         }
+    }
 
-        bossActionTimer = enraged ? 2.15f : 3.1f;
+    private void CastPlagueBossSkill(Vector2 direction, bool enraged)
+    {
+        int pools = enraged ? 10 : 7;
+        for (int i = 0; i < pools; i++)
+        {
+            Vector2 offset = UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(1.6f, enraged ? 5.2f : 4.2f);
+            game.SpawnAreaEffect((Vector2)transform.position + offset, enraged ? 1.12f : 0.95f, 8f, enraged ? 3.1f : 2.4f, 0.45f, new Color(0.5f, 1f, 0.18f, 0.42f), "toxic_pool");
+        }
+
+        int volleys = enraged ? 5 : 3;
+        for (int i = 0; i < volleys; i++)
+        {
+            Vector2 shotDir = ZombieStormGameController.Rotate(direction, (i - volleys / 2f) * 12f);
+            game.SpawnEnemyProjectile(transform.position, shotDir, enraged ? 14f : 10f, enraged ? 5.5f : 4.7f, 4.6f);
+        }
+
+        game.PlaySfx("boom", 0.42f, 0.08f);
+    }
+
+    private void CastBruteBossSkill(Vector2 direction, bool enraged)
+    {
+        float dashDistance = enraged ? 5.6f : 4.1f;
+        transform.position += (Vector3)(direction * dashDistance);
+        game.ShakeCamera(enraged ? 0.24f : 0.18f, 0.22f);
+        game.SpawnAreaEffect(transform.position, enraged ? 2.2f : 1.75f, 0f, 0.24f, 1f, new Color(1f, 0.36f, 0.08f, 0.54f), "zombie_explosion");
+
+        if (game.Player != null && Vector2.Distance(transform.position, game.Player.transform.position) < (enraged ? 2.75f : 2.2f))
+        {
+            game.Player.TakeDamage(enraged ? 32f : 24f);
+        }
+
+        int shockwaves = enraged ? 12 : 8;
+        for (int i = 0; i < shockwaves; i++)
+        {
+            Vector2 shotDir = ZombieStormGameController.Rotate(Vector2.up, i * (360f / shockwaves));
+            game.SpawnEnemyProjectile(transform.position, shotDir, enraged ? 13f : 9f, enraged ? 5.3f : 4.2f, 2.2f);
+        }
+
+        game.PlaySfx("boom", 0.62f, 0.08f);
+    }
+
+    private void CastStormBossSkill(Vector2 direction, bool enraged)
+    {
+        int strikes = enraged ? 6 : 4;
+        Vector2 playerPosition = game.Player != null ? (Vector2)game.Player.transform.position : (Vector2)transform.position + direction * 3f;
+        for (int i = 0; i < strikes; i++)
+        {
+            Vector2 strikePosition = playerPosition + UnityEngine.Random.insideUnitCircle * (enraged ? 3.7f : 2.9f);
+            float radius = enraged ? 1.15f : 0.9f;
+            game.SpawnAreaEffect(strikePosition, radius, 0f, 0.18f, 1f, new Color(0.34f, 0.72f, 1f, 0.56f), "lightning_flash");
+            if (game.Player != null && Vector2.Distance(strikePosition, game.Player.transform.position) <= radius + 0.35f)
+            {
+                game.Player.TakeDamage(enraged ? 18f : 12f);
+            }
+        }
+
+        int arcs = enraged ? 10 : 7;
+        for (int i = 0; i < arcs; i++)
+        {
+            Vector2 shotDir = ZombieStormGameController.Rotate(direction, -42f + i * (84f / Mathf.Max(1, arcs - 1)));
+            game.SpawnEnemyProjectile(transform.position, shotDir, enraged ? 12f : 8f, enraged ? 6.8f : 5.7f, 2.4f);
+        }
+
+        game.PlaySfx("lightning", 0.7f, 0.08f);
+        game.ShakeCamera(0.1f, 0.12f);
+    }
+
+    private float GetBossActionCooldown(bool enraged)
+    {
+        if (Type == ZombieStormEnemyType.PlagueBoss)
+        {
+            return enraged ? 1.85f : 2.55f;
+        }
+
+        if (Type == ZombieStormEnemyType.BruteBoss)
+        {
+            return enraged ? 1.55f : 2.25f;
+        }
+
+        if (Type == ZombieStormEnemyType.StormBoss)
+        {
+            return enraged ? 1.35f : 2.05f;
+        }
+
+        return enraged ? 2.15f : 3.1f;
+    }
+
+    private static bool IsBossType(ZombieStormEnemyType enemyType)
+    {
+        return enemyType == ZombieStormEnemyType.Boss || enemyType == ZombieStormEnemyType.PlagueBoss || enemyType == ZombieStormEnemyType.BruteBoss || enemyType == ZombieStormEnemyType.StormBoss;
+    }
+
+    private static string BossName(ZombieStormEnemyType enemyType)
+    {
+        if (enemyType == ZombieStormEnemyType.PlagueBoss)
+        {
+            return "Plague Matriarch";
+        }
+
+        if (enemyType == ZombieStormEnemyType.BruteBoss)
+        {
+            return "Ravager Brute";
+        }
+
+        if (enemyType == ZombieStormEnemyType.StormBoss)
+        {
+            return "Storm Revenant";
+        }
+
+        return "Horde Alpha";
+    }
+
+    private static Color BossAccent(ZombieStormEnemyType enemyType)
+    {
+        if (enemyType == ZombieStormEnemyType.PlagueBoss)
+        {
+            return new Color(0.5f, 1f, 0.18f, 0.9f);
+        }
+
+        if (enemyType == ZombieStormEnemyType.BruteBoss)
+        {
+            return new Color(1f, 0.36f, 0.08f, 0.9f);
+        }
+
+        if (enemyType == ZombieStormEnemyType.StormBoss)
+        {
+            return new Color(0.34f, 0.72f, 1f, 0.9f);
+        }
+
+        return new Color(1f, 0.2f, 0.15f, 0.9f);
     }
 
     private void Die(bool reward)
