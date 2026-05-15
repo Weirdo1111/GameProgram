@@ -14,9 +14,14 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private float speed;
     private float damagePerSecond;
     private float bossActionTimer;
+    private float bossTelegraphTimer;
     private float sprintTimer;
     private float shootTimer;
+    private int bossQueuedAction = -1;
+    private bool bossQueuedEnraged;
     private bool sprinting;
+    private Vector2 bossQueuedDirection;
+    private readonly List<Vector2> bossTelegraphPositions = new List<Vector2>(12);
 
     public ZombieStormEnemyType Type { get; private set; }
     public bool IsDead { get; private set; }
@@ -46,6 +51,10 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         transform.localScale = Vector3.one * 0.95f;
         sprintTimer = 0.8f;
         shootTimer = UnityEngine.Random.Range(0.7f, 1.6f);
+        bossTelegraphTimer = 0f;
+        bossQueuedAction = -1;
+        bossQueuedDirection = Vector2.zero;
+        bossTelegraphPositions.Clear();
 
         if (Type == ZombieStormEnemyType.Fast)
         {
@@ -247,37 +256,178 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private void UpdateBoss(Vector2 direction)
     {
         bool enraged = health < maxHealth * 0.5f;
+        if (bossTelegraphTimer > 0f)
+        {
+            bossTelegraphTimer -= Time.deltaTime;
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.color = Color.Lerp(baseColor, BossAccent(Type), 0.78f + Mathf.Sin(Time.time * 22f) * 0.18f);
+            }
+
+            if (bossTelegraphTimer <= 0f)
+            {
+                ExecuteQueuedBossSkill();
+                bossActionTimer = GetBossActionCooldown(bossQueuedEnraged);
+                bossQueuedAction = -1;
+                bossTelegraphPositions.Clear();
+            }
+
+            return;
+        }
+
         float moveMultiplier = Type == ZombieStormEnemyType.BruteBoss ? (enraged ? 1.55f : 1.18f) : Type == ZombieStormEnemyType.StormBoss ? (enraged ? 1.65f : 1.25f) : enraged ? 1.35f : 1f;
         transform.position += (Vector3)(direction * speed * moveMultiplier * Time.deltaTime);
+
         bossActionTimer -= Time.deltaTime;
         if (bossActionTimer > 0f)
         {
             return;
         }
 
+        BeginBossSkillTelegraph(direction, enraged);
+    }
+
+    private void BeginBossSkillTelegraph(Vector2 direction, bool enraged)
+    {
+        bossQueuedDirection = direction.sqrMagnitude > 0.01f ? direction.normalized : Vector2.up;
+        bossQueuedEnraged = enraged;
+        bossTelegraphPositions.Clear();
+
         if (Type == ZombieStormEnemyType.PlagueBoss)
         {
-            CastPlagueBossSkill(direction, enraged);
+            bossQueuedAction = 0;
+            PreparePlagueBossTelegraph(enraged);
         }
         else if (Type == ZombieStormEnemyType.BruteBoss)
         {
-            CastBruteBossSkill(direction, enraged);
+            bossQueuedAction = 0;
+            PrepareBruteBossTelegraph(bossQueuedDirection, enraged);
         }
         else if (Type == ZombieStormEnemyType.StormBoss)
         {
-            CastStormBossSkill(direction, enraged);
+            bossQueuedAction = 0;
+            PrepareStormBossTelegraph(enraged);
         }
         else
         {
-            CastAlphaBossSkill(direction, enraged);
+            bossQueuedAction = UnityEngine.Random.Range(0, 3);
+            PrepareAlphaBossTelegraph(bossQueuedAction, bossQueuedDirection, enraged);
         }
 
-        bossActionTimer = GetBossActionCooldown(enraged);
+        bossTelegraphTimer = GetBossTelegraphDuration();
+        game.PlaySfx(Type == ZombieStormEnemyType.StormBoss ? "lightning" : "boom", 0.22f, 0.08f);
     }
 
-    private void CastAlphaBossSkill(Vector2 direction, bool enraged)
+    private void ExecuteQueuedBossSkill()
     {
-        int action = UnityEngine.Random.Range(0, 3);
+        if (Type == ZombieStormEnemyType.PlagueBoss)
+        {
+            CastPlagueBossSkill(bossQueuedDirection, bossQueuedEnraged);
+        }
+        else if (Type == ZombieStormEnemyType.BruteBoss)
+        {
+            CastBruteBossSkill(bossQueuedDirection, bossQueuedEnraged);
+        }
+        else if (Type == ZombieStormEnemyType.StormBoss)
+        {
+            CastStormBossSkill(bossQueuedDirection, bossQueuedEnraged);
+        }
+        else
+        {
+            CastAlphaBossSkill(bossQueuedAction, bossQueuedDirection, bossQueuedEnraged);
+        }
+    }
+
+    private void PrepareAlphaBossTelegraph(int action, Vector2 direction, bool enraged)
+    {
+        if (action == 0)
+        {
+            int shots = enraged ? 18 : 12;
+            for (int i = 0; i < shots; i++)
+            {
+                Vector2 shotDir = ZombieStormGameController.Rotate(Vector2.up, i * (360f / shots));
+                Vector2 markerPosition = (Vector2)transform.position + shotDir * 1.65f;
+                game.SpawnAreaEffect(markerPosition, 0.26f, 0f, 0.58f, 1f, new Color(1f, 0.18f, 0.12f, 0.62f), "hit_spark");
+            }
+        }
+        else if (action == 1)
+        {
+            int pools = enraged ? 8 : 5;
+            for (int i = 0; i < pools; i++)
+            {
+                Vector2 offset = UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(1.8f, 3.8f);
+                Vector2 position = (Vector2)transform.position + offset;
+                bossTelegraphPositions.Add(position);
+                game.SpawnAreaEffect(position, 1.05f, 0f, 0.62f, 1f, new Color(0.55f, 1f, 0.15f, 0.2f), "toxic_pool");
+            }
+        }
+        else
+        {
+            PrepareDashTelegraph(direction, enraged ? 4.1f : 2.7f, new Color(1f, 0.24f, 0.12f, 0.46f));
+        }
+    }
+
+    private void PreparePlagueBossTelegraph(bool enraged)
+    {
+        int pools = enraged ? 10 : 7;
+        for (int i = 0; i < pools; i++)
+        {
+            Vector2 offset = UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(1.6f, enraged ? 5.2f : 4.2f);
+            Vector2 position = (Vector2)transform.position + offset;
+            bossTelegraphPositions.Add(position);
+            game.SpawnAreaEffect(position, enraged ? 1.25f : 1.05f, 0f, 0.64f, 1f, new Color(0.5f, 1f, 0.18f, 0.22f), "toxic_pool");
+        }
+
+        int volleys = enraged ? 5 : 3;
+        for (int i = 0; i < volleys; i++)
+        {
+            Vector2 shotDir = ZombieStormGameController.Rotate(bossQueuedDirection, (i - volleys / 2f) * 12f);
+            Vector2 markerPosition = (Vector2)transform.position + shotDir * 1.55f;
+            game.SpawnAreaEffect(markerPosition, 0.24f, 0f, 0.58f, 1f, new Color(0.5f, 1f, 0.18f, 0.55f), "hit_spark");
+        }
+    }
+
+    private void PrepareBruteBossTelegraph(Vector2 direction, bool enraged)
+    {
+        PrepareDashTelegraph(direction, enraged ? 5.6f : 4.1f, new Color(1f, 0.36f, 0.08f, 0.5f));
+        Vector2 landingPosition = (Vector2)transform.position + direction * (enraged ? 5.6f : 4.1f);
+        bossTelegraphPositions.Add(landingPosition);
+        game.SpawnAreaEffect(landingPosition, enraged ? 2.45f : 2f, 0f, 0.68f, 1f, new Color(1f, 0.28f, 0.08f, 0.3f), "zombie_explosion");
+    }
+
+    private void PrepareStormBossTelegraph(bool enraged)
+    {
+        int strikes = enraged ? 6 : 4;
+        Vector2 playerPosition = game.Player != null ? (Vector2)game.Player.transform.position : (Vector2)transform.position + bossQueuedDirection * 3f;
+        for (int i = 0; i < strikes; i++)
+        {
+            Vector2 strikePosition = playerPosition + UnityEngine.Random.insideUnitCircle * (enraged ? 3.7f : 2.9f);
+            bossTelegraphPositions.Add(strikePosition);
+            game.SpawnAreaEffect(strikePosition, enraged ? 1.35f : 1.05f, 0f, 0.62f, 1f, new Color(0.34f, 0.72f, 1f, 0.34f), "lightning_flash");
+        }
+
+        int arcs = enraged ? 10 : 7;
+        for (int i = 0; i < arcs; i++)
+        {
+            Vector2 shotDir = ZombieStormGameController.Rotate(bossQueuedDirection, -42f + i * (84f / Mathf.Max(1, arcs - 1)));
+            Vector2 markerPosition = (Vector2)transform.position + shotDir * 1.45f;
+            game.SpawnAreaEffect(markerPosition, 0.22f, 0f, 0.54f, 1f, new Color(0.34f, 0.72f, 1f, 0.58f), "lightning_flash");
+        }
+    }
+
+    private void PrepareDashTelegraph(Vector2 direction, float distance, Color color)
+    {
+        int markers = Mathf.Clamp(Mathf.CeilToInt(distance), 3, 7);
+        for (int i = 1; i <= markers; i++)
+        {
+            float t = i / (float)markers;
+            Vector2 position = (Vector2)transform.position + direction * distance * t;
+            game.SpawnAreaEffect(position, 0.42f + t * 0.28f, 0f, 0.62f, 1f, color, "zombie_explosion");
+        }
+    }
+
+    private void CastAlphaBossSkill(int action, Vector2 direction, bool enraged)
+    {
         if (action == 0)
         {
             int shots = enraged ? 18 : 12;
@@ -292,8 +442,8 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             int pools = enraged ? 8 : 5;
             for (int i = 0; i < pools; i++)
             {
-                Vector2 offset = UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(1.8f, 3.8f);
-                game.SpawnAreaEffect((Vector2)transform.position + offset, 0.95f, 8f, 2.4f, 0.45f, new Color(0.55f, 1f, 0.15f, 0.38f), "toxic_pool");
+                Vector2 position = i < bossTelegraphPositions.Count ? bossTelegraphPositions[i] : (Vector2)transform.position + UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(1.8f, 3.8f);
+                game.SpawnAreaEffect(position, 0.95f, 8f, 2.4f, 0.45f, new Color(0.55f, 1f, 0.15f, 0.38f), "toxic_pool");
             }
         }
         else
@@ -308,8 +458,8 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         int pools = enraged ? 10 : 7;
         for (int i = 0; i < pools; i++)
         {
-            Vector2 offset = UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(1.6f, enraged ? 5.2f : 4.2f);
-            game.SpawnAreaEffect((Vector2)transform.position + offset, enraged ? 1.12f : 0.95f, 8f, enraged ? 3.1f : 2.4f, 0.45f, new Color(0.5f, 1f, 0.18f, 0.42f), "toxic_pool");
+            Vector2 position = i < bossTelegraphPositions.Count ? bossTelegraphPositions[i] : (Vector2)transform.position + UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(1.6f, enraged ? 5.2f : 4.2f);
+            game.SpawnAreaEffect(position, enraged ? 1.12f : 0.95f, 8f, enraged ? 3.1f : 2.4f, 0.45f, new Color(0.5f, 1f, 0.18f, 0.42f), "toxic_pool");
         }
 
         int volleys = enraged ? 5 : 3;
@@ -325,7 +475,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private void CastBruteBossSkill(Vector2 direction, bool enraged)
     {
         float dashDistance = enraged ? 5.6f : 4.1f;
-        transform.position += (Vector3)(direction * dashDistance);
+        transform.position = bossTelegraphPositions.Count > 0 ? bossTelegraphPositions[0] : (Vector2)transform.position + direction * dashDistance;
         game.ShakeCamera(enraged ? 0.24f : 0.18f, 0.22f);
         game.SpawnAreaEffect(transform.position, enraged ? 2.2f : 1.75f, 0f, 0.24f, 1f, new Color(1f, 0.36f, 0.08f, 0.54f), "zombie_explosion");
 
@@ -347,10 +497,9 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private void CastStormBossSkill(Vector2 direction, bool enraged)
     {
         int strikes = enraged ? 6 : 4;
-        Vector2 playerPosition = game.Player != null ? (Vector2)game.Player.transform.position : (Vector2)transform.position + direction * 3f;
         for (int i = 0; i < strikes; i++)
         {
-            Vector2 strikePosition = playerPosition + UnityEngine.Random.insideUnitCircle * (enraged ? 3.7f : 2.9f);
+            Vector2 strikePosition = i < bossTelegraphPositions.Count ? bossTelegraphPositions[i] : (Vector2)transform.position + direction * 3f;
             float radius = enraged ? 1.15f : 0.9f;
             game.SpawnAreaEffect(strikePosition, radius, 0f, 0.18f, 1f, new Color(0.34f, 0.72f, 1f, 0.56f), "lightning_flash");
             if (game.Player != null && Vector2.Distance(strikePosition, game.Player.transform.position) <= radius + 0.35f)
@@ -368,6 +517,21 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 
         game.PlaySfx("lightning", 0.7f, 0.08f);
         game.ShakeCamera(0.1f, 0.12f);
+    }
+
+    private float GetBossTelegraphDuration()
+    {
+        if (Type == ZombieStormEnemyType.BruteBoss)
+        {
+            return bossQueuedEnraged ? 0.46f : 0.58f;
+        }
+
+        if (Type == ZombieStormEnemyType.StormBoss)
+        {
+            return bossQueuedEnraged ? 0.5f : 0.62f;
+        }
+
+        return bossQueuedEnraged ? 0.52f : 0.66f;
     }
 
     private float GetBossActionCooldown(bool enraged)
