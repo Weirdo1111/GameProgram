@@ -7,6 +7,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 {
     private ZombieStormGameController game;
     private SpriteRenderer spriteRenderer;
+    private Sprite[] walkFrames;
     private string poolKey;
     private Color baseColor;
     private float health;
@@ -17,9 +18,11 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private float bossTelegraphTimer;
     private float sprintTimer;
     private float shootTimer;
+    private float walkAnimTime;
     private int bossQueuedAction = -1;
     private bool bossQueuedEnraged;
     private bool sprinting;
+    private bool useSideViewWalk;
     private Vector2 bossQueuedDirection;
     private readonly List<Vector2> bossTelegraphPositions = new List<Vector2>(12);
 
@@ -32,7 +35,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     public bool IsBoss { get { return IsBossType(Type); } }
     public string DisplayName { get { return BossName(Type); } }
 
-    public void Initialize(ZombieStormGameController owner, ZombieStormEnemyType enemyType, string key, Sprite sprite, float runTime, float difficulty)
+    public void Initialize(ZombieStormGameController owner, ZombieStormEnemyType enemyType, string key, Sprite sprite, Sprite[] enemyWalkFrames, float runTime, float difficulty)
     {
         game = owner;
         Type = enemyType;
@@ -40,6 +43,11 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         IsDead = false;
         spriteRenderer = GetComponent<SpriteRenderer>();
         spriteRenderer.sprite = sprite;
+        spriteRenderer.flipX = false;
+        walkFrames = enemyWalkFrames;
+        useSideViewWalk = walkFrames != null && walkFrames.Length > 0;
+        walkAnimTime = UnityEngine.Random.value * 4f;
+        transform.rotation = Quaternion.identity;
         baseColor = Color.white;
         spriteRenderer.color = baseColor;
 
@@ -142,6 +150,13 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             bossActionTimer = 1.55f;
         }
 
+        if (useSideViewWalk)
+        {
+            baseColor = Color.white;
+            spriteRenderer.color = baseColor;
+            spriteRenderer.sprite = walkFrames[Mathf.FloorToInt(walkAnimTime) % walkFrames.Length];
+        }
+
         health = maxHealth;
         game.RegisterEnemy(this);
     }
@@ -161,6 +176,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         Vector2 toPlayer = (Vector2)game.Player.transform.position - (Vector2)transform.position;
         float distance = toPlayer.magnitude;
         Vector2 direction = distance > 0.01f ? toPlayer / distance : Vector2.zero;
+        UpdateWalkVisual(direction);
 
         if (Type == ZombieStormEnemyType.Fast)
         {
@@ -202,10 +218,29 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             }
         }
 
-        if (direction.sqrMagnitude > 0.01f)
+        if (!useSideViewWalk && direction.sqrMagnitude > 0.01f)
         {
             transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f);
         }
+    }
+
+    private void UpdateWalkVisual(Vector2 direction)
+    {
+        if (!useSideViewWalk || spriteRenderer == null || walkFrames == null || walkFrames.Length == 0)
+        {
+            return;
+        }
+
+        float frameRate = IsBoss ? 5.6f : Type == ZombieStormEnemyType.Fast ? 10f : 7.2f;
+        walkAnimTime += Time.deltaTime * frameRate;
+        int frameIndex = Mathf.FloorToInt(walkAnimTime) % walkFrames.Length;
+        spriteRenderer.sprite = walkFrames[frameIndex];
+        if (Mathf.Abs(direction.x) > 0.05f)
+        {
+            spriteRenderer.flipX = direction.x < 0f;
+        }
+
+        transform.rotation = Quaternion.identity;
     }
 
     public void TakeDamage(float amount, Vector2 impulse)

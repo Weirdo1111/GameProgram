@@ -39,6 +39,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private readonly Dictionary<string, Sprite[]> effectFrames = new Dictionary<string, Sprite[]>();
     private readonly List<ZombieStormDamagePopup> damagePopups = new List<ZombieStormDamagePopup>();
     private Sprite[] playerHurtFrames = new Sprite[0];
+    private Sprite[] sharedEnemyWalkFrames = new Sprite[0];
     private readonly List<Sprite> groundSprites = new List<Sprite>();
     private readonly List<Sprite> debrisSprites = new List<Sprite>();
 
@@ -67,6 +68,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Sprite softGlowSprite;
     private Sprite bloodSplatSprite;
     private Sprite neonSignSprite;
+    private Sprite customArenaMapSprite;
     private Sprite kenneyZombieSprite;
     private Sprite kenneyFastZombieSprite;
     private Sprite kenneyTankZombieSprite;
@@ -83,6 +85,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private float cameraShakePower;
     private float screenFlash;
     private Color screenFlashColor = new Color(1f, 0.08f, 0.04f);
+    private bool usingCustomArenaMap;
+    private Vector2 customArenaHalfExtents;
     private bool leveling;
     private bool finished;
     private bool won;
@@ -98,6 +102,19 @@ public sealed class ZombieStormGameController : MonoBehaviour
     public float AreaMultiplier { get { return 1f + GetPassiveLevel(ZombieStormPassiveType.Area) * 0.16f; } }
     public float CritChance { get { return Mathf.Clamp01(GetPassiveLevel(ZombieStormPassiveType.Crit) * 0.07f); } }
     public float CoinMultiplier { get { return 1f + GetPassiveLevel(ZombieStormPassiveType.CoinGain) * 0.2f; } }
+
+    public Vector2 ClampToArena(Vector2 position)
+    {
+        if (!usingCustomArenaMap)
+        {
+            return position;
+        }
+
+        const float margin = 2.2f;
+        float x = Mathf.Clamp(position.x, -customArenaHalfExtents.x + margin, customArenaHalfExtents.x - margin);
+        float y = Mathf.Clamp(position.y, -customArenaHalfExtents.y + margin, customArenaHalfExtents.y - margin);
+        return new Vector2(x, y);
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AutoBoot()
@@ -810,7 +827,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         mainCamera.name = "Zombie Storm Camera";
         mainCamera.orthographic = true;
-        mainCamera.orthographicSize = 8f;
+        mainCamera.orthographicSize = 10.5f;
         mainCamera.clearFlags = CameraClearFlags.SolidColor;
         mainCamera.backgroundColor = new Color(0.035f, 0.04f, 0.052f);
 
@@ -827,6 +844,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private void BuildEnvironment()
     {
+        usingCustomArenaMap = false;
+        if (BuildCustomArenaMap())
+        {
+            return;
+        }
+
         if (groundSprites.Count > 0)
         {
             BuildKenneyCityFloor();
@@ -866,6 +889,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         softGlowSprite = CreateSoftDiscSprite(new Color(1f, 1f, 1f, 0.72f), 64, 1f, 0.08f);
         bloodSplatSprite = CreateBloodSplatSprite();
         neonSignSprite = CreateNeonSignSprite();
+        LoadCustomEnemyWalkSheet();
+        LoadCustomArenaMap();
         LoadKenneyTopdownArt();
         LoadMikodrakSpellEffects();
     }
@@ -1061,7 +1086,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         enemyObject.transform.SetParent(worldRoot, false);
         enemyObject.transform.position = GetOffscreenSpawnPosition();
         ZombieStormEnemy enemy = enemyObject.GetComponent<ZombieStormEnemy>();
-        enemy.Initialize(this, enemyType, key, GetEnemySprite(enemyType), runTime, difficultyScore);
+        enemy.Initialize(this, enemyType, key, GetEnemySprite(enemyType), GetEnemyWalkFrames(), runTime, difficultyScore);
     }
 
     private Vector2 GetOffscreenSpawnPosition()
@@ -1074,11 +1099,17 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         float spawnDistance = mainCamera != null ? mainCamera.orthographicSize * 1.65f + 3f : 16f;
-        return center + direction * spawnDistance;
+        Vector2 spawnPosition = center + direction * spawnDistance;
+        return usingCustomArenaMap ? ClampToArena(spawnPosition) : spawnPosition;
     }
 
     private Sprite GetEnemySprite(ZombieStormEnemyType enemyType)
     {
+        if (sharedEnemyWalkFrames != null && sharedEnemyWalkFrames.Length > 0)
+        {
+            return sharedEnemyWalkFrames[0];
+        }
+
         if (kenneyZombieSprite != null)
         {
             if (enemyType == ZombieStormEnemyType.Fast && kenneyFastZombieSprite != null)
@@ -1165,6 +1196,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         return zombieSprite;
+    }
+
+    private Sprite[] GetEnemyWalkFrames()
+    {
+        return sharedEnemyWalkFrames != null && sharedEnemyWalkFrames.Length > 0 ? sharedEnemyWalkFrames : null;
     }
 
     private GameObject CreateEnemy()
@@ -1896,6 +1932,16 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         Vector3 target = new Vector3(Player.transform.position.x, Player.transform.position.y, -10f);
+        if (usingCustomArenaMap)
+        {
+            float cameraHalfHeight = mainCamera.orthographicSize;
+            float cameraHalfWidth = cameraHalfHeight * mainCamera.aspect;
+            float maxX = Mathf.Max(0f, customArenaHalfExtents.x - cameraHalfWidth);
+            float maxY = Mathf.Max(0f, customArenaHalfExtents.y - cameraHalfHeight);
+            target.x = Mathf.Clamp(target.x, -maxX, maxX);
+            target.y = Mathf.Clamp(target.y, -maxY, maxY);
+        }
+
         if (cameraShakeTime > 0f)
         {
             cameraShakeTime -= Time.deltaTime;
@@ -2396,6 +2442,32 @@ public sealed class ZombieStormGameController : MonoBehaviour
         dash.transform.SetParent(worldRoot, false);
     }
 
+    private bool BuildCustomArenaMap()
+    {
+        if (customArenaMapSprite == null)
+        {
+            return false;
+        }
+
+        const float targetWidth = 58f;
+        float spriteWidth = customArenaMapSprite.bounds.size.x;
+        float spriteHeight = customArenaMapSprite.bounds.size.y;
+        if (spriteWidth <= 0.01f || spriteHeight <= 0.01f)
+        {
+            return false;
+        }
+
+        float scale = targetWidth / spriteWidth;
+        float targetHeight = spriteHeight * scale;
+        customArenaHalfExtents = new Vector2(targetWidth * 0.5f, targetHeight * 0.5f);
+        usingCustomArenaMap = true;
+
+        GameObject map = CreateSpriteObject("Custom Graveyard Arena", customArenaMapSprite, Color.white, new Vector3(0f, 0f, 5f), Vector3.one * scale, -10);
+        map.transform.SetParent(worldRoot, false);
+        mainCamera.backgroundColor = new Color(0.015f, 0.018f, 0.014f);
+        return true;
+    }
+
     private void AddCrosswalk(Vector2 center, bool horizontal)
     {
         for (int i = -3; i <= 3; i++)
@@ -2745,6 +2817,26 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     }
 
+    private void LoadCustomEnemyWalkSheet()
+    {
+        sharedEnemyWalkFrames = new Sprite[0];
+
+        string path = Path.Combine(Application.dataPath, "ZombieStormArt", "Enemies", "zombie_walk.png");
+        Sprite[] frames = LoadHorizontalSpriteSheet(path, 4, 220f, true);
+        if (frames != null && frames.Length > 0)
+        {
+            sharedEnemyWalkFrames = frames;
+        }
+    }
+
+    private void LoadCustomArenaMap()
+    {
+        customArenaMapSprite = null;
+
+        string path = Path.Combine(Application.dataPath, "ZombieStormArt", "Maps", "graveyard_arena.png");
+        customArenaMapSprite = LoadRawSpriteFromPng(path, 64f, false);
+    }
+
     private void LoadMikodrakSpellEffects()
     {
         effectFrames.Clear();
@@ -2830,6 +2922,53 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (sprite != null)
         {
             target.Add(sprite);
+        }
+    }
+
+    private Sprite[] LoadHorizontalSpriteSheet(string path, int frameCount, float pixelsPerUnit, bool removeCheckerBackground)
+    {
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            if (!ImageConversion.LoadImage(texture, bytes))
+            {
+                return null;
+            }
+
+            if (removeCheckerBackground)
+            {
+                RemoveEdgeCheckerBackground(texture);
+                CleanBackgroundFringe(texture);
+            }
+
+            texture.name = Path.GetFileNameWithoutExtension(path);
+            texture.Apply(false, false);
+
+            int safeFrameCount = Mathf.Max(1, frameCount);
+            int frameWidth = texture.width / safeFrameCount;
+            List<Sprite> frames = new List<Sprite>(safeFrameCount);
+            for (int i = 0; i < safeFrameCount; i++)
+            {
+                Rect rect = new Rect(i * frameWidth, 0f, frameWidth, texture.height);
+                Sprite frame = Sprite.Create(texture, rect, new Vector2(0.5f, 0.5f), pixelsPerUnit);
+                frame.name = texture.name + "_" + (i + 1).ToString("00");
+                frames.Add(frame);
+            }
+
+            return frames.ToArray();
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning("Failed to load custom enemy walk sheet: " + path + "\n" + exception.Message);
+            return null;
         }
     }
 
@@ -2932,6 +3071,156 @@ public sealed class ZombieStormGameController : MonoBehaviour
         texture.Apply(true, false);
     }
 
+    private void CleanBackgroundFringe(Texture2D texture)
+    {
+        int width = texture.width;
+        int height = texture.height;
+        Color32[] pixels = texture.GetPixels32();
+        Color32[] cleaned = new Color32[pixels.Length];
+        Array.Copy(pixels, cleaned, pixels.Length);
+
+        for (int pass = 0; pass < 4; pass++)
+        {
+            bool changed = false;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int index = y * width + x;
+                    Color32 color = pixels[index];
+                    if (color.a == 0 || !TouchesTransparentPixel(x, y, width, height, pixels))
+                    {
+                        continue;
+                    }
+
+                    int max = Mathf.Max(color.r, Mathf.Max(color.g, color.b));
+                    int min = Mathf.Min(color.r, Mathf.Min(color.g, color.b));
+                    int average = (color.r + color.g + color.b) / 3;
+                    int saturation = max - min;
+                    if (average >= 188 && saturation <= 82)
+                    {
+                        cleaned[index].a = 0;
+                        changed = true;
+                    }
+                    else if (average >= 172 && saturation <= 96)
+                    {
+                        cleaned[index].a = (byte)Mathf.Min(color.a, 92);
+                        changed = true;
+                    }
+                }
+            }
+
+            if (!changed)
+            {
+                break;
+            }
+
+            Color32[] swap = pixels;
+            pixels = cleaned;
+            cleaned = swap;
+            Array.Copy(pixels, cleaned, pixels.Length);
+        }
+
+        DilateTransparentPixels(texture, pixels);
+    }
+
+    private static bool TouchesTransparentPixel(int x, int y, int width, int height, Color32[] pixels)
+    {
+        for (int yy = y - 1; yy <= y + 1; yy++)
+        {
+            for (int xx = x - 1; xx <= x + 1; xx++)
+            {
+                if (xx == x && yy == y)
+                {
+                    continue;
+                }
+
+                if (xx < 0 || xx >= width || yy < 0 || yy >= height)
+                {
+                    return true;
+                }
+
+                if (pixels[yy * width + xx].a < 20)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private void DilateTransparentPixels(Texture2D texture, Color32[] pixels)
+    {
+        int width = texture.width;
+        int height = texture.height;
+        Color32[] dilated = new Color32[pixels.Length];
+        Array.Copy(pixels, dilated, pixels.Length);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int index = y * width + x;
+                if (pixels[index].a >= 20)
+                {
+                    continue;
+                }
+
+                Color32 replacement;
+                if (TryFindOpaqueNeighborColor(x, y, width, height, pixels, out replacement))
+                {
+                    replacement.a = 0;
+                    dilated[index] = replacement;
+                }
+            }
+        }
+
+        texture.SetPixels32(dilated);
+        texture.Apply(false, false);
+    }
+
+    private static bool TryFindOpaqueNeighborColor(int x, int y, int width, int height, Color32[] pixels, out Color32 color)
+    {
+        for (int radius = 1; radius <= 3; radius++)
+        {
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int count = 0;
+            for (int yy = y - radius; yy <= y + radius; yy++)
+            {
+                for (int xx = x - radius; xx <= x + radius; xx++)
+                {
+                    if (xx < 0 || xx >= width || yy < 0 || yy >= height)
+                    {
+                        continue;
+                    }
+
+                    Color32 sample = pixels[yy * width + xx];
+                    if (sample.a < 210)
+                    {
+                        continue;
+                    }
+
+                    r += sample.r;
+                    g += sample.g;
+                    b += sample.b;
+                    count++;
+                }
+            }
+
+            if (count > 0)
+            {
+                color = new Color32((byte)(r / count), (byte)(g / count), (byte)(b / count), 0);
+                return true;
+            }
+        }
+
+        color = new Color32(0, 0, 0, 0);
+        return false;
+    }
+
     private static void TryQueueBackgroundPixel(int x, int y, int width, Color32[] pixels, bool[] visited, Queue<int> queue)
     {
         int height = pixels.Length / width;
@@ -2960,7 +3249,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
         int max = Mathf.Max(color.r, Mathf.Max(color.g, color.b));
         int min = Mathf.Min(color.r, Mathf.Min(color.g, color.b));
         int average = (color.r + color.g + color.b) / 3;
-        return max - min <= 18 && average >= 150;
+        int saturation = max - min;
+        if (average >= 232)
+        {
+            return true;
+        }
+
+        return saturation <= 48 && average >= 168;
     }
 
     private Texture2D NormalizePlayerFrame(Texture2D source, int width, int height)
