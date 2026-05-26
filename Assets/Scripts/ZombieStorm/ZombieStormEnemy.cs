@@ -8,6 +8,9 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private ZombieStormGameController game;
     private SpriteRenderer spriteRenderer;
     private Sprite[] walkFrames;
+    private Sprite[] attackFrames;
+    private Sprite[] hurtFrames;
+    private Sprite[] deathFrames;
     private string poolKey;
     private Color baseColor;
     private float health;
@@ -19,10 +22,20 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private float sprintTimer;
     private float shootTimer;
     private float walkAnimTime;
+    private float attackAnimTime;
+    private float attackAnimDuration;
+    private float attackCooldown;
+    private float hurtAnimTime;
+    private float hurtAnimDuration;
+    private float deathAnimTime;
+    private float deathAnimDuration;
     private int bossQueuedAction = -1;
     private bool bossQueuedEnraged;
     private bool sprinting;
     private bool useSideViewWalk;
+    private bool walkFramesFaceRight;
+    private bool slasherStrikeApplied;
+    private float renderDepthOffset;
     private Vector2 bossQueuedDirection;
     private readonly List<Vector2> bossTelegraphPositions = new List<Vector2>(12);
 
@@ -34,8 +47,9 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     public float Health01 { get { return maxHealth <= 0f ? 0f : Mathf.Clamp01(health / maxHealth); } }
     public bool IsBoss { get { return IsBossType(Type); } }
     public string DisplayName { get { return BossName(Type); } }
+    private bool UsesAnimatedMeleeAttack { get { return Type == ZombieStormEnemyType.Slasher || Type == ZombieStormEnemyType.Gravedigger || Type == ZombieStormEnemyType.Reaper; } }
 
-    public void Initialize(ZombieStormGameController owner, ZombieStormEnemyType enemyType, string key, Sprite sprite, Sprite[] enemyWalkFrames, float runTime, float difficulty)
+    public void Initialize(ZombieStormGameController owner, ZombieStormEnemyType enemyType, string key, Sprite sprite, Sprite[] enemyWalkFrames, Sprite[] enemyAttackFrames, Sprite[] enemyHurtFrames, Sprite[] enemyDeathFrames, bool framesFaceRight, float runTime, float difficulty)
     {
         game = owner;
         Type = enemyType;
@@ -45,8 +59,21 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         spriteRenderer.sprite = sprite;
         spriteRenderer.flipX = false;
         walkFrames = enemyWalkFrames;
+        attackFrames = enemyAttackFrames;
+        hurtFrames = enemyHurtFrames;
+        deathFrames = enemyDeathFrames;
         useSideViewWalk = walkFrames != null && walkFrames.Length > 0;
+        walkFramesFaceRight = framesFaceRight;
         walkAnimTime = UnityEngine.Random.value * 4f;
+        attackAnimTime = 0f;
+        attackAnimDuration = 0f;
+        attackCooldown = UnityEngine.Random.Range(0.15f, 0.7f);
+        hurtAnimTime = 0f;
+        hurtAnimDuration = 0f;
+        deathAnimTime = 0f;
+        deathAnimDuration = 0f;
+        slasherStrikeApplied = false;
+        renderDepthOffset = UnityEngine.Random.Range(-0.00004f, 0.00004f);
         transform.rotation = Quaternion.identity;
         baseColor = Color.white;
         spriteRenderer.color = baseColor;
@@ -98,6 +125,30 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             Radius = 0.42f;
             baseColor = new Color(0.7f, 1f, 0.75f);
             spriteRenderer.color = baseColor;
+        }
+        else if (Type == ZombieStormEnemyType.Slasher)
+        {
+            speed = 1.9f;
+            maxHealth = 48f * hpScale;
+            damagePerSecond = 0f;
+            Radius = 0.48f;
+            transform.localScale = Vector3.one * 1.05f;
+        }
+        else if (Type == ZombieStormEnemyType.Gravedigger)
+        {
+            speed = 1.34f;
+            maxHealth = 96f * hpScale;
+            damagePerSecond = 0f;
+            Radius = 0.58f;
+            transform.localScale = Vector3.one * 1.12f;
+        }
+        else if (Type == ZombieStormEnemyType.Reaper)
+        {
+            speed = 1.62f;
+            maxHealth = 78f * hpScale;
+            damagePerSecond = 0f;
+            Radius = 0.55f;
+            transform.localScale = Vector3.one * 1.1f;
         }
         else if (Type == ZombieStormEnemyType.Elite)
         {
@@ -158,12 +209,25 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
 
         health = maxHealth;
+        UpdateRenderDepth();
         game.RegisterEnemy(this);
     }
 
     private void Update()
     {
-        if (game == null || game.Player == null || IsDead)
+        if (game == null)
+        {
+            return;
+        }
+
+        if (IsDead)
+        {
+            UpdateDeathAnimation();
+            UpdateRenderDepth();
+            return;
+        }
+
+        if (game.Player == null)
         {
             return;
         }
@@ -176,7 +240,10 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         Vector2 toPlayer = (Vector2)game.Player.transform.position - (Vector2)transform.position;
         float distance = toPlayer.magnitude;
         Vector2 direction = distance > 0.01f ? toPlayer / distance : Vector2.zero;
-        UpdateWalkVisual(direction);
+        if (!UsesAnimatedMeleeAttack)
+        {
+            UpdateWalkVisual(direction);
+        }
 
         if (Type == ZombieStormEnemyType.Fast)
         {
@@ -196,13 +263,25 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         {
             UpdateSpitter(direction, distance);
         }
+        else if (Type == ZombieStormEnemyType.Slasher)
+        {
+            UpdateAnimatedMelee(direction, distance, 14f, 0.68f, 0.92f, 18f, 0.42f, 0.7f, 0.68f, 0.62f, new Color(0.82f, 0.92f, 0.76f, 0.6f), false);
+        }
+        else if (Type == ZombieStormEnemyType.Gravedigger)
+        {
+            UpdateAnimatedMelee(direction, distance, 22f, 0.82f, 1.08f, 15f, 0.72f, 1.05f, 0.96f, 0.76f, new Color(0.77f, 0.62f, 0.3f, 0.64f), true);
+        }
+        else if (Type == ZombieStormEnemyType.Reaper)
+        {
+            UpdateAnimatedMelee(direction, distance, 18f, 1.18f, 1.42f, 16f, 0.68f, 0.94f, 1.26f, 0.98f, new Color(0.64f, 0.86f, 0.8f, 0.62f), false);
+        }
         else
         {
             float finalSpeed = speed * (sprinting ? 1.85f : 1f);
             transform.position += (Vector3)(direction * finalSpeed * Time.deltaTime);
         }
 
-        if (distance <= Radius + 0.45f)
+        if (!UsesAnimatedMeleeAttack && distance <= Radius + 0.45f)
         {
             if (Type == ZombieStormEnemyType.Exploder)
             {
@@ -222,6 +301,8 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         {
             transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f);
         }
+
+        UpdateRenderDepth();
     }
 
     private void UpdateWalkVisual(Vector2 direction)
@@ -231,15 +312,11 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             return;
         }
 
-        float frameRate = IsBoss ? 5.6f : Type == ZombieStormEnemyType.Fast ? 10f : 7.2f;
+        float frameRate = IsBoss ? 8f : Type == ZombieStormEnemyType.Fast ? 13f : UsesAnimatedMeleeAttack ? 12f : 10f;
         walkAnimTime += Time.deltaTime * frameRate;
         int frameIndex = Mathf.FloorToInt(walkAnimTime) % walkFrames.Length;
         spriteRenderer.sprite = walkFrames[frameIndex];
-        if (Mathf.Abs(direction.x) > 0.05f)
-        {
-            spriteRenderer.flipX = direction.x < 0f;
-        }
-
+        UpdateFacing(direction);
         transform.rotation = Quaternion.identity;
     }
 
@@ -260,6 +337,12 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         if (spriteRenderer != null)
         {
             spriteRenderer.color = Color.Lerp(baseColor, Color.red, 0.55f);
+        }
+
+        if (UsesAnimatedMeleeAttack && health > 0f && attackAnimTime <= 0f && hurtFrames != null && hurtFrames.Length > 0)
+        {
+            hurtAnimDuration = 0.2f;
+            hurtAnimTime = hurtAnimDuration;
         }
 
         if (health <= 0f)
@@ -371,6 +454,101 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         {
             CastAlphaBossSkill(bossQueuedAction, bossQueuedDirection, bossQueuedEnraged);
         }
+    }
+
+    private void UpdateAnimatedMelee(Vector2 direction, float distance, float strikeDamage, float attackRange, float hitRange, float attackFrameRate, float cooldownMin, float cooldownMax, float effectRadius, float effectOffset, Color effectColor, bool heavyStrike)
+    {
+        UpdateFacing(direction);
+        transform.rotation = Quaternion.identity;
+        attackCooldown -= Time.deltaTime;
+
+        if (attackAnimTime > 0f)
+        {
+            attackAnimTime -= Time.deltaTime;
+            float elapsed = attackAnimDuration - Mathf.Max(0f, attackAnimTime);
+            SetActionFrame(attackFrames, elapsed, attackAnimDuration);
+            if (!slasherStrikeApplied && elapsed >= attackAnimDuration * 0.5f)
+            {
+                slasherStrikeApplied = true;
+                Vector2 strikePosition = (Vector2)transform.position + direction * effectOffset;
+                game.SpawnAreaEffect(strikePosition, effectRadius, 0f, heavyStrike ? 0.2f : 0.13f, 1f, effectColor, heavyStrike ? "zombie_explosion" : "hit_spark");
+                game.PlaySfx(heavyStrike ? "boom" : "hit", heavyStrike ? 0.42f : 0.32f, 0.08f);
+                if (heavyStrike)
+                {
+                    game.ShakeCamera(0.07f, 0.09f);
+                }
+
+                if (distance <= Radius + hitRange)
+                {
+                    game.Player.TakeDamage(strikeDamage);
+                }
+            }
+
+            return;
+        }
+
+        if (hurtAnimTime > 0f)
+        {
+            hurtAnimTime -= Time.deltaTime;
+            SetActionFrame(hurtFrames, hurtAnimDuration - Mathf.Max(0f, hurtAnimTime), hurtAnimDuration);
+            return;
+        }
+
+        if (distance <= Radius + attackRange && attackCooldown <= 0f && attackFrames != null && attackFrames.Length > 0)
+        {
+            attackAnimDuration = attackFrames.Length / attackFrameRate;
+            attackAnimTime = attackAnimDuration;
+            attackCooldown = attackAnimDuration + UnityEngine.Random.Range(cooldownMin, cooldownMax);
+            slasherStrikeApplied = false;
+            SetActionFrame(attackFrames, 0f, attackAnimDuration);
+            return;
+        }
+
+        transform.position += (Vector3)(direction * speed * Time.deltaTime);
+        UpdateWalkVisual(direction);
+    }
+
+    private void UpdateDeathAnimation()
+    {
+        if (deathFrames == null || deathFrames.Length == 0 || spriteRenderer == null)
+        {
+            game.ReturnPooled(poolKey, gameObject);
+            return;
+        }
+
+        deathAnimTime -= Time.deltaTime;
+        SetActionFrame(deathFrames, deathAnimDuration - Mathf.Max(0f, deathAnimTime), deathAnimDuration);
+        if (deathAnimTime <= 0f)
+        {
+            game.ReturnPooled(poolKey, gameObject);
+        }
+    }
+
+    private void SetActionFrame(Sprite[] frames, float elapsed, float duration)
+    {
+        if (spriteRenderer == null || frames == null || frames.Length == 0)
+        {
+            return;
+        }
+
+        float normalized = duration > 0f ? Mathf.Clamp01(elapsed / duration) : 0f;
+        int frameIndex = Mathf.Min(frames.Length - 1, Mathf.FloorToInt(normalized * frames.Length));
+        spriteRenderer.sprite = frames[frameIndex];
+    }
+
+    private void UpdateFacing(Vector2 direction)
+    {
+        if (spriteRenderer != null && Mathf.Abs(direction.x) > 0.05f)
+        {
+            spriteRenderer.flipX = walkFramesFaceRight ? direction.x < 0f : direction.x > 0f;
+        }
+    }
+
+    private void UpdateRenderDepth()
+    {
+        Vector3 position = transform.position;
+        position.z = position.y * 0.001f + renderDepthOffset;
+        transform.position = position;
     }
 
     private void PrepareAlphaBossTelegraph(int action, Vector2 direction, bool enraged)
@@ -646,6 +824,14 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         if (reward)
         {
             game.OnEnemyKilled(this);
+        }
+
+        if (deathFrames != null && deathFrames.Length > 0 && spriteRenderer != null)
+        {
+            deathAnimDuration = deathFrames.Length / 18f;
+            deathAnimTime = deathAnimDuration;
+            spriteRenderer.sprite = deathFrames[0];
+            return;
         }
 
         game.ReturnPooled(poolKey, gameObject);

@@ -71,7 +71,9 @@ public sealed class ZombieStormEnemyProjectile : MonoBehaviour
 
     private void Update()
     {
-        transform.position += (Vector3)(direction * speed * Time.deltaTime);
+        Vector2 startPosition = transform.position;
+        Vector2 endPosition = startPosition + direction * speed * Time.deltaTime;
+        transform.position = endPosition;
         life -= Time.deltaTime;
         if (life <= 0f)
         {
@@ -79,10 +81,24 @@ public sealed class ZombieStormEnemyProjectile : MonoBehaviour
             return;
         }
 
-        if (game.Player != null && Vector2.Distance(transform.position, game.Player.transform.position) <= 0.5f)
+        if (game.Player != null && DistanceToSegment(game.Player.transform.position, startPosition, endPosition) <= 0.62f)
         {
+            game.SpawnHitSpark(game.Player.transform.position, new Color(0.48f, 1f, 0.3f, 0.92f), 0.44f);
             game.Player.TakeDamage(damage);
             game.ReturnPooled("enemy_spit", gameObject);
         }
+    }
+
+    private static float DistanceToSegment(Vector2 point, Vector2 start, Vector2 end)
+    {
+        Vector2 segment = end - start;
+        float lengthSquared = segment.sqrMagnitude;
+        if (lengthSquared <= 0.0001f)
+        {
+            return Vector2.Distance(point, start);
+        }
+
+        float t = Mathf.Clamp01(Vector2.Dot(point - start, segment) / lengthSquared);
+        return Vector2.Distance(point, start + segment * t);
     }
 }

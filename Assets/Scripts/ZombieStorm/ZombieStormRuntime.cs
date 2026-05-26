@@ -39,7 +39,19 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private readonly Dictionary<string, Sprite[]> effectFrames = new Dictionary<string, Sprite[]>();
     private readonly List<ZombieStormDamagePopup> damagePopups = new List<ZombieStormDamagePopup>();
     private Sprite[] playerHurtFrames = new Sprite[0];
-    private Sprite[] sharedEnemyWalkFrames = new Sprite[0];
+    private Sprite[] chibiEnemyWalkFrames = new Sprite[0];
+    private Sprite[] villagerRunFrames = new Sprite[0];
+    private Sprite[] villagerSlashFrames = new Sprite[0];
+    private Sprite[] villagerHurtFrames = new Sprite[0];
+    private Sprite[] villagerDeathFrames = new Sprite[0];
+    private Sprite[] gravediggerRunFrames = new Sprite[0];
+    private Sprite[] gravediggerSlashFrames = new Sprite[0];
+    private Sprite[] gravediggerHurtFrames = new Sprite[0];
+    private Sprite[] gravediggerDeathFrames = new Sprite[0];
+    private Sprite[] reaperRunFrames = new Sprite[0];
+    private Sprite[] reaperSlashFrames = new Sprite[0];
+    private Sprite[] reaperHurtFrames = new Sprite[0];
+    private Sprite[] reaperDeathFrames = new Sprite[0];
     private readonly List<Sprite> groundSprites = new List<Sprite>();
     private readonly List<Sprite> debrisSprites = new List<Sprite>();
 
@@ -425,7 +437,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GameObject projectileObject = SpawnPooled("enemy_spit", CreateEnemyProjectile);
         projectileObject.transform.SetParent(worldRoot, false);
         projectileObject.transform.position = position;
-        projectileObject.transform.localScale = Vector3.one * 0.28f;
+        projectileObject.transform.localScale = Vector3.one * 0.44f;
+        SpriteRenderer spriteRenderer = projectileObject.GetComponent<SpriteRenderer>();
+        spriteRenderer.color = new Color(0.5f, 1f, 0.22f, 1f);
         ZombieStormEnemyProjectile projectile = projectileObject.GetComponent<ZombieStormEnemyProjectile>();
         projectile.Initialize(this, direction, damage, speed, life);
     }
@@ -534,7 +548,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             PlaySfx(enemy.IsBoss ? "boss_down" : "elite_down", 0.75f, 0.1f);
         }
 
-        int xp = enemy.IsBoss ? BossXpReward(enemy.Type) : enemy.Type == ZombieStormEnemyType.Elite ? 24 : enemy.Type == ZombieStormEnemyType.Tank ? 7 : enemy.Type == ZombieStormEnemyType.Spitter ? 6 : 3;
+        int xp = enemy.IsBoss ? BossXpReward(enemy.Type) : enemy.Type == ZombieStormEnemyType.Elite ? 24 : enemy.Type == ZombieStormEnemyType.Reaper ? 10 : enemy.Type == ZombieStormEnemyType.Tank ? 7 : enemy.Type == ZombieStormEnemyType.Gravedigger ? 8 : enemy.Type == ZombieStormEnemyType.Slasher ? 6 : enemy.Type == ZombieStormEnemyType.Spitter ? 6 : 3;
         int coins = enemy.IsBoss ? BossCoinReward(enemy.Type) : enemy.Type == ZombieStormEnemyType.Elite ? 18 : UnityEngine.Random.value < 0.24f ? 1 : 0;
         SpawnBloodSplat(enemy.transform.position, enemy.IsBoss ? 2.8f : enemy.Type == ZombieStormEnemyType.Elite ? 1.8f : 1.0f);
         SpawnPickup(enemy.transform.position, xp, coins);
@@ -889,7 +903,10 @@ public sealed class ZombieStormGameController : MonoBehaviour
         softGlowSprite = CreateSoftDiscSprite(new Color(1f, 1f, 1f, 0.72f), 64, 1f, 0.08f);
         bloodSplatSprite = CreateBloodSplatSprite();
         neonSignSprite = CreateNeonSignSprite();
-        LoadCustomEnemyWalkSheet();
+        LoadChibiEnemyWalkFrames();
+        LoadCraftpixVillagerFrames();
+        LoadCraftpixGravediggerFrames();
+        LoadCraftpixReaperFrames();
         LoadCustomArenaMap();
         LoadKenneyTopdownArt();
         LoadMikodrakSpellEffects();
@@ -1075,6 +1092,21 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return ZombieStormEnemyType.Fast;
         }
 
+        if (runTime > 32f && UnityEngine.Random.value < (lowHealth ? 0.04f : 0.13f))
+        {
+            return ZombieStormEnemyType.Slasher;
+        }
+
+        if (runTime > 58f && UnityEngine.Random.value < (lowHealth ? 0.03f : 0.1f))
+        {
+            return ZombieStormEnemyType.Gravedigger;
+        }
+
+        if (runTime > 82f && UnityEngine.Random.value < (lowHealth ? 0.02f : 0.08f))
+        {
+            return ZombieStormEnemyType.Reaper;
+        }
+
         return ZombieStormEnemyType.Grunt;
     }
 
@@ -1086,7 +1118,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
         enemyObject.transform.SetParent(worldRoot, false);
         enemyObject.transform.position = GetOffscreenSpawnPosition();
         ZombieStormEnemy enemy = enemyObject.GetComponent<ZombieStormEnemy>();
-        enemy.Initialize(this, enemyType, key, GetEnemySprite(enemyType), GetEnemyWalkFrames(), runTime, difficultyScore);
+        Sprite[] walkFrames = GetEnemyWalkFrames(enemyType);
+        bool framesFaceRight = walkFrames != chibiEnemyWalkFrames;
+        enemy.Initialize(this, enemyType, key, GetEnemySprite(enemyType, walkFrames), walkFrames, GetEnemyAttackFrames(enemyType), GetEnemyHurtFrames(enemyType), GetEnemyDeathFrames(enemyType), framesFaceRight, runTime, difficultyScore);
     }
 
     private Vector2 GetOffscreenSpawnPosition()
@@ -1103,11 +1137,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return usingCustomArenaMap ? ClampToArena(spawnPosition) : spawnPosition;
     }
 
-    private Sprite GetEnemySprite(ZombieStormEnemyType enemyType)
+    private Sprite GetEnemySprite(ZombieStormEnemyType enemyType, Sprite[] walkFrames)
     {
-        if (sharedEnemyWalkFrames != null && sharedEnemyWalkFrames.Length > 0)
+        if (walkFrames != null && walkFrames.Length > 0)
         {
-            return sharedEnemyWalkFrames[0];
+            return walkFrames[0];
         }
 
         if (kenneyZombieSprite != null)
@@ -1198,9 +1232,74 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return zombieSprite;
     }
 
-    private Sprite[] GetEnemyWalkFrames()
+    private Sprite[] GetEnemyWalkFrames(ZombieStormEnemyType enemyType)
     {
-        return sharedEnemyWalkFrames != null && sharedEnemyWalkFrames.Length > 0 ? sharedEnemyWalkFrames : null;
+        if (enemyType == ZombieStormEnemyType.Slasher && villagerRunFrames != null && villagerRunFrames.Length > 0)
+        {
+            return villagerRunFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.Gravedigger && gravediggerRunFrames != null && gravediggerRunFrames.Length > 0)
+        {
+            return gravediggerRunFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.Reaper && reaperRunFrames != null && reaperRunFrames.Length > 0)
+        {
+            return reaperRunFrames;
+        }
+
+        if (chibiEnemyWalkFrames != null && chibiEnemyWalkFrames.Length > 0)
+        {
+            return chibiEnemyWalkFrames;
+        }
+
+        return null;
+    }
+
+    private Sprite[] GetEnemyAttackFrames(ZombieStormEnemyType enemyType)
+    {
+        if (enemyType == ZombieStormEnemyType.Gravedigger && gravediggerSlashFrames.Length > 0)
+        {
+            return gravediggerSlashFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.Reaper && reaperSlashFrames.Length > 0)
+        {
+            return reaperSlashFrames;
+        }
+
+        return enemyType == ZombieStormEnemyType.Slasher && villagerSlashFrames.Length > 0 ? villagerSlashFrames : null;
+    }
+
+    private Sprite[] GetEnemyHurtFrames(ZombieStormEnemyType enemyType)
+    {
+        if (enemyType == ZombieStormEnemyType.Gravedigger && gravediggerHurtFrames.Length > 0)
+        {
+            return gravediggerHurtFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.Reaper && reaperHurtFrames.Length > 0)
+        {
+            return reaperHurtFrames;
+        }
+
+        return enemyType == ZombieStormEnemyType.Slasher && villagerHurtFrames.Length > 0 ? villagerHurtFrames : null;
+    }
+
+    private Sprite[] GetEnemyDeathFrames(ZombieStormEnemyType enemyType)
+    {
+        if (enemyType == ZombieStormEnemyType.Gravedigger && gravediggerDeathFrames.Length > 0)
+        {
+            return gravediggerDeathFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.Reaper && reaperDeathFrames.Length > 0)
+        {
+            return reaperDeathFrames;
+        }
+
+        return enemyType == ZombieStormEnemyType.Slasher && villagerDeathFrames.Length > 0 ? villagerDeathFrames : null;
     }
 
     private GameObject CreateEnemy()
@@ -2817,16 +2916,68 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     }
 
-    private void LoadCustomEnemyWalkSheet()
+    private void LoadChibiEnemyWalkFrames()
     {
-        sharedEnemyWalkFrames = new Sprite[0];
+        chibiEnemyWalkFrames = new Sprite[0];
 
-        string path = Path.Combine(Application.dataPath, "ZombieStormArt", "Enemies", "zombie_walk.png");
-        Sprite[] frames = LoadHorizontalSpriteSheet(path, 4, 220f, true);
+        string folder = Path.Combine(Application.dataPath, "ZombieStormArt", "Enemies", "chibi_zombie");
+        const float chibiPixelsPerUnit = 440f;
+        Sprite[] frames = LoadEnemyFrameSequence(folder, "zombie_chibi_", chibiPixelsPerUnit, true);
+        if (frames == null || frames.Length == 0)
+        {
+            string sheetPath = Path.Combine(folder, "zombie_chibi_walk.png");
+            frames = LoadEnemyWalkSheet(sheetPath, chibiPixelsPerUnit, true, 4, 4);
+        }
+
         if (frames != null && frames.Length > 0)
         {
-            sharedEnemyWalkFrames = frames;
+            chibiEnemyWalkFrames = frames;
         }
+    }
+
+    private void LoadCraftpixVillagerFrames()
+    {
+        villagerRunFrames = new Sprite[0];
+        villagerSlashFrames = new Sprite[0];
+        villagerHurtFrames = new Sprite[0];
+        villagerDeathFrames = new Sprite[0];
+
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Enemies", "craftpix_villager");
+        const float pixelsPerUnit = 264f;
+        villagerRunFrames = LoadEnemyFrameFolder(Path.Combine(root, "Run"), pixelsPerUnit);
+        villagerSlashFrames = LoadEnemyFrameFolder(Path.Combine(root, "Slash"), pixelsPerUnit);
+        villagerHurtFrames = LoadEnemyFrameFolder(Path.Combine(root, "Hurt"), pixelsPerUnit);
+        villagerDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
+    }
+
+    private void LoadCraftpixGravediggerFrames()
+    {
+        gravediggerRunFrames = new Sprite[0];
+        gravediggerSlashFrames = new Sprite[0];
+        gravediggerHurtFrames = new Sprite[0];
+        gravediggerDeathFrames = new Sprite[0];
+
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Enemies", "craftpix_gravedigger");
+        const float pixelsPerUnit = 264f;
+        gravediggerRunFrames = LoadEnemyFrameFolder(Path.Combine(root, "Run"), pixelsPerUnit);
+        gravediggerSlashFrames = LoadEnemyFrameFolder(Path.Combine(root, "Slash"), pixelsPerUnit);
+        gravediggerHurtFrames = LoadEnemyFrameFolder(Path.Combine(root, "Hurt"), pixelsPerUnit);
+        gravediggerDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
+    }
+
+    private void LoadCraftpixReaperFrames()
+    {
+        reaperRunFrames = new Sprite[0];
+        reaperSlashFrames = new Sprite[0];
+        reaperHurtFrames = new Sprite[0];
+        reaperDeathFrames = new Sprite[0];
+
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Enemies", "craftpix_reaper");
+        const float pixelsPerUnit = 264f;
+        reaperRunFrames = LoadEnemyFrameFolder(Path.Combine(root, "Run"), pixelsPerUnit);
+        reaperSlashFrames = LoadEnemyFrameFolder(Path.Combine(root, "Slash"), pixelsPerUnit);
+        reaperHurtFrames = LoadEnemyFrameFolder(Path.Combine(root, "Hurt"), pixelsPerUnit);
+        reaperDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
     }
 
     private void LoadCustomArenaMap()
@@ -2925,7 +3076,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    private Sprite[] LoadHorizontalSpriteSheet(string path, int frameCount, float pixelsPerUnit, bool removeCheckerBackground)
+    private Sprite[] LoadEnemyWalkSheet(string path, float pixelsPerUnit, bool removeCheckerBackground, int specifiedColumns = 0, int specifiedRows = 0)
     {
         if (!File.Exists(path))
         {
@@ -2952,15 +3103,24 @@ public sealed class ZombieStormGameController : MonoBehaviour
             texture.name = Path.GetFileNameWithoutExtension(path);
             texture.Apply(false, false);
 
-            int safeFrameCount = Mathf.Max(1, frameCount);
-            int frameWidth = texture.width / safeFrameCount;
-            List<Sprite> frames = new List<Sprite>(safeFrameCount);
-            for (int i = 0; i < safeFrameCount; i++)
+            bool tenFrameGrid = texture.width < texture.height * 3.2f;
+            int columns = specifiedColumns > 0 ? specifiedColumns : tenFrameGrid ? 5 : 4;
+            int rows = specifiedRows > 0 ? specifiedRows : tenFrameGrid ? 2 : 1;
+            List<Sprite> frames = new List<Sprite>(columns * rows);
+            for (int row = 0; row < rows; row++)
             {
-                Rect rect = new Rect(i * frameWidth, 0f, frameWidth, texture.height);
-                Sprite frame = Sprite.Create(texture, rect, new Vector2(0.5f, 0.5f), pixelsPerUnit);
-                frame.name = texture.name + "_" + (i + 1).ToString("00");
-                frames.Add(frame);
+                int sourceRow = rows - row - 1;
+                for (int column = 0; column < columns; column++)
+                {
+                    int left = Mathf.RoundToInt(column * texture.width / (float)columns);
+                    int right = Mathf.RoundToInt((column + 1) * texture.width / (float)columns);
+                    int bottom = Mathf.RoundToInt(sourceRow * texture.height / (float)rows);
+                    int top = Mathf.RoundToInt((sourceRow + 1) * texture.height / (float)rows);
+                    Rect rect = new Rect(left, bottom, right - left, top - bottom);
+                    Sprite frame = Sprite.Create(texture, rect, new Vector2(0.5f, 0.5f), pixelsPerUnit);
+                    frame.name = texture.name + "_" + (frames.Count + 1).ToString("00");
+                    frames.Add(frame);
+                }
             }
 
             return frames.ToArray();
@@ -2970,6 +3130,59 @@ public sealed class ZombieStormGameController : MonoBehaviour
             Debug.LogWarning("Failed to load custom enemy walk sheet: " + path + "\n" + exception.Message);
             return null;
         }
+    }
+
+    private Sprite[] LoadEnemyFrameSequence(string folder, string prefix, float pixelsPerUnit, bool removeCheckerBackground)
+    {
+        if (!Directory.Exists(folder))
+        {
+            return null;
+        }
+
+        List<Sprite> frames = new List<Sprite>(16);
+        for (int i = 1; i <= 24; i++)
+        {
+            string path = Path.Combine(folder, prefix + i.ToString("00") + ".png");
+            if (!File.Exists(path))
+            {
+                if (frames.Count > 0)
+                {
+                    break;
+                }
+
+                continue;
+            }
+
+            Sprite sprite = LoadRawSpriteFromPng(path, pixelsPerUnit, removeCheckerBackground);
+            if (sprite != null)
+            {
+                frames.Add(sprite);
+            }
+        }
+
+        return frames.Count > 0 ? frames.ToArray() : null;
+    }
+
+    private Sprite[] LoadEnemyFrameFolder(string folder, float pixelsPerUnit)
+    {
+        if (!Directory.Exists(folder))
+        {
+            return new Sprite[0];
+        }
+
+        string[] files = Directory.GetFiles(folder, "*.png");
+        Array.Sort(files, CompareFrameFileNames);
+        List<Sprite> frames = new List<Sprite>(files.Length);
+        for (int i = 0; i < files.Length; i++)
+        {
+            Sprite sprite = LoadRawSpriteFromPng(files[i], pixelsPerUnit, false);
+            if (sprite != null)
+            {
+                frames.Add(sprite);
+            }
+        }
+
+        return frames.ToArray();
     }
 
     private Sprite LoadRawSpriteFromPng(string path, float pixelsPerUnit, bool removeCheckerBackground)
@@ -2993,6 +3206,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             if (removeCheckerBackground)
             {
                 RemoveEdgeCheckerBackground(texture);
+                CleanBackgroundFringe(texture);
             }
 
             texture.name = Path.GetFileNameWithoutExtension(path);
