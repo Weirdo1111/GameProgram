@@ -52,6 +52,21 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Sprite[] reaperSlashFrames = new Sprite[0];
     private Sprite[] reaperHurtFrames = new Sprite[0];
     private Sprite[] reaperDeathFrames = new Sprite[0];
+    private Sprite[] crystalGolemRunFrames = new Sprite[0];
+    private Sprite[] crystalGolemSlashFrames = new Sprite[0];
+    private Sprite[] crystalGolemThrowFrames = new Sprite[0];
+    private Sprite[] crystalGolemHurtFrames = new Sprite[0];
+    private Sprite[] crystalGolemDeathFrames = new Sprite[0];
+    private Sprite[] mossGolemRunFrames = new Sprite[0];
+    private Sprite[] mossGolemSlashFrames = new Sprite[0];
+    private Sprite[] mossGolemThrowFrames = new Sprite[0];
+    private Sprite[] mossGolemHurtFrames = new Sprite[0];
+    private Sprite[] mossGolemDeathFrames = new Sprite[0];
+    private Sprite[] emberGolemRunFrames = new Sprite[0];
+    private Sprite[] emberGolemSlashFrames = new Sprite[0];
+    private Sprite[] emberGolemThrowFrames = new Sprite[0];
+    private Sprite[] emberGolemHurtFrames = new Sprite[0];
+    private Sprite[] emberGolemDeathFrames = new Sprite[0];
     private readonly List<Sprite> groundSprites = new List<Sprite>();
     private readonly List<Sprite> debrisSprites = new List<Sprite>();
 
@@ -434,14 +449,19 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     public void SpawnEnemyProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life)
     {
+        SpawnEnemyProjectile(position, direction, damage, speed, life, new Color(0.5f, 1f, 0.22f, 1f), 0.44f);
+    }
+
+    public void SpawnEnemyProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life, Color color, float size)
+    {
         GameObject projectileObject = SpawnPooled("enemy_spit", CreateEnemyProjectile);
         projectileObject.transform.SetParent(worldRoot, false);
         projectileObject.transform.position = position;
-        projectileObject.transform.localScale = Vector3.one * 0.44f;
+        projectileObject.transform.localScale = Vector3.one * size;
         SpriteRenderer spriteRenderer = projectileObject.GetComponent<SpriteRenderer>();
-        spriteRenderer.color = new Color(0.5f, 1f, 0.22f, 1f);
+        spriteRenderer.color = color;
         ZombieStormEnemyProjectile projectile = projectileObject.GetComponent<ZombieStormEnemyProjectile>();
-        projectile.Initialize(this, direction, damage, speed, life);
+        projectile.Initialize(this, direction, damage, speed, life, color, size);
     }
 
     public void SpawnAreaEffect(Vector2 position, float radius, float damage, float duration, float tickRate, Color color, string poolKey)
@@ -455,6 +475,19 @@ public sealed class ZombieStormGameController : MonoBehaviour
         spriteRenderer.sortingOrder = poolKey == "hit_spark" || poolKey == "lightning_flash" ? 48 : 14;
         ZombieStormAreaEffect effect = effectObject.GetComponent<ZombieStormAreaEffect>();
         effect.Initialize(this, poolKey, radius, damage, duration, tickRate);
+    }
+
+    public void SpawnEnemyAreaEffect(Vector2 position, float radius, float damage, float duration, float tickRate, Color color, string poolKey)
+    {
+        GameObject effectObject = SpawnPooled(poolKey, CreateAreaEffect);
+        effectObject.transform.SetParent(worldRoot, false);
+        effectObject.transform.position = position;
+        effectObject.transform.localScale = Vector3.one * radius * 2f;
+        SpriteRenderer spriteRenderer = effectObject.GetComponent<SpriteRenderer>();
+        spriteRenderer.color = color;
+        spriteRenderer.sortingOrder = poolKey == "hit_spark" || poolKey == "lightning_flash" ? 48 : 14;
+        ZombieStormAreaEffect effect = effectObject.GetComponent<ZombieStormAreaEffect>();
+        effect.Initialize(this, poolKey, radius, damage, duration, tickRate, true);
     }
 
     public void SpawnHitSpark(Vector2 position, Color color, float radius = 0.36f)
@@ -560,7 +593,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         if (enemy.IsBoss && Player != null)
         {
-            Player.Heal(enemy.Type == ZombieStormEnemyType.BruteBoss ? 32f : 24f);
+            float bossHeal = enemy.Type == ZombieStormEnemyType.EmberTyrantBoss ? 38f : enemy.Type == ZombieStormEnemyType.MossGolemBoss ? 31f : 26f;
+            Player.Heal(bossHeal);
             ShowFeedback(enemy.DisplayName + " defeated. The horde breaks for a moment.", 3f);
         }
     }
@@ -907,6 +941,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
         LoadCraftpixVillagerFrames();
         LoadCraftpixGravediggerFrames();
         LoadCraftpixReaperFrames();
+        LoadCraftpixCrystalGolemFrames();
+        LoadCraftpixMossGolemFrames();
+        LoadCraftpixEmberGolemFrames();
         LoadCustomArenaMap();
         LoadKenneyTopdownArt();
         LoadMikodrakSpellEffects();
@@ -1044,20 +1081,20 @@ public sealed class ZombieStormGameController : MonoBehaviour
             ShowFeedback("Elite zombie incoming. Kill it for a reward burst.", 2.5f);
         }
 
-        if (bossCount == 0 && runTime >= 120f)
+        if (bossCount == 0 && runTime >= 90f)
         {
             bossCount++;
-            SpawnBossWave(ZombieStormEnemyType.BruteBoss);
+            SpawnBossWave(ZombieStormEnemyType.CrystalGolemBoss);
         }
-        else if (bossCount == 1 && runTime >= 210f)
+        else if (bossCount == 1 && runTime >= 185f)
         {
             bossCount++;
-            SpawnBossWave(ZombieStormEnemyType.PlagueBoss);
+            SpawnBossWave(ZombieStormEnemyType.MossGolemBoss);
         }
-        else if (bossCount == 2 && runTime >= 275f)
+        else if (bossCount == 2 && runTime >= 270f)
         {
             bossCount++;
-            SpawnBossWave(ZombieStormEnemyType.StormBoss);
+            SpawnBossWave(ZombieStormEnemyType.EmberTyrantBoss);
         }
     }
 
@@ -1120,7 +1157,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ZombieStormEnemy enemy = enemyObject.GetComponent<ZombieStormEnemy>();
         Sprite[] walkFrames = GetEnemyWalkFrames(enemyType);
         bool framesFaceRight = walkFrames != chibiEnemyWalkFrames;
-        enemy.Initialize(this, enemyType, key, GetEnemySprite(enemyType, walkFrames), walkFrames, GetEnemyAttackFrames(enemyType), GetEnemyHurtFrames(enemyType), GetEnemyDeathFrames(enemyType), framesFaceRight, runTime, difficultyScore);
+        enemy.Initialize(this, enemyType, key, GetEnemySprite(enemyType, walkFrames), walkFrames, GetEnemyAttackFrames(enemyType), GetEnemySpecialAttackFrames(enemyType), GetEnemyHurtFrames(enemyType), GetEnemyDeathFrames(enemyType), framesFaceRight, runTime, difficultyScore);
     }
 
     private Vector2 GetOffscreenSpawnPosition()
@@ -1249,6 +1286,21 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return reaperRunFrames;
         }
 
+        if (enemyType == ZombieStormEnemyType.CrystalGolemBoss && crystalGolemRunFrames != null && crystalGolemRunFrames.Length > 0)
+        {
+            return crystalGolemRunFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.MossGolemBoss && mossGolemRunFrames != null && mossGolemRunFrames.Length > 0)
+        {
+            return mossGolemRunFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.EmberTyrantBoss && emberGolemRunFrames != null && emberGolemRunFrames.Length > 0)
+        {
+            return emberGolemRunFrames;
+        }
+
         if (chibiEnemyWalkFrames != null && chibiEnemyWalkFrames.Length > 0)
         {
             return chibiEnemyWalkFrames;
@@ -1269,7 +1321,37 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return reaperSlashFrames;
         }
 
+        if (enemyType == ZombieStormEnemyType.CrystalGolemBoss && crystalGolemSlashFrames.Length > 0)
+        {
+            return crystalGolemSlashFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.MossGolemBoss && mossGolemSlashFrames.Length > 0)
+        {
+            return mossGolemSlashFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.EmberTyrantBoss && emberGolemSlashFrames.Length > 0)
+        {
+            return emberGolemSlashFrames;
+        }
+
         return enemyType == ZombieStormEnemyType.Slasher && villagerSlashFrames.Length > 0 ? villagerSlashFrames : null;
+    }
+
+    private Sprite[] GetEnemySpecialAttackFrames(ZombieStormEnemyType enemyType)
+    {
+        if (enemyType == ZombieStormEnemyType.CrystalGolemBoss && crystalGolemThrowFrames.Length > 0)
+        {
+            return crystalGolemThrowFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.MossGolemBoss && mossGolemThrowFrames.Length > 0)
+        {
+            return mossGolemThrowFrames;
+        }
+
+        return enemyType == ZombieStormEnemyType.EmberTyrantBoss && emberGolemThrowFrames.Length > 0 ? emberGolemThrowFrames : null;
     }
 
     private Sprite[] GetEnemyHurtFrames(ZombieStormEnemyType enemyType)
@@ -1282,6 +1364,21 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (enemyType == ZombieStormEnemyType.Reaper && reaperHurtFrames.Length > 0)
         {
             return reaperHurtFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.CrystalGolemBoss && crystalGolemHurtFrames.Length > 0)
+        {
+            return crystalGolemHurtFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.MossGolemBoss && mossGolemHurtFrames.Length > 0)
+        {
+            return mossGolemHurtFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.EmberTyrantBoss && emberGolemHurtFrames.Length > 0)
+        {
+            return emberGolemHurtFrames;
         }
 
         return enemyType == ZombieStormEnemyType.Slasher && villagerHurtFrames.Length > 0 ? villagerHurtFrames : null;
@@ -1297,6 +1394,21 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (enemyType == ZombieStormEnemyType.Reaper && reaperDeathFrames.Length > 0)
         {
             return reaperDeathFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.CrystalGolemBoss && crystalGolemDeathFrames.Length > 0)
+        {
+            return crystalGolemDeathFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.MossGolemBoss && mossGolemDeathFrames.Length > 0)
+        {
+            return mossGolemDeathFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.EmberTyrantBoss && emberGolemDeathFrames.Length > 0)
+        {
+            return emberGolemDeathFrames;
         }
 
         return enemyType == ZombieStormEnemyType.Slasher && villagerDeathFrames.Length > 0 ? villagerDeathFrames : null;
@@ -2105,6 +2217,21 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private static int BossXpReward(ZombieStormEnemyType bossType)
     {
+        if (bossType == ZombieStormEnemyType.CrystalGolemBoss)
+        {
+            return 66;
+        }
+
+        if (bossType == ZombieStormEnemyType.MossGolemBoss)
+        {
+            return 72;
+        }
+
+        if (bossType == ZombieStormEnemyType.EmberTyrantBoss)
+        {
+            return 98;
+        }
+
         if (bossType == ZombieStormEnemyType.BruteBoss)
         {
             return 62;
@@ -2125,6 +2252,21 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private static int BossCoinReward(ZombieStormEnemyType bossType)
     {
+        if (bossType == ZombieStormEnemyType.CrystalGolemBoss)
+        {
+            return 52;
+        }
+
+        if (bossType == ZombieStormEnemyType.MossGolemBoss)
+        {
+            return 58;
+        }
+
+        if (bossType == ZombieStormEnemyType.EmberTyrantBoss)
+        {
+            return 82;
+        }
+
         if (bossType == ZombieStormEnemyType.BruteBoss)
         {
             return 48;
@@ -2145,6 +2287,21 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private static string BossWaveWarning(ZombieStormEnemyType bossType)
     {
+        if (bossType == ZombieStormEnemyType.CrystalGolemBoss)
+        {
+            return "Crystal Colossus incoming. Dodge blade sweeps and crystal volleys.";
+        }
+
+        if (bossType == ZombieStormEnemyType.MossGolemBoss)
+        {
+            return "Mossbound Colossus incoming. Do not linger in corrupted ground.";
+        }
+
+        if (bossType == ZombieStormEnemyType.EmberTyrantBoss)
+        {
+            return "Ember Tyrant incoming. Evade the charge and falling magma.";
+        }
+
         if (bossType == ZombieStormEnemyType.BruteBoss)
         {
             return "Ravager Brute incoming. Keep distance from charge slams.";
@@ -2165,6 +2322,21 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private static Color BossUiAccent(ZombieStormEnemyType bossType)
     {
+        if (bossType == ZombieStormEnemyType.CrystalGolemBoss)
+        {
+            return new Color(0.36f, 0.92f, 1f, 1f);
+        }
+
+        if (bossType == ZombieStormEnemyType.MossGolemBoss)
+        {
+            return new Color(0.56f, 0.82f, 0.18f, 1f);
+        }
+
+        if (bossType == ZombieStormEnemyType.EmberTyrantBoss)
+        {
+            return new Color(1f, 0.34f, 0.1f, 1f);
+        }
+
         if (bossType == ZombieStormEnemyType.BruteBoss)
         {
             return new Color(1f, 0.38f, 0.1f, 1f);
@@ -2978,6 +3150,57 @@ public sealed class ZombieStormGameController : MonoBehaviour
         reaperSlashFrames = LoadEnemyFrameFolder(Path.Combine(root, "Slash"), pixelsPerUnit);
         reaperHurtFrames = LoadEnemyFrameFolder(Path.Combine(root, "Hurt"), pixelsPerUnit);
         reaperDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
+    }
+
+    private void LoadCraftpixCrystalGolemFrames()
+    {
+        crystalGolemRunFrames = new Sprite[0];
+        crystalGolemSlashFrames = new Sprite[0];
+        crystalGolemThrowFrames = new Sprite[0];
+        crystalGolemHurtFrames = new Sprite[0];
+        crystalGolemDeathFrames = new Sprite[0];
+
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Enemies", "craftpix_crystal_golem");
+        const float pixelsPerUnit = 230f;
+        crystalGolemRunFrames = LoadEnemyFrameFolder(Path.Combine(root, "Run"), pixelsPerUnit);
+        crystalGolemSlashFrames = LoadEnemyFrameFolder(Path.Combine(root, "Slash"), pixelsPerUnit);
+        crystalGolemThrowFrames = LoadEnemyFrameFolder(Path.Combine(root, "Throw"), pixelsPerUnit);
+        crystalGolemHurtFrames = LoadEnemyFrameFolder(Path.Combine(root, "Hurt"), pixelsPerUnit);
+        crystalGolemDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
+    }
+
+    private void LoadCraftpixMossGolemFrames()
+    {
+        mossGolemRunFrames = new Sprite[0];
+        mossGolemSlashFrames = new Sprite[0];
+        mossGolemThrowFrames = new Sprite[0];
+        mossGolemHurtFrames = new Sprite[0];
+        mossGolemDeathFrames = new Sprite[0];
+
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Enemies", "craftpix_moss_golem");
+        const float pixelsPerUnit = 230f;
+        mossGolemRunFrames = LoadEnemyFrameFolder(Path.Combine(root, "Run"), pixelsPerUnit);
+        mossGolemSlashFrames = LoadEnemyFrameFolder(Path.Combine(root, "Slash"), pixelsPerUnit);
+        mossGolemThrowFrames = LoadEnemyFrameFolder(Path.Combine(root, "Throw"), pixelsPerUnit);
+        mossGolemHurtFrames = LoadEnemyFrameFolder(Path.Combine(root, "Hurt"), pixelsPerUnit);
+        mossGolemDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
+    }
+
+    private void LoadCraftpixEmberGolemFrames()
+    {
+        emberGolemRunFrames = new Sprite[0];
+        emberGolemSlashFrames = new Sprite[0];
+        emberGolemThrowFrames = new Sprite[0];
+        emberGolemHurtFrames = new Sprite[0];
+        emberGolemDeathFrames = new Sprite[0];
+
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Enemies", "craftpix_ember_golem");
+        const float pixelsPerUnit = 230f;
+        emberGolemRunFrames = LoadEnemyFrameFolder(Path.Combine(root, "Run"), pixelsPerUnit);
+        emberGolemSlashFrames = LoadEnemyFrameFolder(Path.Combine(root, "Slash"), pixelsPerUnit);
+        emberGolemThrowFrames = LoadEnemyFrameFolder(Path.Combine(root, "Throw"), pixelsPerUnit);
+        emberGolemHurtFrames = LoadEnemyFrameFolder(Path.Combine(root, "Hurt"), pixelsPerUnit);
+        emberGolemDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
     }
 
     private void LoadCustomArenaMap()

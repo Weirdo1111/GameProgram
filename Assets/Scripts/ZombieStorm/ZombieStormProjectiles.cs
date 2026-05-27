@@ -59,14 +59,18 @@ public sealed class ZombieStormEnemyProjectile : MonoBehaviour
     private float damage;
     private float speed;
     private float life;
+    private Color hitColor;
+    private float hitRadius;
 
-    public void Initialize(ZombieStormGameController owner, Vector2 fireDirection, float hitDamage, float moveSpeed, float seconds)
+    public void Initialize(ZombieStormGameController owner, Vector2 fireDirection, float hitDamage, float moveSpeed, float seconds, Color impactColor, float impactRadius)
     {
         game = owner;
         direction = fireDirection.sqrMagnitude > 0.01f ? fireDirection.normalized : Vector2.up;
         damage = hitDamage;
         speed = moveSpeed;
         life = seconds;
+        hitColor = impactColor;
+        hitRadius = impactRadius;
     }
 
     private void Update()
@@ -83,7 +87,7 @@ public sealed class ZombieStormEnemyProjectile : MonoBehaviour
 
         if (game.Player != null && DistanceToSegment(game.Player.transform.position, startPosition, endPosition) <= 0.62f)
         {
-            game.SpawnHitSpark(game.Player.transform.position, new Color(0.48f, 1f, 0.3f, 0.92f), 0.44f);
+            game.SpawnHitSpark(game.Player.transform.position, hitColor, hitRadius);
             game.Player.TakeDamage(damage);
             game.ReturnPooled("enemy_spit", gameObject);
         }

@@ -9,6 +9,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private SpriteRenderer spriteRenderer;
     private Sprite[] walkFrames;
     private Sprite[] attackFrames;
+    private Sprite[] specialAttackFrames;
     private Sprite[] hurtFrames;
     private Sprite[] deathFrames;
     private string poolKey;
@@ -48,8 +49,9 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     public bool IsBoss { get { return IsBossType(Type); } }
     public string DisplayName { get { return BossName(Type); } }
     private bool UsesAnimatedMeleeAttack { get { return Type == ZombieStormEnemyType.Slasher || Type == ZombieStormEnemyType.Gravedigger || Type == ZombieStormEnemyType.Reaper; } }
+    private bool UsesAnimatedBossArt { get { return Type == ZombieStormEnemyType.CrystalGolemBoss || Type == ZombieStormEnemyType.MossGolemBoss || Type == ZombieStormEnemyType.EmberTyrantBoss; } }
 
-    public void Initialize(ZombieStormGameController owner, ZombieStormEnemyType enemyType, string key, Sprite sprite, Sprite[] enemyWalkFrames, Sprite[] enemyAttackFrames, Sprite[] enemyHurtFrames, Sprite[] enemyDeathFrames, bool framesFaceRight, float runTime, float difficulty)
+    public void Initialize(ZombieStormGameController owner, ZombieStormEnemyType enemyType, string key, Sprite sprite, Sprite[] enemyWalkFrames, Sprite[] enemyAttackFrames, Sprite[] enemySpecialAttackFrames, Sprite[] enemyHurtFrames, Sprite[] enemyDeathFrames, bool framesFaceRight, float runTime, float difficulty)
     {
         game = owner;
         Type = enemyType;
@@ -60,6 +62,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         spriteRenderer.flipX = false;
         walkFrames = enemyWalkFrames;
         attackFrames = enemyAttackFrames;
+        specialAttackFrames = enemySpecialAttackFrames;
         hurtFrames = enemyHurtFrames;
         deathFrames = enemyDeathFrames;
         useSideViewWalk = walkFrames != null && walkFrames.Length > 0;
@@ -198,6 +201,33 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             baseColor = new Color(0.45f, 0.78f, 1f);
             spriteRenderer.color = baseColor;
             transform.localScale = Vector3.one * 3.05f;
+            bossActionTimer = 1.55f;
+        }
+        else if (Type == ZombieStormEnemyType.CrystalGolemBoss)
+        {
+            speed = 1.16f;
+            maxHealth = 1120f * Mathf.Max(1f, difficulty * 1.02f);
+            damagePerSecond = 28f;
+            Radius = 1.46f;
+            transform.localScale = Vector3.one * 2.02f;
+            bossActionTimer = 1.7f;
+        }
+        else if (Type == ZombieStormEnemyType.MossGolemBoss)
+        {
+            speed = 1.04f;
+            maxHealth = 1260f * Mathf.Max(1f, difficulty * 1.06f);
+            damagePerSecond = 30f;
+            Radius = 1.52f;
+            transform.localScale = Vector3.one * 2.08f;
+            bossActionTimer = 1.85f;
+        }
+        else if (Type == ZombieStormEnemyType.EmberTyrantBoss)
+        {
+            speed = 1.45f;
+            maxHealth = 1680f * Mathf.Max(1f, difficulty * 1.12f);
+            damagePerSecond = 36f;
+            Radius = 1.48f;
+            transform.localScale = Vector3.one * 2.12f;
             bossActionTimer = 1.55f;
         }
 
@@ -339,9 +369,10 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             spriteRenderer.color = Color.Lerp(baseColor, Color.red, 0.55f);
         }
 
-        if (UsesAnimatedMeleeAttack && health > 0f && attackAnimTime <= 0f && hurtFrames != null && hurtFrames.Length > 0)
+        bool playsHurtAnimation = UsesAnimatedMeleeAttack || UsesAnimatedBossArt;
+        if (playsHurtAnimation && health > 0f && attackAnimTime <= 0f && bossTelegraphTimer <= 0f && hurtFrames != null && hurtFrames.Length > 0 && (!UsesAnimatedBossArt || amount >= 12f))
         {
-            hurtAnimDuration = 0.2f;
+            hurtAnimDuration = UsesAnimatedBossArt ? 0.16f : 0.2f;
             hurtAnimTime = hurtAnimDuration;
         }
 
@@ -374,12 +405,28 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private void UpdateBoss(Vector2 direction)
     {
         bool enraged = health < maxHealth * 0.5f;
+        UpdateFacing(direction);
+        transform.rotation = Quaternion.identity;
+        if (UsesAnimatedBossArt && hurtAnimTime > 0f && bossTelegraphTimer <= 0f)
+        {
+            hurtAnimTime -= Time.deltaTime;
+            SetActionFrame(hurtFrames, hurtAnimDuration - Mathf.Max(0f, hurtAnimTime), hurtAnimDuration);
+            return;
+        }
+
         if (bossTelegraphTimer > 0f)
         {
             bossTelegraphTimer -= Time.deltaTime;
             if (spriteRenderer != null)
             {
                 spriteRenderer.color = Color.Lerp(baseColor, BossAccent(Type), 0.78f + Mathf.Sin(Time.time * 22f) * 0.18f);
+            }
+
+            if (UsesAnimatedBossArt && attackAnimTime > 0f)
+            {
+                attackAnimTime -= Time.deltaTime;
+                Sprite[] actionFrames = bossQueuedAction == 1 && specialAttackFrames != null && specialAttackFrames.Length > 0 ? specialAttackFrames : attackFrames;
+                SetActionFrame(actionFrames, attackAnimDuration - Mathf.Max(0f, attackAnimTime), attackAnimDuration);
             }
 
             if (bossTelegraphTimer <= 0f)
@@ -393,7 +440,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             return;
         }
 
-        float moveMultiplier = Type == ZombieStormEnemyType.BruteBoss ? (enraged ? 1.55f : 1.18f) : Type == ZombieStormEnemyType.StormBoss ? (enraged ? 1.65f : 1.25f) : enraged ? 1.35f : 1f;
+        float moveMultiplier = Type == ZombieStormEnemyType.EmberTyrantBoss ? (enraged ? 1.75f : 1.34f) : Type == ZombieStormEnemyType.BruteBoss ? (enraged ? 1.55f : 1.18f) : Type == ZombieStormEnemyType.StormBoss ? (enraged ? 1.65f : 1.25f) : enraged ? 1.35f : 1f;
         transform.position += (Vector3)(direction * speed * moveMultiplier * Time.deltaTime);
 
         bossActionTimer -= Time.deltaTime;
@@ -426,6 +473,21 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             bossQueuedAction = 0;
             PrepareStormBossTelegraph(enraged);
         }
+        else if (Type == ZombieStormEnemyType.CrystalGolemBoss)
+        {
+            bossQueuedAction = UnityEngine.Random.Range(0, 2);
+            PrepareCrystalGolemTelegraph(bossQueuedAction, bossQueuedDirection, enraged);
+        }
+        else if (Type == ZombieStormEnemyType.MossGolemBoss)
+        {
+            bossQueuedAction = UnityEngine.Random.Range(0, 2);
+            PrepareMossGolemTelegraph(bossQueuedAction, bossQueuedDirection, enraged);
+        }
+        else if (Type == ZombieStormEnemyType.EmberTyrantBoss)
+        {
+            bossQueuedAction = UnityEngine.Random.Range(0, 2);
+            PrepareEmberTyrantTelegraph(bossQueuedAction, bossQueuedDirection, enraged);
+        }
         else
         {
             bossQueuedAction = UnityEngine.Random.Range(0, 3);
@@ -433,7 +495,18 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
 
         bossTelegraphTimer = GetBossTelegraphDuration();
-        game.PlaySfx(Type == ZombieStormEnemyType.StormBoss ? "lightning" : "boom", 0.22f, 0.08f);
+        if (UsesAnimatedBossArt)
+        {
+            Sprite[] actionFrames = bossQueuedAction == 1 && specialAttackFrames != null && specialAttackFrames.Length > 0 ? specialAttackFrames : attackFrames;
+            if (actionFrames != null && actionFrames.Length > 0)
+            {
+                attackAnimDuration = bossTelegraphTimer;
+                attackAnimTime = attackAnimDuration;
+                SetActionFrame(actionFrames, 0f, attackAnimDuration);
+            }
+        }
+
+        game.PlaySfx(Type == ZombieStormEnemyType.StormBoss ? "lightning" : "boom", UsesAnimatedBossArt ? 0.36f : 0.22f, 0.08f);
     }
 
     private void ExecuteQueuedBossSkill()
@@ -449,6 +522,18 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         else if (Type == ZombieStormEnemyType.StormBoss)
         {
             CastStormBossSkill(bossQueuedDirection, bossQueuedEnraged);
+        }
+        else if (Type == ZombieStormEnemyType.CrystalGolemBoss)
+        {
+            CastCrystalGolemSkill(bossQueuedAction, bossQueuedDirection, bossQueuedEnraged);
+        }
+        else if (Type == ZombieStormEnemyType.MossGolemBoss)
+        {
+            CastMossGolemSkill(bossQueuedAction, bossQueuedDirection, bossQueuedEnraged);
+        }
+        else if (Type == ZombieStormEnemyType.EmberTyrantBoss)
+        {
+            CastEmberTyrantSkill(bossQueuedAction, bossQueuedDirection, bossQueuedEnraged);
         }
         else
         {
@@ -628,6 +713,68 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    private void PrepareCrystalGolemTelegraph(int action, Vector2 direction, bool enraged)
+    {
+        Color crystal = new Color(0.36f, 0.92f, 1f, 0.46f);
+        if (action == 0)
+        {
+            Vector2 strikePosition = (Vector2)transform.position + direction * (enraged ? 1.55f : 1.35f);
+            bossTelegraphPositions.Add(strikePosition);
+            game.SpawnAreaEffect(strikePosition, enraged ? 2.3f : 1.95f, 0f, 0.68f, 1f, crystal, "zombie_explosion");
+            PrepareDashTelegraph(direction, 1.6f, crystal);
+            return;
+        }
+
+        int shards = enraged ? 7 : 5;
+        for (int i = 0; i < shards; i++)
+        {
+            Vector2 shotDir = ZombieStormGameController.Rotate(direction, -38f + i * (76f / Mathf.Max(1, shards - 1)));
+            game.SpawnAreaEffect((Vector2)transform.position + shotDir * 1.5f, 0.3f, 0f, 0.6f, 1f, crystal, "lightning_flash");
+        }
+    }
+
+    private void PrepareMossGolemTelegraph(int action, Vector2 direction, bool enraged)
+    {
+        Color moss = new Color(0.56f, 0.82f, 0.18f, 0.44f);
+        if (action == 0)
+        {
+            Vector2 strikePosition = (Vector2)transform.position + direction * (enraged ? 1.7f : 1.45f);
+            bossTelegraphPositions.Add(strikePosition);
+            game.SpawnAreaEffect(strikePosition, enraged ? 2.5f : 2.12f, 0f, 0.72f, 1f, moss, "toxic_pool");
+            return;
+        }
+
+        int seeds = enraged ? 10 : 7;
+        for (int i = 0; i < seeds; i++)
+        {
+            Vector2 shotDir = ZombieStormGameController.Rotate(Vector2.up, i * (360f / seeds));
+            game.SpawnAreaEffect((Vector2)transform.position + shotDir * 1.55f, 0.3f, 0f, 0.66f, 1f, moss, "hit_spark");
+        }
+    }
+
+    private void PrepareEmberTyrantTelegraph(int action, Vector2 direction, bool enraged)
+    {
+        Color ember = new Color(1f, 0.3f, 0.06f, 0.5f);
+        if (action == 0)
+        {
+            float distance = enraged ? 5.4f : 4.3f;
+            PrepareDashTelegraph(direction, distance, ember);
+            Vector2 landingPosition = (Vector2)transform.position + direction * distance;
+            bossTelegraphPositions.Add(landingPosition);
+            game.SpawnAreaEffect(landingPosition, enraged ? 2.45f : 2.05f, 0f, 0.74f, 1f, ember, "zombie_explosion");
+            return;
+        }
+
+        int impacts = enraged ? 6 : 4;
+        Vector2 target = game.Player != null ? (Vector2)game.Player.transform.position : (Vector2)transform.position + direction * 3f;
+        for (int i = 0; i < impacts; i++)
+        {
+            Vector2 position = target + UnityEngine.Random.insideUnitCircle * (enraged ? 3.1f : 2.4f);
+            bossTelegraphPositions.Add(position);
+            game.SpawnAreaEffect(position, enraged ? 1.38f : 1.15f, 0f, 0.76f, 1f, new Color(1f, 0.32f, 0.05f, 0.38f), "meteor_warning");
+        }
+    }
+
     private void PrepareDashTelegraph(Vector2 direction, float distance, Color color)
     {
         int markers = Mathf.Clamp(Mathf.CeilToInt(distance), 3, 7);
@@ -732,6 +879,95 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         game.ShakeCamera(0.1f, 0.12f);
     }
 
+    private void CastCrystalGolemSkill(int action, Vector2 direction, bool enraged)
+    {
+        Color crystal = new Color(0.36f, 0.92f, 1f, 0.86f);
+        if (action == 0)
+        {
+            Vector2 strikePosition = bossTelegraphPositions.Count > 0 ? bossTelegraphPositions[0] : (Vector2)transform.position + direction * 1.35f;
+            float radius = enraged ? 2.15f : 1.82f;
+            game.SpawnAreaEffect(strikePosition, radius, 0f, 0.22f, 1f, crystal, "zombie_explosion");
+            game.ShakeCamera(enraged ? 0.2f : 0.14f, 0.18f);
+            if (game.Player != null && Vector2.Distance(strikePosition, game.Player.transform.position) <= radius + 0.34f)
+            {
+                game.Player.TakeDamage(enraged ? 30f : 22f);
+            }
+        }
+        else
+        {
+            int shards = enraged ? 7 : 5;
+            for (int i = 0; i < shards; i++)
+            {
+                Vector2 shotDir = ZombieStormGameController.Rotate(direction, -38f + i * (76f / Mathf.Max(1, shards - 1)));
+                game.SpawnEnemyProjectile(transform.position, shotDir, enraged ? 17f : 12f, enraged ? 6.3f : 5.3f, 3.2f, crystal, 0.56f);
+            }
+        }
+
+        game.PlaySfx(action == 0 ? "boom" : "shoot", action == 0 ? 0.62f : 0.48f, 0.08f);
+    }
+
+    private void CastMossGolemSkill(int action, Vector2 direction, bool enraged)
+    {
+        Color moss = new Color(0.56f, 0.82f, 0.18f, 0.82f);
+        if (action == 0)
+        {
+            Vector2 strikePosition = bossTelegraphPositions.Count > 0 ? bossTelegraphPositions[0] : (Vector2)transform.position + direction * 1.45f;
+            float radius = enraged ? 2.34f : 2f;
+            game.SpawnAreaEffect(strikePosition, radius, 0f, 0.2f, 1f, moss, "zombie_explosion");
+            game.SpawnEnemyAreaEffect(strikePosition, enraged ? 1.75f : 1.45f, enraged ? 10f : 7f, enraged ? 3.4f : 2.7f, 0.48f, new Color(0.48f, 0.78f, 0.14f, 0.42f), "toxic_pool");
+            game.ShakeCamera(enraged ? 0.2f : 0.15f, 0.2f);
+            if (game.Player != null && Vector2.Distance(strikePosition, game.Player.transform.position) <= radius + 0.34f)
+            {
+                game.Player.TakeDamage(enraged ? 27f : 20f);
+            }
+        }
+        else
+        {
+            int seeds = enraged ? 10 : 7;
+            for (int i = 0; i < seeds; i++)
+            {
+                Vector2 shotDir = ZombieStormGameController.Rotate(Vector2.up, i * (360f / seeds));
+                game.SpawnEnemyProjectile(transform.position, shotDir, enraged ? 15f : 10f, enraged ? 5.9f : 4.9f, 3.4f, moss, 0.52f);
+            }
+        }
+
+        game.PlaySfx(action == 0 ? "boom" : "shoot", action == 0 ? 0.64f : 0.46f, 0.08f);
+    }
+
+    private void CastEmberTyrantSkill(int action, Vector2 direction, bool enraged)
+    {
+        Color ember = new Color(1f, 0.3f, 0.05f, 0.88f);
+        if (action == 0)
+        {
+            Vector2 start = transform.position;
+            float distance = enraged ? 5.4f : 4.3f;
+            Vector2 landingPosition = bossTelegraphPositions.Count > 0 ? bossTelegraphPositions[0] : start + direction * distance;
+            transform.position = game.ClampToArena(landingPosition);
+            int pools = enraged ? 4 : 3;
+            for (int i = 0; i < pools; i++)
+            {
+                Vector2 trailPosition = Vector2.Lerp(start, transform.position, (i + 1f) / pools);
+                game.SpawnEnemyAreaEffect(trailPosition, enraged ? 0.82f : 0.7f, enraged ? 8f : 6f, enraged ? 2.6f : 2.1f, 0.48f, new Color(1f, 0.22f, 0.04f, 0.46f), "fire_pool");
+            }
+
+            game.SpawnEnemyAreaEffect(transform.position, enraged ? 2.2f : 1.86f, enraged ? 32f : 24f, 0.2f, 99f, ember, "zombie_explosion");
+            game.ShakeCamera(enraged ? 0.26f : 0.19f, 0.22f);
+        }
+        else
+        {
+            for (int i = 0; i < bossTelegraphPositions.Count; i++)
+            {
+                Vector2 impactPosition = bossTelegraphPositions[i];
+                game.SpawnEnemyAreaEffect(impactPosition, enraged ? 1.35f : 1.1f, enraged ? 24f : 18f, 0.2f, 99f, ember, "meteor_blast");
+                game.SpawnEnemyAreaEffect(impactPosition, enraged ? 0.92f : 0.76f, enraged ? 7f : 5f, enraged ? 2.4f : 1.9f, 0.5f, new Color(1f, 0.22f, 0.04f, 0.44f), "fire_pool");
+            }
+
+            game.ShakeCamera(enraged ? 0.2f : 0.14f, 0.18f);
+        }
+
+        game.PlaySfx("boom", action == 0 ? 0.76f : 0.66f, 0.08f);
+    }
+
     private float GetBossTelegraphDuration()
     {
         if (Type == ZombieStormEnemyType.BruteBoss)
@@ -742,6 +978,21 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         if (Type == ZombieStormEnemyType.StormBoss)
         {
             return bossQueuedEnraged ? 0.5f : 0.62f;
+        }
+
+        if (Type == ZombieStormEnemyType.CrystalGolemBoss)
+        {
+            return bossQueuedEnraged ? 0.54f : 0.72f;
+        }
+
+        if (Type == ZombieStormEnemyType.MossGolemBoss)
+        {
+            return bossQueuedEnraged ? 0.58f : 0.78f;
+        }
+
+        if (Type == ZombieStormEnemyType.EmberTyrantBoss)
+        {
+            return bossQueuedEnraged ? 0.48f : 0.64f;
         }
 
         return bossQueuedEnraged ? 0.52f : 0.66f;
@@ -764,12 +1015,27 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             return enraged ? 1.35f : 2.05f;
         }
 
+        if (Type == ZombieStormEnemyType.CrystalGolemBoss)
+        {
+            return enraged ? 1.62f : 2.42f;
+        }
+
+        if (Type == ZombieStormEnemyType.MossGolemBoss)
+        {
+            return enraged ? 1.72f : 2.55f;
+        }
+
+        if (Type == ZombieStormEnemyType.EmberTyrantBoss)
+        {
+            return enraged ? 1.28f : 1.9f;
+        }
+
         return enraged ? 2.15f : 3.1f;
     }
 
     private static bool IsBossType(ZombieStormEnemyType enemyType)
     {
-        return enemyType == ZombieStormEnemyType.Boss || enemyType == ZombieStormEnemyType.PlagueBoss || enemyType == ZombieStormEnemyType.BruteBoss || enemyType == ZombieStormEnemyType.StormBoss;
+        return enemyType == ZombieStormEnemyType.Boss || enemyType == ZombieStormEnemyType.PlagueBoss || enemyType == ZombieStormEnemyType.BruteBoss || enemyType == ZombieStormEnemyType.StormBoss || enemyType == ZombieStormEnemyType.CrystalGolemBoss || enemyType == ZombieStormEnemyType.MossGolemBoss || enemyType == ZombieStormEnemyType.EmberTyrantBoss;
     }
 
     private static string BossName(ZombieStormEnemyType enemyType)
@@ -787,6 +1053,21 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         if (enemyType == ZombieStormEnemyType.StormBoss)
         {
             return "Storm Revenant";
+        }
+
+        if (enemyType == ZombieStormEnemyType.CrystalGolemBoss)
+        {
+            return "Crystal Colossus";
+        }
+
+        if (enemyType == ZombieStormEnemyType.MossGolemBoss)
+        {
+            return "Mossbound Colossus";
+        }
+
+        if (enemyType == ZombieStormEnemyType.EmberTyrantBoss)
+        {
+            return "Ember Tyrant";
         }
 
         return "Horde Alpha";
@@ -807,6 +1088,21 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         if (enemyType == ZombieStormEnemyType.StormBoss)
         {
             return new Color(0.34f, 0.72f, 1f, 0.9f);
+        }
+
+        if (enemyType == ZombieStormEnemyType.CrystalGolemBoss)
+        {
+            return new Color(0.36f, 0.92f, 1f, 0.92f);
+        }
+
+        if (enemyType == ZombieStormEnemyType.MossGolemBoss)
+        {
+            return new Color(0.56f, 0.82f, 0.18f, 0.92f);
+        }
+
+        if (enemyType == ZombieStormEnemyType.EmberTyrantBoss)
+        {
+            return new Color(1f, 0.34f, 0.1f, 0.94f);
         }
 
         return new Color(1f, 0.2f, 0.15f, 0.9f);

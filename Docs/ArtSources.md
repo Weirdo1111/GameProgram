@@ -32,3 +32,14 @@ The downloaded archive includes `License.txt`, which states that the assets may 
 - Used for: `Slasher` sword enemy, `Gravedigger` shovel enemy, and `Reaper` curved-blade enemy animation sequences.
 
 The CraftPix source pack includes a license link in `TXT/license.txt`. Review its redistribution conditions before committing raw source PNG files to a public repository.
+
+## CraftPix Golems Chibi
+
+- Source: `Free Golems Chibi 2D Game Sprites` / `Golem_1`, `Golem_2`, and `Golem_3`, downloaded by the project owner from https://craftpix.net/
+- License reference: https://craftpix.net/file-licenses/
+- Local paths: `Assets/ZombieStormArt/Enemies/craftpix_crystal_golem`, `Assets/ZombieStormArt/Enemies/craftpix_moss_golem`, `Assets/ZombieStormArt/Enemies/craftpix_ember_golem`
+- Used for: `CrystalGolemBoss` (`Crystal Colossus`) sword sweep and crystal volley; `MossGolemBoss` (`Mossbound Colossus`) corrupted-ground slam and seed-rock volley; `EmberTyrantBoss` (`Ember Tyrant`) burning charge and targeted magma impacts. Each Boss also uses its corresponding run, hurt, and death animations.
+
+The active Boss roster is limited to these three CraftPix golems.
+
+The Golem source pack also points to the CraftPix license in `TXT/license.txt`. Keep the same redistribution review requirement before making raw PNG frames public.

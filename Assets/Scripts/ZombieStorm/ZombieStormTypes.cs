@@ -29,7 +29,10 @@ public enum ZombieStormEnemyType
     Boss,
     PlagueBoss,
     BruteBoss,
-    StormBoss
+    StormBoss,
+    CrystalGolemBoss,
+    MossGolemBoss,
+    EmberTyrantBoss
 }
 
 public enum ZombieStormPassiveType

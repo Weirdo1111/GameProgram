@@ -19,8 +19,9 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
     private float tickTimer;
     private float frameDuration;
     private bool mineTriggered;
+    private bool harmsPlayer;
 
-    public void Initialize(ZombieStormGameController owner, string key, float areaRadius, float hitDamage, float duration, float rate)
+    public void Initialize(ZombieStormGameController owner, string key, float areaRadius, float hitDamage, float duration, float rate, bool targetsPlayer = false)
     {
         game = owner;
         poolKey = key;
@@ -31,6 +32,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
         tickRate = rate;
         tickTimer = 0f;
         mineTriggered = false;
+        harmsPlayer = targetsPlayer;
         spriteRenderer = GetComponent<SpriteRenderer>();
         frames = game.GetEffectFrames(poolKey);
         if (spriteRenderer != null && frames != null && frames.Length > 0)
@@ -84,7 +86,14 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
         if (tickTimer <= 0f)
         {
             tickTimer = tickRate;
-            DamageEnemies();
+            if (harmsPlayer)
+            {
+                DamagePlayer();
+            }
+            else
+            {
+                DamageEnemies();
+            }
         }
 
         if (life <= 0f)
@@ -140,6 +149,19 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
             {
                 enemy.TakeDamage(damage, ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
             }
+        }
+    }
+
+    private void DamagePlayer()
+    {
+        if (damage <= 0f || game.Player == null)
+        {
+            return;
+        }
+
+        if (Vector2.Distance(transform.position, game.Player.transform.position) <= radius + 0.38f)
+        {
+            game.Player.TakeDamage(damage);
         }
     }
 }
