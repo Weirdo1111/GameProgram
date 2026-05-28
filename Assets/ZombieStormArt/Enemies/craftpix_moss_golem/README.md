@@ -1,6 +1,6 @@
 # Moss Golem Boss
 
-- Source: `Free Golems Chibi 2D Game Sprites` / `Golem_2`, downloaded by the project owner from https://craftpix.net/
+- Source: `Free Golems Chibi 2D Game Sprites` / `Golem_2`, downloaded by the project owner from https://craftpix.net/freebies/free-golems-chibi-2d-game-sprites/
 - License reference: https://craftpix.net/file-licenses/
 - Runtime role: `MossGolemBoss` / `Mossbound Colossus`
 

@@ -1,7 +1,7 @@
 ## CraftPix Zombie Villager
 
 - Source pack: `Free Zombie Villager Chibi Character Sprites`
-- Source site: https://craftpix.net/
+- Source site: https://craftpix.net/freebies/free-zombie-villager-chibi-character-sprites/
 - License reference: https://craftpix.net/file-licenses/
 - Imported prototype role: `Slasher`, a sword-wielding melee zombie.
 

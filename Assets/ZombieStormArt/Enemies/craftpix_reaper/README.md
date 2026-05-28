@@ -1,7 +1,7 @@
 ## CraftPix Reaper Zombie
 
 - Source pack: `Free Zombie Villager Chibi Character Sprites`, `Zombie_Villager_1`
-- Source site: https://craftpix.net/
+- Source site: https://craftpix.net/freebies/free-zombie-villager-chibi-character-sprites/
 - License reference: https://craftpix.net/file-licenses/
 - Imported prototype role: `Reaper`, a long-reach sweeping melee zombie.
 
