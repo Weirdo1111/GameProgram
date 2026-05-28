@@ -88,6 +88,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Sprite coinSprite;
     private Sprite fireSprite;
     private Sprite sawSprite;
+    private Sprite orbitBladeSprite;
+    private Sprite orbitRingSprite;
     private Sprite mineSprite;
     private Sprite tileSprite;
     private Sprite ruinSprite;
@@ -634,7 +636,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     {
         if (skillType == ZombieStormSkillType.OrbitingKnife)
         {
-            return sawSprite;
+            return orbitBladeSprite != null ? orbitBladeSprite : sawSprite;
         }
 
         if (skillType == ZombieStormSkillType.SummonDrone || skillType == ZombieStormSkillType.ShieldBurst)
@@ -684,6 +686,16 @@ public sealed class ZombieStormGameController : MonoBehaviour
     public Sprite GetSoftShadowSprite()
     {
         return softShadowSprite;
+    }
+
+    public Sprite GetSoftGlowSprite()
+    {
+        return softGlowSprite;
+    }
+
+    public Sprite GetOrbitRingSprite()
+    {
+        return orbitRingSprite != null ? orbitRingSprite : softGlowSprite;
     }
 
     public Sprite GetHealthBarSprite()
@@ -930,6 +942,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         coinSprite = CreatePixelSprite(new Color(1f, 0.73f, 0.15f), new Color(1f, 0.95f, 0.55f), 8, true);
         fireSprite = CreatePixelSprite(new Color(1f, 0.28f, 0.04f), new Color(1f, 0.82f, 0.1f), 18, true);
         sawSprite = CreatePixelSprite(new Color(0.82f, 0.84f, 0.9f), new Color(0.2f, 0.75f, 1f), 14, true);
+        orbitBladeSprite = CreateOrbitingBladeSprite();
+        orbitRingSprite = CreateOrbitingRingSprite();
         mineSprite = CreatePixelSprite(new Color(0.22f, 0.22f, 0.25f), new Color(1f, 0.18f, 0.08f), 12, true);
         tileSprite = CreatePixelSprite(Color.white, Color.white, 8, false);
         ruinSprite = CreatePixelSprite(Color.white, new Color(0.06f, 0.06f, 0.08f), 12, false);
@@ -1631,7 +1645,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             ZombieStormSkillType weaponType = (ZombieStormSkillType)values.GetValue(UnityEngine.Random.Range(0, values.Length));
             if (Skills.GetSkillLevel(weaponType) <= 0)
             {
-                return ZombieStormUpgradeOption.Skill("unlock_" + weaponType, "Learn " + SkillName(weaponType), SkillSummary(weaponType), SkillAccent(weaponType), delegate { Skills.LearnSkill(weaponType); });
+                return ZombieStormUpgradeOption.Skill("unlock_" + weaponType, SkillName(weaponType) + " Lv.1", SkillSummary(weaponType), SkillAccent(weaponType), delegate { Skills.LearnSkill(weaponType); });
             }
         }
 
@@ -1954,51 +1968,253 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private void DrawUpgradePanel()
     {
-        GUI.color = new Color(0f, 0f, 0f, 0.84f);
-        GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
-        GUI.color = new Color(0.12f, 0.75f, 1f, 0.12f);
-        GUI.DrawTexture(new Rect(0f, Screen.height * 0.5f - 170f, Screen.width, 360f), Texture2D.whiteTexture);
-        GUI.color = new Color(1f, 0.9f, 0.35f, 1f);
-        GUI.skin.label.fontSize = 34;
-        GUI.Label(new Rect(Screen.width * 0.5f - 188f, Screen.height * 0.5f - 184f, 460f, 48f), "LEVEL UP");
-        GUI.color = new Color(0.82f, 0.9f, 1f, 1f);
-        GUI.skin.label.fontSize = 16;
-        GUI.Label(new Rect(Screen.width * 0.5f - 198f, Screen.height * 0.5f - 140f, 520f, 26f), "Choose one upgrade to shape this run");
-        GUI.skin.label.fontSize = 18;
+        DrawOverlayBackdrop(0.82f);
 
-        float startX = Screen.width * 0.5f - 390f;
-        float y = Screen.height * 0.5f - 92f;
+        float panelWidth = Mathf.Min(Screen.width - 48f, 940f);
+        float panelHeight = Screen.height < 620f ? 390f : 430f;
+        Rect panel = new Rect(Screen.width * 0.5f - panelWidth * 0.5f, Screen.height * 0.5f - panelHeight * 0.5f, panelWidth, panelHeight);
+        Color headerAccent = currentChoices.Count > 0 ? currentChoices[0].Accent : new Color(0.3f, 0.86f, 1f, 1f);
+
+        GUI.color = new Color(0.07f, 0.16f, 0.18f, 0.32f);
+        GUI.DrawTexture(new Rect(0f, panel.y + 58f, Screen.width, panel.height - 116f), Texture2D.whiteTexture);
+        DrawPanel(panel, new Color(0.018f, 0.024f, 0.033f, 0.96f), WithAlpha(headerAccent, 0.52f));
+
+        GUI.color = new Color(1f, 0.86f, 0.28f, 1f);
+        GUI.skin.label.fontSize = 32;
+        GUI.skin.label.alignment = TextAnchor.UpperCenter;
+        GUI.Label(new Rect(panel.x, panel.y + 24f, panel.width, 42f), "LEVEL UP");
+
+        GUI.color = new Color(0.78f, 0.88f, 0.96f, 1f);
+        GUI.skin.label.fontSize = 15;
+        GUI.Label(new Rect(panel.x, panel.y + 62f, panel.width, 24f), "Choose one upgrade. Press 1 / 2 / 3 or click a card.");
+        GUI.skin.label.alignment = TextAnchor.UpperLeft;
+
+        bool narrow = panel.width < 760f;
+        float gap = narrow ? 12f : 18f;
+        float cardWidth = narrow ? panel.width - 48f : (panel.width - 84f - gap * 2f) / 3f;
+        float cardHeight = narrow ? 92f : 250f;
+        float startX = narrow ? panel.x + 24f : panel.x + 42f;
+        float startY = panel.y + (narrow ? 104f : 116f);
+
         for (int i = 0; i < currentChoices.Count; i++)
         {
-            Rect rect = new Rect(startX + i * 260f, y, 240f, 178f);
-            Color edge = i == 0 ? new Color(0.2f, 0.75f, 1f, 0.72f) : i == 1 ? new Color(1f, 0.75f, 0.18f, 0.72f) : new Color(1f, 0.2f, 0.5f, 0.72f);
-            edge = currentChoices[i].Accent;
-            edge.a = 0.72f;
-            DrawPanel(rect, new Color(0.045f, 0.055f, 0.07f, 0.98f), edge);
-            GUI.color = new Color(edge.r, edge.g, edge.b, 0.16f);
-            GUI.DrawTexture(new Rect(rect.x + 8f, rect.y + 8f, rect.width - 16f, 46f), Texture2D.whiteTexture);
-            GUI.color = edge;
-            GUI.DrawTexture(new Rect(rect.x + 16f, rect.y + 18f, 30f, 30f), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GUI.skin.label.fontSize = 20;
-            GUI.Label(new Rect(rect.x + 24f, rect.y + 19f, 30f, 26f), (i + 1).ToString());
-            GUI.skin.label.fontSize = 17;
-            GUI.Label(new Rect(rect.x + 58f, rect.y + 17f, rect.width - 76f, 34f), currentChoices[i].Title);
-            GUI.skin.label.fontSize = 12;
-            GUI.color = new Color(edge.r, edge.g, edge.b, 1f);
-            GUI.Label(new Rect(rect.x + 18f, rect.y + 54f, rect.width - 36f, 18f), currentChoices[i].Category);
-            GUI.skin.label.fontSize = 15;
-            GUI.color = new Color(0.78f, 0.85f, 0.92f, 1f);
-            GUI.Label(new Rect(rect.x + 18f, rect.y + 72f, rect.width - 36f, 64f), currentChoices[i].Description);
-            GUI.color = Color.white;
-            if (GUI.Button(new Rect(rect.x + 42f, rect.y + 136f, 156f, 30f), "Pick " + (i + 1)))
-            {
-                ApplyUpgrade(i);
-            }
+            Rect rect = narrow
+                ? new Rect(startX, startY + i * (cardHeight + gap), cardWidth, cardHeight)
+                : new Rect(startX + i * (cardWidth + gap), startY, cardWidth, cardHeight);
+            DrawUpgradeCard(rect, currentChoices[i], i, narrow);
         }
 
         GUI.skin.label.fontSize = 18;
+        GUI.skin.label.alignment = TextAnchor.UpperLeft;
+        GUI.skin.label.wordWrap = false;
         GUI.color = Color.white;
+    }
+
+    private void DrawUpgradeCard(Rect rect, ZombieStormUpgradeOption option, int index, bool compact)
+    {
+        Event currentEvent = Event.current;
+        bool hover = rect.Contains(currentEvent.mousePosition);
+        Color accent = option.Accent;
+        Color edge = WithAlpha(accent, hover ? 0.96f : 0.68f);
+        Color fill = hover ? new Color(0.055f, 0.072f, 0.09f, 0.99f) : new Color(0.035f, 0.046f, 0.062f, 0.98f);
+
+        GUI.color = new Color(0f, 0f, 0f, 0.38f);
+        GUI.DrawTexture(new Rect(rect.x + 5f, rect.y + 7f, rect.width, rect.height), Texture2D.whiteTexture);
+        DrawPanel(rect, fill, edge);
+
+        GUI.color = WithAlpha(accent, hover ? 0.24f : 0.14f);
+        GUI.DrawTexture(new Rect(rect.x + 2f, rect.y + 2f, rect.width - 4f, compact ? 32f : 62f), Texture2D.whiteTexture);
+        GUI.color = WithAlpha(accent, hover ? 0.95f : 0.72f);
+        GUI.DrawTexture(new Rect(rect.x + 2f, rect.y + 2f, 5f, rect.height - 4f), Texture2D.whiteTexture);
+
+        Rect hotkey = compact ? new Rect(rect.x + 14f, rect.y + 14f, 34f, 34f) : new Rect(rect.x + 18f, rect.y + 20f, 42f, 42f);
+        DrawUpgradeHotkey(hotkey, index + 1, accent, hover);
+
+        Rect icon = compact ? new Rect(rect.x + rect.width - 50f, rect.y + 14f, 32f, 32f) : new Rect(rect.x + rect.width - 68f, rect.y + 18f, 46f, 46f);
+        DrawUpgradeIcon(icon, option, accent, hover);
+
+        float textX = compact ? rect.x + 58f : rect.x + 20f;
+        float textWidth = compact ? rect.width - 118f : rect.width - 40f;
+        float titleY = compact ? rect.y + 12f : rect.y + 76f;
+
+        GUI.skin.label.wordWrap = true;
+        GUI.skin.label.fontSize = option.Title.Length > 24 ? 16 : 18;
+        GUI.color = Color.white;
+        GUI.Label(new Rect(textX, titleY, textWidth, compact ? 24f : 46f), option.Title);
+
+        GUI.skin.label.fontSize = 11;
+        GUI.color = accent;
+        GUI.Label(new Rect(textX, compact ? rect.y + 38f : rect.y + 126f, textWidth, 18f), GetUpgradeKindLabel(option));
+
+        GUI.skin.label.fontSize = compact ? 13 : 14;
+        GUI.color = new Color(0.76f, 0.84f, 0.91f, 1f);
+        GUI.Label(new Rect(textX, compact ? rect.y + 56f : rect.y + 150f, textWidth, compact ? 30f : 58f), option.Description);
+
+        if (!compact)
+        {
+            Rect button = new Rect(rect.x + 26f, rect.yMax - 44f, rect.width - 52f, 30f);
+            DrawUpgradePickButton(button, index + 1, accent, hover);
+        }
+
+        if (currentEvent.type == EventType.MouseDown && currentEvent.button == 0 && rect.Contains(currentEvent.mousePosition))
+        {
+            currentEvent.Use();
+            ApplyUpgrade(index);
+        }
+
+        GUI.skin.label.wordWrap = false;
+        GUI.color = Color.white;
+    }
+
+    private void DrawUpgradeHotkey(Rect rect, int number, Color accent, bool hover)
+    {
+        GUI.color = WithAlpha(accent, hover ? 0.92f : 0.68f);
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = new Color(0.015f, 0.022f, 0.03f, 0.92f);
+        GUI.DrawTexture(new Rect(rect.x + 3f, rect.y + 3f, rect.width - 6f, rect.height - 6f), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        GUI.skin.label.fontSize = Mathf.RoundToInt(rect.height * 0.48f);
+        GUI.skin.label.alignment = TextAnchor.MiddleCenter;
+        GUI.Label(rect, number.ToString());
+        GUI.skin.label.alignment = TextAnchor.UpperLeft;
+    }
+
+    private void DrawUpgradeIcon(Rect rect, ZombieStormUpgradeOption option, Color accent, bool hover)
+    {
+        GUI.color = WithAlpha(accent, hover ? 0.22f : 0.14f);
+        GUI.DrawTexture(new Rect(rect.x - 3f, rect.y - 3f, rect.width + 6f, rect.height + 6f), Texture2D.whiteTexture);
+        GUI.color = new Color(0.011f, 0.018f, 0.026f, 0.94f);
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = WithAlpha(accent, 0.95f);
+        GUI.DrawTexture(new Rect(rect.x + 4f, rect.y + 4f, rect.width - 8f, 3f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.x + 4f, rect.yMax - 7f, rect.width - 8f, 3f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.x + 4f, rect.y + 7f, 3f, rect.height - 14f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.xMax - 7f, rect.y + 7f, 3f, rect.height - 14f), Texture2D.whiteTexture);
+
+        GUI.color = Color.white;
+        GUI.skin.label.fontSize = Mathf.RoundToInt(rect.height * 0.42f);
+        GUI.skin.label.alignment = TextAnchor.MiddleCenter;
+        GUI.Label(rect, GetUpgradeIconText(option));
+        GUI.skin.label.alignment = TextAnchor.UpperLeft;
+    }
+
+    private void DrawUpgradePickButton(Rect rect, int number, Color accent, bool hover)
+    {
+        GUI.color = WithAlpha(accent, hover ? 0.86f : 0.52f);
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = hover ? new Color(0.03f, 0.045f, 0.06f, 0.88f) : new Color(0.018f, 0.026f, 0.036f, 0.88f);
+        GUI.DrawTexture(new Rect(rect.x + 2f, rect.y + 2f, rect.width - 4f, rect.height - 4f), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        GUI.skin.label.fontSize = 13;
+        GUI.skin.label.alignment = TextAnchor.MiddleCenter;
+        GUI.Label(rect, "PICK " + number);
+        GUI.skin.label.alignment = TextAnchor.UpperLeft;
+    }
+
+    private static string GetUpgradeKindLabel(ZombieStormUpgradeOption option)
+    {
+        if (option.Key != null && option.Key.StartsWith("unlock_", StringComparison.Ordinal))
+        {
+            return "NEW ACTIVE SKILL";
+        }
+
+        if (option.Key != null && option.Key.StartsWith("level_", StringComparison.Ordinal))
+        {
+            return "SKILL LEVEL UP";
+        }
+
+        if (option.Key != null && option.Key.StartsWith("passive_", StringComparison.Ordinal))
+        {
+            return "PASSIVE STAT";
+        }
+
+        return option.Category;
+    }
+
+    private static string GetUpgradeIconText(ZombieStormUpgradeOption option)
+    {
+        string key = option.Key ?? string.Empty;
+        if (key.Contains("MagicBolt") || key.Contains("magic_"))
+        {
+            return "MB";
+        }
+
+        if (key.Contains("OrbitingKnife") || key.Contains("knife_"))
+        {
+            return "OK";
+        }
+
+        if (key.Contains("MeteorStorm") || key.Contains("meteor_"))
+        {
+            return "MT";
+        }
+
+        if (key.Contains("FireZone") || key.Contains("fire_"))
+        {
+            return "FZ";
+        }
+
+        if (key.Contains("SummonDrone") || key.Contains("drone_"))
+        {
+            return "DR";
+        }
+
+        if (key.Contains("ChainLightning") || key.Contains("lightning_"))
+        {
+            return "CL";
+        }
+
+        if (key.Contains("ShieldBurst") || key.Contains("shield_"))
+        {
+            return "SH";
+        }
+
+        if (key.Contains("UltimateStorm") || key.Contains("ultimate_"))
+        {
+            return "UL";
+        }
+
+        if (key.Contains("Damage"))
+        {
+            return "AT";
+        }
+
+        if (key.Contains("FireRate"))
+        {
+            return "AS";
+        }
+
+        if (key.Contains("MoveSpeed"))
+        {
+            return "MS";
+        }
+
+        if (key.Contains("PickupRange"))
+        {
+            return "XP";
+        }
+
+        if (key.Contains("MaxHealth"))
+        {
+            return "HP";
+        }
+
+        if (key.Contains("CoinGain"))
+        {
+            return "CN";
+        }
+
+        if (key.Contains("Crit"))
+        {
+            return "CR";
+        }
+
+        if (key.Contains("Area"))
+        {
+            return "AR";
+        }
+
+        return "UP";
     }
 
     private void DrawBar(Rect rect, float value, Color color, string label)
@@ -3831,6 +4047,88 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         texture.Apply(true, false);
         return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
+    }
+
+    private Sprite CreateOrbitingBladeSprite()
+    {
+        const int size = 64;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, true);
+        texture.filterMode = FilterMode.Bilinear;
+        texture.wrapMode = TextureWrapMode.Clamp;
+        ClearTexture(texture, Color.clear);
+
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        Color glow = new Color(0.18f, 0.86f, 1f, 0.34f);
+        Color edge = new Color(0.08f, 0.18f, 0.28f, 1f);
+        Color steel = new Color(0.82f, 0.94f, 1f, 1f);
+        Color highlight = Color.white;
+        Color hilt = new Color(0.22f, 0.58f, 0.82f, 1f);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float px = x - center.x;
+                float py = y - center.y;
+                Color pixel = Color.clear;
+                float bodyT = Mathf.InverseLerp(-24f, 22f, px);
+                float bladeHalfWidth = Mathf.Lerp(6.4f, 2.1f, bodyT);
+                bool bladeBody = px >= -24f && px <= 22f && Mathf.Abs(py) <= bladeHalfWidth;
+                bool bladeTip = px > 22f && px <= 30f && Mathf.Abs(py) <= (30f - px) * 0.48f;
+                bool bladeGlow = px >= -28f && px <= 31f && Mathf.Abs(py) <= bladeHalfWidth + 4.4f;
+                bool grip = px >= -31f && px < -23f && Mathf.Abs(py) <= 8.2f;
+                bool guard = px >= -24f && px <= -19f && Mathf.Abs(py) <= 12.5f;
+
+                if (bladeGlow || (px > 22f && px <= 31f && Mathf.Abs(py) <= (31f - px) * 0.58f + 3f))
+                {
+                    pixel = glow;
+                }
+
+                if (bladeBody || bladeTip)
+                {
+                    pixel = Mathf.Abs(py) > bladeHalfWidth - 1.3f ? edge : Color.Lerp(steel, highlight, Mathf.Clamp01((py + bladeHalfWidth) / Mathf.Max(0.01f, bladeHalfWidth * 2f)));
+                }
+
+                if (grip)
+                {
+                    pixel = Mathf.FloorToInt(Mathf.Abs(py)) % 4 == 0 ? edge : hilt;
+                }
+
+                if (guard)
+                {
+                    pixel = Mathf.Abs(py) > 9.5f ? edge : new Color(0.72f, 0.96f, 1f, 1f);
+                }
+
+                texture.SetPixel(x, y, pixel);
+            }
+        }
+
+        texture.Apply(true, false);
+        return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 64f);
+    }
+
+    private Sprite CreateOrbitingRingSprite()
+    {
+        const int size = 128;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, true);
+        texture.filterMode = FilterMode.Bilinear;
+        texture.wrapMode = TextureWrapMode.Clamp;
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x, y), center) / (size * 0.5f);
+                float ring = Mathf.Clamp01(1f - Mathf.Abs(d - 0.82f) / 0.055f);
+                float inner = Mathf.Clamp01(1f - Mathf.Abs(d - 0.62f) / 0.025f) * 0.38f;
+                float sparkle = (x + y) % 23 == 0 && d > 0.7f && d < 0.93f ? 0.2f : 0f;
+                float alpha = Mathf.Clamp01(ring * 0.7f + inner + sparkle);
+                texture.SetPixel(x, y, new Color(0.48f, 0.9f, 1f, alpha));
+            }
+        }
+
+        texture.Apply(true, false);
+        return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 64f);
     }
 
     private Sprite CreateSoftDiscSprite(Color color, int size, float radiusScale, float centerFade)

@@ -16,6 +16,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
     private ZombieStormGameController game;
     private ZombieStormPlayer player;
     private float ultimateCooldown;
+    private GameObject orbitingRing;
+    private float orbitVisualPulseTimer;
 
     public int KnownSkillCount
     {
@@ -48,22 +50,20 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
     public void LearnSkill(ZombieStormSkillType weapon)
     {
-        if (GetSkillLevel(weapon) <= 0)
+        if (GetSkillLevel(weapon) > 0)
         {
-            levels[weapon] = 1;
-            cooldowns[weapon] = 0.05f;
-            if (weapon == ZombieStormSkillType.OrbitingKnife)
-            {
-                RebuildOrbitingKnives();
-            }
-            else if (weapon == ZombieStormSkillType.SummonDrone)
-            {
-                RebuildDrones();
-            }
+            return;
         }
-        else
+
+        levels[weapon] = 1;
+        cooldowns[weapon] = 0.05f;
+        if (weapon == ZombieStormSkillType.OrbitingKnife)
         {
-            LevelUpSkill(weapon);
+            RebuildOrbitingKnives();
+        }
+        else if (weapon == ZombieStormSkillType.SummonDrone)
+        {
+            RebuildDrones();
         }
     }
 
@@ -335,12 +335,41 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         float radius = (1.45f + level * 0.18f + Mod("knife_reach") * 0.22f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.32f : 1f);
         float speed = 120f + level * 28f;
+        if (orbitingObjects.Count == 0)
+        {
+            RebuildOrbitingKnives();
+        }
+
+        if (orbitingRing != null)
+        {
+            orbitingRing.transform.position = transform.position;
+            orbitingRing.transform.rotation = Quaternion.Euler(0f, 0f, -Time.time * (speed * 0.42f));
+            orbitingRing.transform.localScale = Vector3.one * radius;
+            SpriteRenderer ringRenderer = orbitingRing.GetComponent<SpriteRenderer>();
+            if (ringRenderer != null)
+            {
+                float pulse = 0.52f + Mathf.PingPong(Time.time * 1.8f, 0.18f);
+                ringRenderer.color = IsEvolved(ZombieStormSkillType.OrbitingKnife) ? new Color(0.72f, 0.96f, 1f, pulse) : new Color(0.62f, 0.9f, 1f, pulse);
+            }
+        }
+
         for (int i = 0; i < orbitingObjects.Count; i++)
         {
             float angle = Time.time * speed + i * (360f / Mathf.Max(1, orbitingObjects.Count));
             Vector2 offset = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * radius;
             orbitingObjects[i].transform.position = (Vector2)transform.position + offset;
-            orbitingObjects[i].transform.Rotate(0f, 0f, 420f * Time.deltaTime);
+            orbitingObjects[i].transform.rotation = Quaternion.Euler(0f, 0f, angle + 90f);
+            float bladeScale = (0.78f + level * 0.035f + Mod("knife_edge") * 0.035f) * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.08f : 1f);
+            orbitingObjects[i].transform.localScale = Vector3.one * bladeScale;
+        }
+
+        orbitVisualPulseTimer -= Time.deltaTime;
+        if (orbitVisualPulseTimer <= 0f && orbitingObjects.Count > 0)
+        {
+            int bladeIndex = Mathf.Abs(Mathf.FloorToInt(Time.time * 10f)) % orbitingObjects.Count;
+            Color sparkleColor = IsEvolved(ZombieStormSkillType.OrbitingKnife) ? new Color(0.72f, 1f, 1f, 0.55f) : new Color(0.72f, 0.92f, 1f, 0.48f);
+            game.SpawnAreaEffect(orbitingObjects[bladeIndex].transform.position, 0.16f, 0f, 0.09f, 1f, sparkleColor, "hit_spark");
+            orbitVisualPulseTimer = 0.11f;
         }
 
         float current;
@@ -359,10 +388,12 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             if (enemy != null && !enemy.IsDead && Vector2.Distance(enemy.transform.position, transform.position) <= radius + enemy.Radius)
             {
                 enemy.TakeDamage(RollDamage((6f + level * 1.8f) * (1f + Mod("knife_edge") * 0.18f)), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
-                game.SpawnHitSpark(enemy.transform.position, new Color(0.9f, 0.96f, 1f, 0.72f), 0.18f);
+                game.SpawnHitSpark(enemy.transform.position, new Color(0.86f, 0.97f, 1f, 0.86f), 0.28f);
+                game.SpawnAreaEffect(enemy.transform.position, 0.34f, 0f, 0.12f, 1f, new Color(0.62f, 0.92f, 1f, 0.42f), "hit_spark");
             }
         }
 
+        game.SpawnAreaEffect(transform.position, radius, 0f, 0.1f, 1f, new Color(0.48f, 0.9f, 1f, 0.12f), "shield_burst");
         cooldowns[ZombieStormSkillType.OrbitingKnife] = 0.24f * game.CooldownMultiplier;
     }
 
@@ -377,16 +408,47 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
 
         orbitingObjects.Clear();
+        if (orbitingRing != null)
+        {
+            Destroy(orbitingRing);
+            orbitingRing = null;
+        }
+
         int level = GetSkillLevel(ZombieStormSkillType.OrbitingKnife);
         int count = 2 + Mathf.FloorToInt(level * 0.75f) + Mod("knife_blades") + (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 3 : 0);
+        float radius = (1.45f + level * 0.18f + Mod("knife_reach") * 0.22f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.32f : 1f);
+        if (level > 0)
+        {
+            orbitingRing = new GameObject("Orbiting Blade Halo Ring");
+            orbitingRing.transform.position = transform.position;
+            orbitingRing.transform.localScale = Vector3.one * radius;
+            SpriteRenderer ringRenderer = orbitingRing.AddComponent<SpriteRenderer>();
+            ringRenderer.sprite = game.GetOrbitRingSprite();
+            ringRenderer.color = new Color(0.62f, 0.9f, 1f, 0.56f);
+            ringRenderer.sortingOrder = 33;
+            game.SpawnAreaEffect(transform.position, radius * 1.04f, 0f, 0.28f, 1f, new Color(0.62f, 0.92f, 1f, 0.38f), "upgrade_ring");
+            game.SpawnAreaEffect(transform.position, 0.55f, 0f, 0.2f, 1f, new Color(0.9f, 0.98f, 1f, 0.56f), "upgrade_pulse");
+        }
+
         for (int i = 0; i < count; i++)
         {
             GameObject blade = new GameObject("Orbiting Skill Blade");
-            blade.transform.localScale = Vector3.one * 0.5f;
+            float angle = i * (360f / Mathf.Max(1, count));
+            Vector2 offset = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * radius;
+            blade.transform.position = (Vector2)transform.position + offset;
+            blade.transform.rotation = Quaternion.Euler(0f, 0f, angle + 90f);
+            blade.transform.localScale = Vector3.one * (0.78f + level * 0.035f);
             SpriteRenderer spriteRenderer = blade.AddComponent<SpriteRenderer>();
             spriteRenderer.sprite = game.GetSkillSprite(ZombieStormSkillType.OrbitingKnife);
-            spriteRenderer.color = new Color(0.9f, 0.98f, 1f, 1f);
-            spriteRenderer.sortingOrder = 35;
+            spriteRenderer.color = new Color(0.94f, 0.99f, 1f, 1f);
+            spriteRenderer.sortingOrder = 42;
+            GameObject glow = new GameObject("Blade Glow");
+            glow.transform.SetParent(blade.transform, false);
+            glow.transform.localScale = Vector3.one * 1.55f;
+            SpriteRenderer glowRenderer = glow.AddComponent<SpriteRenderer>();
+            glowRenderer.sprite = game.GetSoftGlowSprite();
+            glowRenderer.color = new Color(0.32f, 0.86f, 1f, 0.26f);
+            glowRenderer.sortingOrder = 41;
             orbitingObjects.Add(blade);
         }
     }
