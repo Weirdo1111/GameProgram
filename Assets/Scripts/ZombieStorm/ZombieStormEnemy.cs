@@ -761,7 +761,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             PrepareDashTelegraph(direction, distance, ember);
             Vector2 landingPosition = (Vector2)transform.position + direction * distance;
             bossTelegraphPositions.Add(landingPosition);
-            game.SpawnAreaEffect(landingPosition, enraged ? 2.45f : 2.05f, 0f, 0.74f, 1f, ember, "zombie_explosion");
+            game.SpawnAreaEffect(landingPosition, enraged ? 2.45f : 2.05f, 0f, 0.74f, 1f, ember, "ember_dash_blast");
             return;
         }
 
@@ -950,7 +950,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
                 game.SpawnEnemyAreaEffect(trailPosition, enraged ? 0.82f : 0.7f, enraged ? 8f : 6f, enraged ? 2.6f : 2.1f, 0.48f, new Color(1f, 0.22f, 0.04f, 0.46f), "fire_pool");
             }
 
-            game.SpawnEnemyAreaEffect(transform.position, enraged ? 2.2f : 1.86f, enraged ? 32f : 24f, 0.2f, 99f, ember, "zombie_explosion");
+            game.SpawnEnemyAreaEffect(transform.position, enraged ? 2.2f : 1.86f, enraged ? 32f : 24f, 0.48f, 99f, ember, "ember_dash_blast");
             game.ShakeCamera(enraged ? 0.26f : 0.19f, 0.22f);
         }
         else
@@ -958,7 +958,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             for (int i = 0; i < bossTelegraphPositions.Count; i++)
             {
                 Vector2 impactPosition = bossTelegraphPositions[i];
-                game.SpawnEnemyAreaEffect(impactPosition, enraged ? 1.35f : 1.1f, enraged ? 24f : 18f, 0.2f, 99f, ember, "meteor_blast");
+                game.SpawnEnemyAreaEffect(impactPosition, enraged ? 1.35f : 1.1f, enraged ? 24f : 18f, 0.48f, 99f, ember, "ember_meteor_blast");
                 game.SpawnEnemyAreaEffect(impactPosition, enraged ? 0.92f : 0.76f, enraged ? 7f : 5f, enraged ? 2.4f : 1.9f, 0.5f, new Color(1f, 0.22f, 0.04f, 0.44f), "fire_pool");
             }
 

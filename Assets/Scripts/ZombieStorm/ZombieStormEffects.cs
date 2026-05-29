@@ -127,7 +127,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
             spriteRenderer.color = color;
         }
 
-        if (poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "zombie_explosion")
+        if (poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "zombie_explosion" || poolKey == "meteor_blast" || poolKey == "foozle_explosion" || poolKey == "ember_dash_blast" || poolKey == "ember_meteor_blast")
         {
             float grow = 1f + (1f - t) * 0.55f;
             transform.localScale = initialScale * grow;

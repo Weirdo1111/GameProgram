@@ -435,7 +435,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         queue.Enqueue(item);
     }
 
-    public void SpawnPlayerProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life, int pierce, Color color, float size)
+    public void SpawnPlayerProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life, int pierce, Color color, float size, bool createsFireZoneOnKill = false)
     {
         GameObject projectileObject = SpawnPooled("player_bullet", CreatePlayerProjectile);
         projectileObject.transform.SetParent(worldRoot, false);
@@ -445,7 +445,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         spriteRenderer.sprite = GetProjectileEffectSprite();
         spriteRenderer.color = color;
         ZombieStormProjectile projectile = projectileObject.GetComponent<ZombieStormProjectile>();
-        projectile.Initialize(this, direction, damage, speed, life, pierce);
+        projectile.Initialize(this, direction, damage, speed, life, pierce, createsFireZoneOnKill);
         PlaySfx("shoot", 0.28f, 0.055f);
     }
 
@@ -474,7 +474,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         effectObject.transform.localScale = Vector3.one * radius * 2f;
         SpriteRenderer spriteRenderer = effectObject.GetComponent<SpriteRenderer>();
         spriteRenderer.color = color;
-        spriteRenderer.sortingOrder = poolKey == "hit_spark" || poolKey == "lightning_flash" ? 48 : 14;
+        spriteRenderer.sortingOrder = IsForegroundEffect(poolKey) ? 48 : 14;
         ZombieStormAreaEffect effect = effectObject.GetComponent<ZombieStormAreaEffect>();
         effect.Initialize(this, poolKey, radius, damage, duration, tickRate);
     }
@@ -487,9 +487,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         effectObject.transform.localScale = Vector3.one * radius * 2f;
         SpriteRenderer spriteRenderer = effectObject.GetComponent<SpriteRenderer>();
         spriteRenderer.color = color;
-        spriteRenderer.sortingOrder = poolKey == "hit_spark" || poolKey == "lightning_flash" ? 48 : 14;
+        spriteRenderer.sortingOrder = IsForegroundEffect(poolKey) ? 48 : 14;
         ZombieStormAreaEffect effect = effectObject.GetComponent<ZombieStormAreaEffect>();
         effect.Initialize(this, poolKey, radius, damage, duration, tickRate, true);
+    }
+
+    private static bool IsForegroundEffect(string poolKey)
+    {
+        return poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "foozle_explosion" || poolKey == "ember_dash_blast" || poolKey == "ember_meteor_blast";
     }
 
     public void SpawnHitSpark(Vector2 position, Color color, float radius = 0.36f)
@@ -634,6 +639,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     public Sprite GetSkillSprite(ZombieStormSkillType skillType)
     {
+        if (skillType == ZombieStormSkillType.MagicBolt)
+        {
+            return GetEffectPreviewSprite("foozle_fireball", 4, bulletSprite);
+        }
+
         if (skillType == ZombieStormSkillType.OrbitingKnife)
         {
             return orbitBladeSprite != null ? orbitBladeSprite : sawSprite;
@@ -646,7 +656,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         if (skillType == ZombieStormSkillType.FireZone || skillType == ZombieStormSkillType.MeteorStorm)
         {
-            return fireSprite;
+            return GetEffectPreviewSprite("meteor_blast", 3, fireSprite);
         }
 
         return bulletSprite;
@@ -705,7 +715,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     public Sprite GetProjectileEffectSprite()
     {
-        return projectileFxSprite != null ? projectileFxSprite : bulletSprite;
+        return GetEffectPreviewSprite("foozle_fireball", 4, projectileFxSprite != null ? projectileFxSprite : bulletSprite);
+    }
+
+    public Sprite[] GetProjectileEffectFrames()
+    {
+        return GetEffectFrames("foozle_fireball");
     }
 
     public Sprite[] GetEffectFrames(string effectKey)
@@ -713,6 +728,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (effectFrames.Count == 0)
         {
             return null;
+        }
+
+        Sprite[] frames;
+        if (effectFrames.TryGetValue(effectKey, out frames) && frames != null && frames.Length > 0)
+        {
+            return frames;
         }
 
         string sequenceKey = "spark";
@@ -733,7 +754,6 @@ public sealed class ZombieStormGameController : MonoBehaviour
             sequenceKey = "burst";
         }
 
-        Sprite[] frames;
         if (effectFrames.TryGetValue(sequenceKey, out frames) && frames != null && frames.Length > 0)
         {
             return frames;
@@ -1321,6 +1341,17 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         return null;
+    }
+
+    private Sprite GetEffectPreviewSprite(string effectKey, int preferredIndex, Sprite fallback)
+    {
+        Sprite[] frames = GetEffectFrames(effectKey);
+        if (frames == null || frames.Length == 0)
+        {
+            return fallback;
+        }
+
+        return frames[Mathf.Clamp(preferredIndex, 0, frames.Length - 1)];
     }
 
     private Sprite[] GetEnemyAttackFrames(ZombieStormEnemyType enemyType)
@@ -2599,7 +2630,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case ZombieStormSkillType.MagicBolt: return "Adds auto magic shots with a bright launch spark.";
             case ZombieStormSkillType.OrbitingKnife: return "Adds visible blades that orbit and cut nearby enemies.";
             case ZombieStormSkillType.MeteorStorm: return "Adds warning circles, then delayed impact blasts.";
-            case ZombieStormSkillType.FireZone: return "Adds burning ground pools with ember flashes.";
+            case ZombieStormSkillType.FireZone: return "Fireball kills leave a 5-second burning pool.";
             case ZombieStormSkillType.SummonDrone: return "Adds an AI drone that circles you and shoots targets.";
             case ZombieStormSkillType.ChainLightning: return "Adds jumping lightning with blue links between enemies.";
             case ZombieStormSkillType.ShieldBurst: return "Adds a close-range defensive shockwave trigger.";
@@ -2615,7 +2646,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case ZombieStormSkillType.MagicBolt: return "Lv." + nextLevel + ": faster bolts, more damage, extra pierce.";
             case ZombieStormSkillType.OrbitingKnife: return "Lv." + nextLevel + ": more blades, wider orbit, stronger ticks.";
             case ZombieStormSkillType.MeteorStorm: return "Lv." + nextLevel + ": more impacts, bigger warning circles.";
-            case ZombieStormSkillType.FireZone: return "Lv." + nextLevel + ": larger pools, longer burn duration.";
+            case ZombieStormSkillType.FireZone: return "Lv." + nextLevel + ": fireball kill pools burn wider and harder.";
             case ZombieStormSkillType.SummonDrone: return "Lv." + nextLevel + ": more drones and faster AI fire.";
             case ZombieStormSkillType.ChainLightning: return "Lv." + nextLevel + ": more jumps and stronger chain damage.";
             case ZombieStormSkillType.ShieldBurst: return "Lv." + nextLevel + ": larger defensive ring and harder hit.";
@@ -2654,7 +2685,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case "meteor_blast": return "Impact Crater";
             case "meteor_heat": return "Molten Core";
             case "fire_spread": return "Wildfire";
-            case "fire_linger": return "Lingering Flame";
+            case "fire_linger": return "Searing Ground";
             case "fire_heat": return "Hotter Burn";
             case "drone_swarm": return "Drone Bay";
             case "drone_focus": return "Targeting Lens";
@@ -2690,9 +2721,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case "meteor_impacts": return "Lv." + nextLevel + ": Meteor Storm drops one more impact.";
             case "meteor_blast": return "Lv." + nextLevel + ": Meteor blast radius grows.";
             case "meteor_heat": return "Lv." + nextLevel + ": Meteor impacts deal more damage.";
-            case "fire_spread": return "Lv." + nextLevel + ": Fire Zone creates another burning pool.";
-            case "fire_linger": return "Lv." + nextLevel + ": Fire Zone lasts longer.";
-            case "fire_heat": return "Lv." + nextLevel + ": Fire Zone tick damage increases.";
+            case "fire_spread": return "Lv." + nextLevel + ": Fireball kills create another nearby pool.";
+            case "fire_linger": return "Lv." + nextLevel + ": Fireball kill pools tick damage faster.";
+            case "fire_heat": return "Lv." + nextLevel + ": Fireball kill pools deal more damage.";
             case "drone_swarm": return "Lv." + nextLevel + ": Summon Drone adds another drone.";
             case "drone_focus": return "Lv." + nextLevel + ": Drone bullets hit harder.";
             case "drone_overclock": return "Lv." + nextLevel + ": Drone firing cooldown is reduced.";
@@ -3435,6 +3466,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         string root = Path.Combine(Application.dataPath, "ExternalArt", "MikodrakSpellEffects");
         if (!Directory.Exists(root))
         {
+            AddDarkVfxEffectSequences();
+            AddFoozlePixelMagicEffectSequences();
             return;
         }
 
@@ -3443,12 +3476,31 @@ public sealed class ZombieStormGameController : MonoBehaviour
         AddEffectSequence(root, "burst", "fx7_energyBall", 240f);
         AddEffectSequence(root, "lightning", "fx8_lighteningBall", 240f);
         AddEffectSequence(root, "explosion", "fx10_blackExplosion", 240f);
+        AddDarkVfxEffectSequences();
+        AddFoozlePixelMagicEffectSequences();
 
         Sprite[] projectileFrames;
         if (effectFrames.TryGetValue("burst", out projectileFrames) && projectileFrames != null && projectileFrames.Length > 0)
         {
             projectileFxSprite = projectileFrames[Mathf.Min(2, projectileFrames.Length - 1)];
         }
+    }
+
+    private void AddDarkVfxEffectSequences()
+    {
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Effects");
+        AddEffectSequence(root, "ember_dash_blast", Path.Combine("DarkVFX1", "Frames"), 38f);
+        AddEffectSequence(root, "ember_meteor_blast", Path.Combine("DarkVFX2", "Frames"), 44f);
+    }
+
+    private void AddFoozlePixelMagicEffectSequences()
+    {
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Effects", "FoozlePixelMagic");
+        AddEffectSequence(root, "foozle_fireball", "Fire_Ball", 64f);
+        AddEffectSequence(root, "foozle_explosion", "Explosion", 72f);
+        AddEffectSequence(root, "meteor_blast", "Explosion", 82f);
+        AddEffectSequence(root, "shield_burst", "Wind", 92f);
+        AddEffectSequence(root, "ultimate_storm", "Tornado", 88f);
     }
 
     private void AddEffectSequence(string root, string key, string folderName, float pixelsPerUnit)

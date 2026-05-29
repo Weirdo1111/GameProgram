@@ -21,8 +21,27 @@ The downloaded archive includes `License.txt`, which states that the assets may 
 ## Custom Zombie Storm Images
 
 - Source: AI-generated images supplied by the project owner.
-- Local paths: `Assets/ZombieStormArt/Enemies`, `Assets/ZombieStormArt/Maps`
-- Used for: Q-style base zombie animation and graveyard arena background.
+- Local paths: `Assets/ZombieStormArt/Enemies`, `Assets/ZombieStormArt/Maps`, `Assets/cowboy_spritesheet_transparent_split (1)`, `Assets/screen_selected`
+- Used for: Q-style base zombie animation, graveyard arena background, main protagonist walk frames, and protagonist hurt frames.
+
+The graveyard arena background image (`Assets/ZombieStormArt/Maps/graveyard_arena.png`) and the main protagonist images in `Assets/cowboy_spritesheet_transparent_split (1)` / `Assets/screen_selected` were generated with AI tools and then supplied by the project owner for use in this project.
+
+## Dark VFX 01 - 02
+
+- Source: local download supplied by the project owner from `C:\Users\ken\Downloads\Dark VFX 01 - 02`.
+- Local paths: `Assets/ZombieStormArt/Effects/DarkVFX1`, `Assets/ZombieStormArt/Effects/DarkVFX2`
+- Used for: `EmberTyrantBoss` (`Golem_3`) dash impact and falling magma impact attack effects.
+
+No license file was found in the supplied download folder during import. Review the original download source before redistributing the raw PNG files publicly.
+
+## Foozle Pixel Magic Effects
+
+- Source: `Pixel Magic Effects (1.0)` local download supplied by the project owner from `C:\Users\ken\Downloads\Foozle_2DE0001_Pixel_Magic_Effects\Foozle_2DE0001_Pixel_Magic_Effects`.
+- Commissioned from: lordfitoi
+- Distributed by: Foozle / https://www.foozle.io
+- License: Creative Commons Zero (CC0), as stated in `Readme.txt`.
+- Local path: `Assets/ZombieStormArt/Effects/FoozlePixelMagic`
+- Used for: player fireball projectile animation, player fireball impact sparks, Meteor Storm blast visuals, Fire Zone ignition bursts, Shield Burst wind visuals, and Ultimate Storm tornado visuals.
 
 ## CraftPix Zombie Villager Chibi
 

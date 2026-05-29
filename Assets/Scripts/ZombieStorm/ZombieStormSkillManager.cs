@@ -39,7 +39,6 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         TickSkill(ZombieStormSkillType.MagicBolt, CastMagicBolt);
         TickSkill(ZombieStormSkillType.MeteorStorm, CastMeteorStorm);
-        TickSkill(ZombieStormSkillType.FireZone, CastFireZone);
         TickSkill(ZombieStormSkillType.ChainLightning, CastChainLightning);
         TickSkill(ZombieStormSkillType.ShieldBurst, CastShieldBurst);
         UpdatePendingBlasts();
@@ -212,12 +211,15 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         int shots = (IsEvolved(ZombieStormSkillType.MagicBolt) ? 3 : level >= 4 ? 2 : 1) + Mod("magic_split");
         float damage = (10f + level * 3.4f) * (1f + Mod("magic_force") * 0.16f);
         int pierce = (level >= 3 ? 1 : 0) + Mod("magic_pierce");
-        game.SpawnHitSpark(origin, new Color(0.48f, 0.95f, 1f, 0.88f), 0.24f + level * 0.025f);
+        float powerTint = Mathf.Clamp01(Mod("magic_force") * 0.18f + (IsEvolved(ZombieStormSkillType.MagicBolt) ? 0.32f : 0f));
+        Color fireballColor = Color.Lerp(Color.white, new Color(1f, 0.42f, 0.12f, 1f), powerTint);
+        float fireballSize = 0.78f + level * 0.055f + Mod("magic_force") * 0.06f + Mod("magic_pierce") * 0.035f + (IsEvolved(ZombieStormSkillType.MagicBolt) ? 0.12f : 0f);
+        game.SpawnAreaEffect(origin, 0.52f + level * 0.035f, 0f, 0.22f, 1f, new Color(1f, 0.5f, 0.12f, 0.72f), "foozle_explosion");
         for (int i = 0; i < shots; i++)
         {
             float spreadStep = shots <= 3 ? 9f : 7f;
             float angle = shots == 1 ? 0f : -(shots - 1) * spreadStep * 0.5f + i * spreadStep;
-            game.SpawnPlayerProjectile(origin, ZombieStormGameController.Rotate(direction, angle), RollDamage(damage), 13.5f, 1.4f, pierce, new Color(0.56f, 0.92f, 1f), 0.34f + level * 0.015f);
+            game.SpawnPlayerProjectile(origin, ZombieStormGameController.Rotate(direction, angle), RollDamage(damage), 13.5f, 1.4f, pierce, fireballColor, fireballSize, true);
         }
 
         float baseCooldown = IsEvolved(ZombieStormSkillType.MagicBolt) ? 0.18f : 0.62f - level * 0.055f;
@@ -248,23 +250,36 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         cooldowns[ZombieStormSkillType.MeteorStorm] = (4.2f - level * 0.24f) * game.CooldownMultiplier;
     }
 
-    private void CastFireZone(int level)
+    public void SpawnFireZoneOnFireballKill(Vector2 position)
     {
-        int pools = (IsEvolved(ZombieStormSkillType.FireZone) ? 3 : 1 + level / 4) + Mod("fire_spread");
-        for (int i = 0; i < pools; i++)
+        int level = GetSkillLevel(ZombieStormSkillType.FireZone);
+        if (level <= 0)
         {
-            Vector2 offset = UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(2.4f, 7.0f);
-            Vector2 position = (Vector2)transform.position + offset;
-            float radius = (1.25f + level * 0.22f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.FireZone) ? 1.22f : 1f);
-            float duration = 2.5f + level * 0.36f + Mod("fire_linger") * 0.55f;
-            game.SpawnAreaEffect(position, radius, RollDamage((4.2f + level * 1.3f) * (1f + Mod("fire_heat") * 0.18f)), duration, 0.28f, new Color(1f, 0.25f, 0.05f, 0.62f), "fire_pool");
-            for (int spark = 0; spark < 4; spark++)
-            {
-                game.SpawnHitSpark(position + UnityEngine.Random.insideUnitCircle * radius * 0.65f, new Color(1f, 0.68f, 0.12f, 0.78f), 0.16f);
-            }
+            return;
         }
 
-        cooldowns[ZombieStormSkillType.FireZone] = (4.1f - level * 0.25f) * game.CooldownMultiplier;
+        int pools = 1 + Mod("fire_spread") + (IsEvolved(ZombieStormSkillType.FireZone) ? 2 : 0);
+        float baseRadius = (1.18f + level * 0.16f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.FireZone) ? 1.18f : 1f);
+        float burnDamage = RollDamage((4.6f + level * 1.55f) * (1f + Mod("fire_heat") * 0.2f));
+        float tickRate = Mathf.Max(0.18f, 0.42f - Mod("fire_linger") * 0.06f);
+
+        for (int i = 0; i < pools; i++)
+        {
+            Vector2 poolPosition = position;
+            float radius = baseRadius;
+            if (i > 0)
+            {
+                poolPosition += UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(0.65f, 1.3f);
+                radius *= 0.72f;
+            }
+
+            game.SpawnAreaEffect(poolPosition, Mathf.Min(radius * 0.72f, 1.35f), 0f, 0.26f, 1f, new Color(1f, 0.48f, 0.08f, 0.66f), "foozle_explosion");
+            game.SpawnAreaEffect(poolPosition, radius, burnDamage, 5f, tickRate, new Color(1f, 0.25f, 0.05f, 0.62f), "fire_pool");
+            for (int spark = 0; spark < 4; spark++)
+            {
+                game.SpawnHitSpark(poolPosition + UnityEngine.Random.insideUnitCircle * radius * 0.65f, new Color(1f, 0.68f, 0.12f, 0.78f), 0.16f);
+            }
+        }
     }
 
     private void CastChainLightning(int level)
@@ -518,7 +533,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             Vector2 direction = ((Vector2)target.transform.position - (Vector2)drones[i].transform.position).normalized;
             Vector2 muzzle = (Vector2)drones[i].transform.position + direction * 0.26f;
             game.SpawnHitSpark(muzzle, new Color(0.35f, 0.9f, 1f, 0.78f), 0.16f);
-            game.SpawnPlayerProjectile(muzzle, direction, RollDamage((7f + level * 2.4f) * (1f + Mod("drone_focus") * 0.18f)), 12f, 1.1f, 0, new Color(0.4f, 0.92f, 1f), 0.26f);
+            game.SpawnPlayerProjectile(muzzle, direction, RollDamage((7f + level * 2.4f) * (1f + Mod("drone_focus") * 0.18f)), 12f, 1.1f, 0, new Color(0.4f, 0.92f, 1f), 0.54f);
         }
 
         cooldowns[ZombieStormSkillType.SummonDrone] = Mathf.Max(0.22f, 0.92f - level * 0.06f - Mod("drone_overclock") * 0.08f) * game.CooldownMultiplier;
@@ -611,7 +626,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
                 continue;
             }
 
-            game.SpawnAreaEffect(blast.Position, blast.Radius, blast.Damage, 0.22f, 99f, blast.Color, blast.Key);
+            float effectDuration = blast.Key == "meteor_blast" ? 0.36f : 0.22f;
+            game.SpawnAreaEffect(blast.Position, blast.Radius, blast.Damage, effectDuration, 99f, blast.Color, blast.Key);
             if (blast.Key == "meteor_blast")
             {
                 game.SpawnHitSpark(blast.Position, new Color(1f, 0.9f, 0.25f, 0.9f), blast.Radius * 0.32f);
