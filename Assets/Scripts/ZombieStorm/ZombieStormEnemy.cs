@@ -5,6 +5,10 @@ using UnityEngine;
 
 public sealed class ZombieStormEnemy : MonoBehaviour
 {
+    private const float BaseZombieHealth = 22f;
+    private const float BaseZombieSpeed = 1.55f;
+    private const float BaseZombieMeleeStrikeDamage = 14f;
+
     private ZombieStormGameController game;
     private SpriteRenderer spriteRenderer;
     private Sprite[] walkFrames;
@@ -26,6 +30,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private float attackAnimTime;
     private float attackAnimDuration;
     private float attackCooldown;
+    private float slasherLeapRollCooldown;
     private float hurtAnimTime;
     private float hurtAnimDuration;
     private float deathAnimTime;
@@ -36,8 +41,11 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private bool useSideViewWalk;
     private bool walkFramesFaceRight;
     private bool slasherStrikeApplied;
+    private bool slasherLeapAttack;
+    private bool slasherLeapUsed;
     private float renderDepthOffset;
     private Vector2 bossQueuedDirection;
+    private Vector2 slasherLeapDirection;
     private readonly List<Vector2> bossTelegraphPositions = new List<Vector2>(12);
 
     public ZombieStormEnemyType Type { get; private set; }
@@ -49,6 +57,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     public bool IsBoss { get { return IsBossType(Type); } }
     public string DisplayName { get { return BossName(Type); } }
     private bool UsesAnimatedMeleeAttack { get { return Type == ZombieStormEnemyType.Slasher || Type == ZombieStormEnemyType.Gravedigger || Type == ZombieStormEnemyType.Reaper; } }
+    private bool UsesAnimatedEnemyArt { get { return UsesAnimatedMeleeAttack || Type == ZombieStormEnemyType.OrcThrower; } }
     private bool UsesAnimatedBossArt { get { return Type == ZombieStormEnemyType.CrystalGolemBoss || Type == ZombieStormEnemyType.MossGolemBoss || Type == ZombieStormEnemyType.EmberTyrantBoss; } }
 
     public void Initialize(ZombieStormGameController owner, ZombieStormEnemyType enemyType, string key, Sprite sprite, Sprite[] enemyWalkFrames, Sprite[] enemyAttackFrames, Sprite[] enemySpecialAttackFrames, Sprite[] enemyHurtFrames, Sprite[] enemyDeathFrames, bool framesFaceRight, float runTime, float difficulty)
@@ -71,11 +80,15 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         attackAnimTime = 0f;
         attackAnimDuration = 0f;
         attackCooldown = UnityEngine.Random.Range(0.15f, 0.7f);
+        slasherLeapRollCooldown = 0f;
         hurtAnimTime = 0f;
         hurtAnimDuration = 0f;
         deathAnimTime = 0f;
         deathAnimDuration = 0f;
         slasherStrikeApplied = false;
+        slasherLeapAttack = false;
+        slasherLeapUsed = false;
+        slasherLeapDirection = Vector2.zero;
         renderDepthOffset = UnityEngine.Random.Range(-0.00004f, 0.00004f);
         transform.rotation = Quaternion.identity;
         baseColor = Color.white;
@@ -83,9 +96,9 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 
         float hpScale = 0.82f + runTime / 165f;
         Radius = 0.42f;
-        speed = 1.55f;
+        speed = BaseZombieSpeed;
         damagePerSecond = 6.5f;
-        maxHealth = 22f * hpScale;
+        maxHealth = BaseZombieHealth * hpScale;
         transform.localScale = Vector3.one * 0.95f;
         sprintTimer = 0.8f;
         shootTimer = UnityEngine.Random.Range(0.7f, 1.6f);
@@ -129,10 +142,26 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             baseColor = new Color(0.7f, 1f, 0.75f);
             spriteRenderer.color = baseColor;
         }
+        else if (Type == ZombieStormEnemyType.Goblin)
+        {
+            speed = BaseZombieSpeed;
+            maxHealth = BaseZombieHealth * hpScale;
+            damagePerSecond = 6.5f;
+            Radius = 0.42f;
+            transform.localScale = Vector3.one;
+        }
+        else if (Type == ZombieStormEnemyType.SmallGoblin)
+        {
+            speed = BaseZombieSpeed * 1.55f;
+            maxHealth = BaseZombieHealth * 0.5f * hpScale;
+            damagePerSecond = 6.5f;
+            Radius = 0.3f;
+            transform.localScale = Vector3.one * 0.68f;
+        }
         else if (Type == ZombieStormEnemyType.Slasher)
         {
-            speed = 1.9f;
-            maxHealth = 48f * hpScale;
+            speed = BaseZombieSpeed * 1.2f;
+            maxHealth = BaseZombieHealth * 1.5f * hpScale;
             damagePerSecond = 0f;
             Radius = 0.48f;
             transform.localScale = Vector3.one * 1.05f;
@@ -140,7 +169,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         else if (Type == ZombieStormEnemyType.Gravedigger)
         {
             speed = 1.34f;
-            maxHealth = 96f * hpScale;
+            maxHealth = BaseZombieHealth * 2.5f * hpScale;
             damagePerSecond = 0f;
             Radius = 0.58f;
             transform.localScale = Vector3.one * 1.12f;
@@ -148,10 +177,19 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         else if (Type == ZombieStormEnemyType.Reaper)
         {
             speed = 1.62f;
-            maxHealth = 78f * hpScale;
+            maxHealth = BaseZombieHealth * hpScale;
             damagePerSecond = 0f;
             Radius = 0.55f;
             transform.localScale = Vector3.one * 1.1f;
+        }
+        else if (Type == ZombieStormEnemyType.OrcThrower)
+        {
+            speed = 1.28f;
+            maxHealth = BaseZombieHealth * 1.35f * hpScale;
+            damagePerSecond = 0f;
+            Radius = 0.5f;
+            transform.localScale = Vector3.one * 1.06f;
+            shootTimer = UnityEngine.Random.Range(0.8f, 1.6f);
         }
         else if (Type == ZombieStormEnemyType.Elite)
         {
@@ -270,7 +308,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         Vector2 toPlayer = (Vector2)game.Player.transform.position - (Vector2)transform.position;
         float distance = toPlayer.magnitude;
         Vector2 direction = distance > 0.01f ? toPlayer / distance : Vector2.zero;
-        if (!UsesAnimatedMeleeAttack)
+        if (!UsesAnimatedEnemyArt)
         {
             UpdateWalkVisual(direction);
         }
@@ -293,9 +331,13 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         {
             UpdateSpitter(direction, distance);
         }
+        else if (Type == ZombieStormEnemyType.OrcThrower)
+        {
+            UpdateOrcThrower(direction, distance);
+        }
         else if (Type == ZombieStormEnemyType.Slasher)
         {
-            UpdateAnimatedMelee(direction, distance, 14f, 0.68f, 0.92f, 18f, 0.42f, 0.7f, 0.68f, 0.62f, new Color(0.82f, 0.92f, 0.76f, 0.6f), false);
+            UpdateAnimatedMelee(direction, distance, BaseZombieMeleeStrikeDamage, 0.68f, 0.92f, 18f, 0.42f, 0.7f, 0.68f, 0.62f, new Color(0.82f, 0.92f, 0.76f, 0.6f), false, true);
         }
         else if (Type == ZombieStormEnemyType.Gravedigger)
         {
@@ -303,7 +345,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
         else if (Type == ZombieStormEnemyType.Reaper)
         {
-            UpdateAnimatedMelee(direction, distance, 18f, 1.18f, 1.42f, 16f, 0.68f, 0.94f, 1.26f, 0.98f, new Color(0.64f, 0.86f, 0.8f, 0.62f), false);
+            UpdateAnimatedMelee(direction, distance, BaseZombieMeleeStrikeDamage * 1.5f, 1.18f, 1.42f, 16f, 0.68f, 0.94f, 1.26f, 0.98f, new Color(0.64f, 0.86f, 0.8f, 0.62f), false);
         }
         else
         {
@@ -311,7 +353,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             transform.position += (Vector3)(direction * finalSpeed * Time.deltaTime);
         }
 
-        if (!UsesAnimatedMeleeAttack && distance <= Radius + 0.45f)
+        if (!UsesAnimatedMeleeAttack && Type != ZombieStormEnemyType.OrcThrower && distance <= Radius + 0.45f)
         {
             if (Type == ZombieStormEnemyType.Exploder)
             {
@@ -342,7 +384,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             return;
         }
 
-        float frameRate = IsBoss ? 8f : Type == ZombieStormEnemyType.Fast ? 13f : UsesAnimatedMeleeAttack ? 12f : 10f;
+        float frameRate = IsBoss ? 8f : Type == ZombieStormEnemyType.Fast ? 13f : UsesAnimatedEnemyArt ? 12f : 10f;
         walkAnimTime += Time.deltaTime * frameRate;
         int frameIndex = Mathf.FloorToInt(walkAnimTime) % walkFrames.Length;
         spriteRenderer.sprite = walkFrames[frameIndex];
@@ -369,7 +411,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             spriteRenderer.color = Color.Lerp(baseColor, Color.red, 0.55f);
         }
 
-        bool playsHurtAnimation = UsesAnimatedMeleeAttack || UsesAnimatedBossArt;
+        bool playsHurtAnimation = UsesAnimatedEnemyArt || UsesAnimatedBossArt;
         if (playsHurtAnimation && health > 0f && attackAnimTime <= 0f && bossTelegraphTimer <= 0f && hurtFrames != null && hurtFrames.Length > 0 && (!UsesAnimatedBossArt || amount >= 12f))
         {
             hurtAnimDuration = UsesAnimatedBossArt ? 0.16f : 0.2f;
@@ -400,6 +442,63 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             shootTimer = 2.2f;
             game.SpawnEnemyProjectile(transform.position, direction, 10f, 4.8f, 4.2f);
         }
+    }
+
+    private void UpdateOrcThrower(Vector2 direction, float distance)
+    {
+        UpdateFacing(direction);
+        transform.rotation = Quaternion.identity;
+
+        if (attackAnimTime > 0f)
+        {
+            attackAnimTime -= Time.deltaTime;
+            float elapsed = attackAnimDuration - Mathf.Max(0f, attackAnimTime);
+            SetActionFrame(attackFrames, elapsed, attackAnimDuration);
+            if (!slasherStrikeApplied && elapsed >= attackAnimDuration * 0.55f)
+            {
+                slasherStrikeApplied = true;
+                Vector2 throwDirection = direction.sqrMagnitude > 0.01f ? direction.normalized : Vector2.right;
+                game.SpawnEnemyRockProjectile((Vector2)transform.position + throwDirection * 0.54f, throwDirection, 13f, 5.8f, 3.4f);
+                game.PlaySfx("hit", 0.28f, 0.07f);
+            }
+
+            return;
+        }
+
+        if (hurtAnimTime > 0f)
+        {
+            hurtAnimTime -= Time.deltaTime;
+            SetActionFrame(hurtFrames, hurtAnimDuration - Mathf.Max(0f, hurtAnimTime), hurtAnimDuration);
+            return;
+        }
+
+        if (distance > 6.9f)
+        {
+            transform.position += (Vector3)(direction * speed * Time.deltaTime);
+        }
+        else if (distance < 4.2f)
+        {
+            transform.position -= (Vector3)(direction * speed * 0.78f * Time.deltaTime);
+        }
+
+        shootTimer -= Time.deltaTime;
+        if (shootTimer <= 0f && distance <= 8.5f && attackFrames != null && attackFrames.Length > 0)
+        {
+            attackAnimDuration = attackFrames.Length / 15f;
+            attackAnimTime = attackAnimDuration;
+            shootTimer = attackAnimDuration + UnityEngine.Random.Range(1.7f, 2.45f);
+            slasherStrikeApplied = false;
+            SetActionFrame(attackFrames, 0f, attackAnimDuration);
+            return;
+        }
+
+        if (shootTimer <= 0f)
+        {
+            shootTimer = UnityEngine.Random.Range(1.7f, 2.45f);
+            game.SpawnEnemyRockProjectile((Vector2)transform.position + direction * 0.54f, direction, 13f, 5.8f, 3.4f);
+        }
+
+        UpdateWalkVisual(direction);
     }
 
     private void UpdateBoss(Vector2 direction)
@@ -543,34 +642,57 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 
     private void UpdateAnimatedMelee(Vector2 direction, float distance, float strikeDamage, float attackRange, float hitRange, float attackFrameRate, float cooldownMin, float cooldownMax, float effectRadius, float effectOffset, Color effectColor, bool heavyStrike)
     {
+        UpdateAnimatedMelee(direction, distance, strikeDamage, attackRange, hitRange, attackFrameRate, cooldownMin, cooldownMax, effectRadius, effectOffset, effectColor, heavyStrike, false);
+    }
+
+    private void UpdateAnimatedMelee(Vector2 direction, float distance, float strikeDamage, float attackRange, float hitRange, float attackFrameRate, float cooldownMin, float cooldownMax, float effectRadius, float effectOffset, Color effectColor, bool heavyStrike, bool canLeapStrike)
+    {
         UpdateFacing(direction);
         transform.rotation = Quaternion.identity;
         attackCooldown -= Time.deltaTime;
+        if (slasherLeapRollCooldown > 0f)
+        {
+            slasherLeapRollCooldown -= Time.deltaTime;
+        }
 
         if (attackAnimTime > 0f)
         {
             attackAnimTime -= Time.deltaTime;
             float elapsed = attackAnimDuration - Mathf.Max(0f, attackAnimTime);
+            if (slasherLeapAttack && elapsed < attackAnimDuration * 0.52f)
+            {
+                float leap01 = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, attackAnimDuration * 0.52f));
+                float leapSpeed = Mathf.Lerp(speed * 3.45f, speed * 1.15f, leap01);
+                transform.position += (Vector3)(slasherLeapDirection * leapSpeed * Time.deltaTime);
+            }
+
             SetActionFrame(attackFrames, elapsed, attackAnimDuration);
             if (!slasherStrikeApplied && elapsed >= attackAnimDuration * 0.5f)
             {
                 slasherStrikeApplied = true;
-                Vector2 strikePosition = (Vector2)transform.position + direction * effectOffset;
-                game.SpawnAreaEffect(strikePosition, effectRadius, 0f, heavyStrike ? 0.2f : 0.13f, 1f, effectColor, heavyStrike ? "zombie_explosion" : "hit_spark");
-                game.PlaySfx(heavyStrike ? "boom" : "hit", heavyStrike ? 0.42f : 0.32f, 0.08f);
-                if (heavyStrike)
+                Vector2 strikeDirection = slasherLeapAttack ? slasherLeapDirection : direction;
+                Vector2 strikePosition = (Vector2)transform.position + strikeDirection * effectOffset;
+                float finalEffectRadius = slasherLeapAttack ? effectRadius * 1.2f : effectRadius;
+                float finalHitRange = slasherLeapAttack ? hitRange * 1.24f : hitRange;
+                float finalStrikeDamage = slasherLeapAttack ? strikeDamage * 1.25f : strikeDamage;
+                Color finalEffectColor = slasherLeapAttack ? new Color(1f, 0.95f, 0.62f, 0.68f) : effectColor;
+                game.SpawnAreaEffect(strikePosition, finalEffectRadius, 0f, heavyStrike || slasherLeapAttack ? 0.2f : 0.13f, 1f, finalEffectColor, heavyStrike ? "zombie_explosion" : "hit_spark");
+                game.PlaySfx(heavyStrike || slasherLeapAttack ? "boom" : "hit", heavyStrike || slasherLeapAttack ? 0.38f : 0.32f, 0.08f);
+                if (heavyStrike || slasherLeapAttack)
                 {
                     game.ShakeCamera(0.07f, 0.09f);
                 }
 
-                if (distance <= Radius + hitRange)
+                if (game.Player != null && Vector2.Distance(transform.position, game.Player.transform.position) <= Radius + finalHitRange)
                 {
-                    game.Player.TakeDamage(strikeDamage);
+                    game.Player.TakeDamage(finalStrikeDamage);
                 }
             }
 
             return;
         }
+
+        slasherLeapAttack = false;
 
         if (hurtAnimTime > 0f)
         {
@@ -579,11 +701,26 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             return;
         }
 
-        if (distance <= Radius + attackRange && attackCooldown <= 0f && attackFrames != null && attackFrames.Length > 0)
+        bool canStartRegularAttack = distance <= Radius + attackRange;
+        bool canStartLeap = false;
+        if (canLeapStrike && !slasherLeapUsed && distance <= Radius * 6f && distance > Radius + attackRange && attackCooldown <= 0f && slasherLeapRollCooldown <= 0f)
+        {
+            slasherLeapRollCooldown = 0.85f;
+            canStartLeap = UnityEngine.Random.value < 0.3f;
+        }
+
+        if ((canStartRegularAttack || canStartLeap) && attackCooldown <= 0f && attackFrames != null && attackFrames.Length > 0)
         {
             attackAnimDuration = attackFrames.Length / attackFrameRate;
             attackAnimTime = attackAnimDuration;
-            attackCooldown = attackAnimDuration + UnityEngine.Random.Range(cooldownMin, cooldownMax);
+            slasherLeapAttack = canStartLeap;
+            if (slasherLeapAttack)
+            {
+                slasherLeapUsed = true;
+            }
+
+            slasherLeapDirection = direction.sqrMagnitude > 0.01f ? direction : Vector2.right;
+            attackCooldown = attackAnimDuration + UnityEngine.Random.Range(cooldownMin, cooldownMax) + (slasherLeapAttack ? 0.22f : 0f);
             slasherStrikeApplied = false;
             SetActionFrame(attackFrames, 0f, attackAnimDuration);
             return;

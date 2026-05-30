@@ -10,6 +10,10 @@ The current chibi variant contains 19 numbered left-facing video frames sampled 
 
 `craftpix_reaper/` supplies the `Reaper` enemy: a mid-to-late game curved-blade zombie with a longer, clearly animated sweeping attack range.
 
+`craftpix_goblin/` supplies the default `Goblin` enemy and the smaller `SmallGoblin` variant. The small variant moves faster, has half health, and only joins the horde after the first Boss has been defeated.
+
+`craftpix_orc/` supplies the `OrcThrower` enemy: a mid-run ranged enemy that uses its throwing animation to launch straight, non-homing rocks at the player.
+
 `craftpix_crystal_golem/` supplies the `Crystal Colossus` Boss: a large crystal-studded golem with dedicated run, blade-sweep, projectile-throw, hurt, and death animations. Its two attacks use cyan telegraphs and crystal-colored projectile impact feedback.
 
 `craftpix_moss_golem/` supplies the `Mossbound Colossus` Boss: a moss-grown stone golem with dedicated run, slam, seed-volley, hurt, and death animations. Its strike leaves hazardous corrupted ground while its throw sends radial green projectiles outward.

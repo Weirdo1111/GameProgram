@@ -40,6 +40,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private readonly List<ZombieStormDamagePopup> damagePopups = new List<ZombieStormDamagePopup>();
     private Sprite[] playerHurtFrames = new Sprite[0];
     private Sprite[] chibiEnemyWalkFrames = new Sprite[0];
+    private Sprite[] goblinRunFrames = new Sprite[0];
+    private Sprite[] goblinHurtFrames = new Sprite[0];
+    private Sprite[] goblinDeathFrames = new Sprite[0];
     private Sprite[] villagerRunFrames = new Sprite[0];
     private Sprite[] villagerSlashFrames = new Sprite[0];
     private Sprite[] villagerHurtFrames = new Sprite[0];
@@ -52,6 +55,10 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Sprite[] reaperSlashFrames = new Sprite[0];
     private Sprite[] reaperHurtFrames = new Sprite[0];
     private Sprite[] reaperDeathFrames = new Sprite[0];
+    private Sprite[] orcRunFrames = new Sprite[0];
+    private Sprite[] orcThrowFrames = new Sprite[0];
+    private Sprite[] orcHurtFrames = new Sprite[0];
+    private Sprite[] orcDeathFrames = new Sprite[0];
     private Sprite[] crystalGolemRunFrames = new Sprite[0];
     private Sprite[] crystalGolemSlashFrames = new Sprite[0];
     private Sprite[] crystalGolemThrowFrames = new Sprite[0];
@@ -87,6 +94,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Sprite xpSprite;
     private Sprite coinSprite;
     private Sprite fireSprite;
+    private Sprite rockSprite;
     private Sprite sawSprite;
     private Sprite orbitBladeSprite;
     private Sprite orbitRingSprite;
@@ -119,6 +127,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private bool leveling;
     private bool finished;
     private bool won;
+    private bool firstBossDefeated;
     private int bossCount;
     private ZombieStormFlowState flowState = ZombieStormFlowState.MainMenu;
     private ZombieStormFlowState settingsReturnState = ZombieStormFlowState.MainMenu;
@@ -456,11 +465,22 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     public void SpawnEnemyProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life, Color color, float size)
     {
+        SpawnEnemyProjectile(position, direction, damage, speed, life, color, size, fireSprite);
+    }
+
+    public void SpawnEnemyRockProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life)
+    {
+        SpawnEnemyProjectile(position, direction, damage, speed, life, new Color(0.62f, 0.54f, 0.43f, 1f), 0.48f, rockSprite);
+    }
+
+    private void SpawnEnemyProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life, Color color, float size, Sprite sprite)
+    {
         GameObject projectileObject = SpawnPooled("enemy_spit", CreateEnemyProjectile);
         projectileObject.transform.SetParent(worldRoot, false);
         projectileObject.transform.position = position;
         projectileObject.transform.localScale = Vector3.one * size;
         SpriteRenderer spriteRenderer = projectileObject.GetComponent<SpriteRenderer>();
+        spriteRenderer.sprite = sprite != null ? sprite : fireSprite;
         spriteRenderer.color = color;
         ZombieStormEnemyProjectile projectile = projectileObject.GetComponent<ZombieStormEnemyProjectile>();
         projectile.Initialize(this, direction, damage, speed, life, color, size);
@@ -588,7 +608,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             PlaySfx(enemy.IsBoss ? "boss_down" : "elite_down", 0.75f, 0.1f);
         }
 
-        int xp = enemy.IsBoss ? BossXpReward(enemy.Type) : enemy.Type == ZombieStormEnemyType.Elite ? 24 : enemy.Type == ZombieStormEnemyType.Reaper ? 10 : enemy.Type == ZombieStormEnemyType.Tank ? 7 : enemy.Type == ZombieStormEnemyType.Gravedigger ? 8 : enemy.Type == ZombieStormEnemyType.Slasher ? 6 : enemy.Type == ZombieStormEnemyType.Spitter ? 6 : 3;
+        int xp = enemy.IsBoss ? BossXpReward(enemy.Type) : enemy.Type == ZombieStormEnemyType.Elite ? 24 : enemy.Type == ZombieStormEnemyType.Reaper ? 10 : enemy.Type == ZombieStormEnemyType.Tank ? 7 : enemy.Type == ZombieStormEnemyType.Gravedigger ? 8 : enemy.Type == ZombieStormEnemyType.OrcThrower ? 7 : enemy.Type == ZombieStormEnemyType.Slasher ? 6 : enemy.Type == ZombieStormEnemyType.SmallGoblin ? 3 : enemy.Type == ZombieStormEnemyType.Goblin ? 4 : enemy.Type == ZombieStormEnemyType.Spitter ? 6 : 3;
         int coins = enemy.IsBoss ? BossCoinReward(enemy.Type) : enemy.Type == ZombieStormEnemyType.Elite ? 18 : UnityEngine.Random.value < 0.24f ? 1 : 0;
         SpawnBloodSplat(enemy.transform.position, enemy.IsBoss ? 2.8f : enemy.Type == ZombieStormEnemyType.Elite ? 1.8f : 1.0f);
         SpawnPickup(enemy.transform.position, xp, coins);
@@ -596,6 +616,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (enemy.Type == ZombieStormEnemyType.Elite)
         {
             ShowFeedback("Elite down. Big XP dropped.", 2.5f);
+        }
+
+        if (enemy.Type == ZombieStormEnemyType.CrystalGolemBoss)
+        {
+            firstBossDefeated = true;
         }
 
         if (enemy.IsBoss && Player != null)
@@ -810,6 +835,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         leveling = false;
         finished = false;
         won = false;
+        firstBossDefeated = false;
         difficultyScore = 1f;
         flowState = ZombieStormFlowState.Running;
         Time.timeScale = 1f;
@@ -961,6 +987,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         xpSprite = CreatePixelSprite(new Color(0.12f, 0.75f, 1f), Color.white, 8, true);
         coinSprite = CreatePixelSprite(new Color(1f, 0.73f, 0.15f), new Color(1f, 0.95f, 0.55f), 8, true);
         fireSprite = CreatePixelSprite(new Color(1f, 0.28f, 0.04f), new Color(1f, 0.82f, 0.1f), 18, true);
+        rockSprite = CreatePixelSprite(new Color(0.42f, 0.36f, 0.28f), new Color(0.72f, 0.66f, 0.54f), 12, true);
         sawSprite = CreatePixelSprite(new Color(0.82f, 0.84f, 0.9f), new Color(0.2f, 0.75f, 1f), 14, true);
         orbitBladeSprite = CreateOrbitingBladeSprite();
         orbitRingSprite = CreateOrbitingRingSprite();
@@ -972,9 +999,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         bloodSplatSprite = CreateBloodSplatSprite();
         neonSignSprite = CreateNeonSignSprite();
         LoadChibiEnemyWalkFrames();
+        LoadCraftpixGoblinFrames();
         LoadCraftpixVillagerFrames();
         LoadCraftpixGravediggerFrames();
         LoadCraftpixReaperFrames();
+        LoadCraftpixOrcFrames();
         LoadCraftpixCrystalGolemFrames();
         LoadCraftpixMossGolemFrames();
         LoadCraftpixEmberGolemFrames();
@@ -1111,8 +1140,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (eliteTimer <= 0f)
         {
             eliteTimer = Mathf.Max(34f, 58f - runTime / 14f);
-            SpawnEnemy(ZombieStormEnemyType.Elite);
-            ShowFeedback("Elite zombie incoming. Kill it for a reward burst.", 2.5f);
+            SpawnEnemy(firstBossDefeated ? ZombieStormEnemyType.Reaper : ZombieStormEnemyType.Gravedigger);
+            ShowFeedback("Heavy zombie incoming. Keep your distance.", 2.5f);
         }
 
         if (bossCount == 0 && runTime >= 90f)
@@ -1143,46 +1172,37 @@ public sealed class ZombieStormGameController : MonoBehaviour
         float roll = UnityEngine.Random.value;
         bool lowHealth = Player != null && Player.Health / Player.MaxHealth < 0.28f;
 
-        if (runTime > 95f && roll < 0.08f)
+        if (firstBossDefeated && roll < (lowHealth ? 0.08f : 0.18f))
         {
-            return ZombieStormEnemyType.Exploder;
+            return ZombieStormEnemyType.SmallGoblin;
         }
 
-        if (runTime > 95f && roll < (lowHealth ? 0.08f : 0.16f))
-        {
-            return ZombieStormEnemyType.Spitter;
-        }
-
-        if (runTime > 70f && roll < 0.3f)
-        {
-            return ZombieStormEnemyType.Tank;
-        }
-
-        if (runTime > 45f && roll < (lowHealth ? 0.22f : 0.38f))
-        {
-            return ZombieStormEnemyType.Fast;
-        }
-
-        if (runTime > 32f && UnityEngine.Random.value < (lowHealth ? 0.04f : 0.13f))
-        {
-            return ZombieStormEnemyType.Slasher;
-        }
-
-        if (runTime > 58f && UnityEngine.Random.value < (lowHealth ? 0.03f : 0.1f))
-        {
-            return ZombieStormEnemyType.Gravedigger;
-        }
-
-        if (runTime > 82f && UnityEngine.Random.value < (lowHealth ? 0.02f : 0.08f))
+        if (firstBossDefeated && runTime > 82f && roll < (lowHealth ? 0.14f : 0.3f))
         {
             return ZombieStormEnemyType.Reaper;
         }
 
-        return ZombieStormEnemyType.Grunt;
+        if (runTime > 45f && roll < (lowHealth ? 0.18f : 0.34f))
+        {
+            return ZombieStormEnemyType.OrcThrower;
+        }
+
+        if (runTime > 58f && roll < (lowHealth ? 0.3f : 0.52f))
+        {
+            return ZombieStormEnemyType.Gravedigger;
+        }
+
+        if (runTime > 32f && roll < (lowHealth ? 0.24f : 0.42f))
+        {
+            return ZombieStormEnemyType.Slasher;
+        }
+
+        return ZombieStormEnemyType.Goblin;
     }
 
     private void SpawnEnemy(ZombieStormEnemyType enemyType)
     {
+        enemyType = RemapRemovedBaseZombieType(enemyType);
         string key = "enemy_" + enemyType;
         GameObject enemyObject = SpawnPooled(key, CreateEnemy);
         enemyObject.name = "Zombie " + enemyType;
@@ -1192,6 +1212,31 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Sprite[] walkFrames = GetEnemyWalkFrames(enemyType);
         bool framesFaceRight = walkFrames != chibiEnemyWalkFrames;
         enemy.Initialize(this, enemyType, key, GetEnemySprite(enemyType, walkFrames), walkFrames, GetEnemyAttackFrames(enemyType), GetEnemySpecialAttackFrames(enemyType), GetEnemyHurtFrames(enemyType), GetEnemyDeathFrames(enemyType), framesFaceRight, runTime, difficultyScore);
+    }
+
+    private ZombieStormEnemyType RemapRemovedBaseZombieType(ZombieStormEnemyType enemyType)
+    {
+        if (enemyType == ZombieStormEnemyType.Grunt ||
+            enemyType == ZombieStormEnemyType.Fast ||
+            enemyType == ZombieStormEnemyType.Tank ||
+            enemyType == ZombieStormEnemyType.Exploder ||
+            enemyType == ZombieStormEnemyType.Spitter ||
+            enemyType == ZombieStormEnemyType.Elite)
+        {
+            if (firstBossDefeated && runTime > 82f)
+            {
+                return ZombieStormEnemyType.Reaper;
+            }
+
+            if (runTime > 58f)
+            {
+                return ZombieStormEnemyType.Gravedigger;
+            }
+
+            return ZombieStormEnemyType.Goblin;
+        }
+
+        return enemyType;
     }
 
     private Vector2 GetOffscreenSpawnPosition()
@@ -1305,6 +1350,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private Sprite[] GetEnemyWalkFrames(ZombieStormEnemyType enemyType)
     {
+        if ((enemyType == ZombieStormEnemyType.Goblin || enemyType == ZombieStormEnemyType.SmallGoblin) && goblinRunFrames != null && goblinRunFrames.Length > 0)
+        {
+            return goblinRunFrames;
+        }
+
         if (enemyType == ZombieStormEnemyType.Slasher && villagerRunFrames != null && villagerRunFrames.Length > 0)
         {
             return villagerRunFrames;
@@ -1318,6 +1368,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (enemyType == ZombieStormEnemyType.Reaper && reaperRunFrames != null && reaperRunFrames.Length > 0)
         {
             return reaperRunFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.OrcThrower && orcRunFrames != null && orcRunFrames.Length > 0)
+        {
+            return orcRunFrames;
         }
 
         if (enemyType == ZombieStormEnemyType.CrystalGolemBoss && crystalGolemRunFrames != null && crystalGolemRunFrames.Length > 0)
@@ -1366,6 +1421,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return reaperSlashFrames;
         }
 
+        if (enemyType == ZombieStormEnemyType.OrcThrower && orcThrowFrames.Length > 0)
+        {
+            return orcThrowFrames;
+        }
+
         if (enemyType == ZombieStormEnemyType.CrystalGolemBoss && crystalGolemSlashFrames.Length > 0)
         {
             return crystalGolemSlashFrames;
@@ -1401,6 +1461,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private Sprite[] GetEnemyHurtFrames(ZombieStormEnemyType enemyType)
     {
+        if ((enemyType == ZombieStormEnemyType.Goblin || enemyType == ZombieStormEnemyType.SmallGoblin) && goblinHurtFrames.Length > 0)
+        {
+            return goblinHurtFrames;
+        }
+
         if (enemyType == ZombieStormEnemyType.Gravedigger && gravediggerHurtFrames.Length > 0)
         {
             return gravediggerHurtFrames;
@@ -1409,6 +1474,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (enemyType == ZombieStormEnemyType.Reaper && reaperHurtFrames.Length > 0)
         {
             return reaperHurtFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.OrcThrower && orcHurtFrames.Length > 0)
+        {
+            return orcHurtFrames;
         }
 
         if (enemyType == ZombieStormEnemyType.CrystalGolemBoss && crystalGolemHurtFrames.Length > 0)
@@ -1431,6 +1501,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private Sprite[] GetEnemyDeathFrames(ZombieStormEnemyType enemyType)
     {
+        if ((enemyType == ZombieStormEnemyType.Goblin || enemyType == ZombieStormEnemyType.SmallGoblin) && goblinDeathFrames.Length > 0)
+        {
+            return goblinDeathFrames;
+        }
+
         if (enemyType == ZombieStormEnemyType.Gravedigger && gravediggerDeathFrames.Length > 0)
         {
             return gravediggerDeathFrames;
@@ -1439,6 +1514,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (enemyType == ZombieStormEnemyType.Reaper && reaperDeathFrames.Length > 0)
         {
             return reaperDeathFrames;
+        }
+
+        if (enemyType == ZombieStormEnemyType.OrcThrower && orcDeathFrames.Length > 0)
+        {
+            return orcDeathFrames;
         }
 
         if (enemyType == ZombieStormEnemyType.CrystalGolemBoss && crystalGolemDeathFrames.Length > 0)
@@ -3369,6 +3449,19 @@ public sealed class ZombieStormGameController : MonoBehaviour
         villagerDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
     }
 
+    private void LoadCraftpixGoblinFrames()
+    {
+        goblinRunFrames = new Sprite[0];
+        goblinHurtFrames = new Sprite[0];
+        goblinDeathFrames = new Sprite[0];
+
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Enemies", "craftpix_goblin");
+        const float pixelsPerUnit = 264f;
+        goblinRunFrames = LoadEnemyFrameFolder(Path.Combine(root, "Run"), pixelsPerUnit);
+        goblinHurtFrames = LoadEnemyFrameFolder(Path.Combine(root, "Hurt"), pixelsPerUnit);
+        goblinDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
+    }
+
     private void LoadCraftpixGravediggerFrames()
     {
         gravediggerRunFrames = new Sprite[0];
@@ -3397,6 +3490,21 @@ public sealed class ZombieStormGameController : MonoBehaviour
         reaperSlashFrames = LoadEnemyFrameFolder(Path.Combine(root, "Slash"), pixelsPerUnit);
         reaperHurtFrames = LoadEnemyFrameFolder(Path.Combine(root, "Hurt"), pixelsPerUnit);
         reaperDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
+    }
+
+    private void LoadCraftpixOrcFrames()
+    {
+        orcRunFrames = new Sprite[0];
+        orcThrowFrames = new Sprite[0];
+        orcHurtFrames = new Sprite[0];
+        orcDeathFrames = new Sprite[0];
+
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Enemies", "craftpix_orc");
+        const float pixelsPerUnit = 264f;
+        orcRunFrames = LoadEnemyFrameFolder(Path.Combine(root, "Run"), pixelsPerUnit);
+        orcThrowFrames = LoadEnemyFrameFolder(Path.Combine(root, "Throw"), pixelsPerUnit);
+        orcHurtFrames = LoadEnemyFrameFolder(Path.Combine(root, "Hurt"), pixelsPerUnit);
+        orcDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
     }
 
     private void LoadCraftpixCrystalGolemFrames()

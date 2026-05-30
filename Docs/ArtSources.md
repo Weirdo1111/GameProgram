@@ -52,6 +52,24 @@ No license file was found in the supplied download folder during import. Review 
 
 The CraftPix source pack includes a license link in `TXT/license.txt`. Review its redistribution conditions before committing raw source PNG files to a public repository.
 
+## CraftPix Orc Chibi
+
+- Source: `Free Orc, Ogre and Goblin Chibi 2D Game Sprites` downloaded by the project owner from https://craftpix.net/freebies/free-orc-ogre-and-goblin-chibi-2d-game-sprites/
+- License reference: https://craftpix.net/file-licenses/
+- Local path: `Assets/ZombieStormArt/Enemies/craftpix_orc`
+- Used for: `OrcThrower`, the throwing zombie, including run, throwing, hurt, and death animation sequences.
+
+The CraftPix source pack includes a license link in `TXT/license.txt`. Review its redistribution conditions before committing raw source PNG files to a public repository.
+
+## CraftPix Goblin Chibi
+
+- Source: `Free Orc, Ogre and Goblin Chibi 2D Game Sprites` downloaded by the project owner from https://craftpix.net/freebies/free-orc-ogre-and-goblin-chibi-2d-game-sprites/
+- License reference: https://craftpix.net/file-licenses/
+- Local path: `Assets/ZombieStormArt/Enemies/craftpix_goblin`
+- Used for: `Goblin`, the default normal zombie, and `SmallGoblin`, the faster small normal zombie variant, including run, hurt, and death animation sequences.
+
+The CraftPix source pack includes a license link in `TXT/license.txt`. Review its redistribution conditions before committing raw source PNG files to a public repository.
+
 ## CraftPix Golems Chibi
 
 - Source: `Free Golems Chibi 2D Game Sprites` / `Golem_1`, `Golem_2`, and `Golem_3`, downloaded by the project owner from https://craftpix.net/freebies/free-golems-chibi-2d-game-sprites/
