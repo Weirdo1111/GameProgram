@@ -70,6 +70,15 @@ The CraftPix source pack includes a license link in `TXT/license.txt`. Review it
 
 The CraftPix source pack includes a license link in `TXT/license.txt`. Review its redistribution conditions before committing raw source PNG files to a public repository.
 
+## CraftPix Reaper Man Chibi
+
+- Source: `Free Reaper Man Chibi 2D Game Sprites` downloaded by the project owner from https://craftpix.net/freebies/free-reaper-man-chibi-2d-game-sprites/
+- License reference: https://craftpix.net/file-licenses/
+- Local paths: `Assets/ZombieStormArt/Enemies/craftpix_reaper_man_1`, `Assets/ZombieStormArt/Enemies/craftpix_reaper_man_2`, `Assets/ZombieStormArt/Enemies/craftpix_reaper_man_3`
+- Used for: reserved Level 2 enemy art sets. Each imported character includes air slash, air throw, death, fall, hurt, idle, idle blink, jump loop, jump start, kick, run, run slash, run throw, slash, slide, throw, and walk PNG sequences.
+
+The CraftPix source pack includes a license link in `TXT/license.txt`. Review its redistribution conditions before committing raw source PNG files to a public repository.
+
 ## CraftPix Golems Chibi
 
 - Source: `Free Golems Chibi 2D Game Sprites` / `Golem_1`, `Golem_2`, and `Golem_3`, downloaded by the project owner from https://craftpix.net/freebies/free-golems-chibi-2d-game-sprites/
