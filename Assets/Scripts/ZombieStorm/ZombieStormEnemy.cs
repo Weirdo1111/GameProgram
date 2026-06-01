@@ -8,6 +8,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private const float BaseZombieHealth = 22f;
     private const float BaseZombieSpeed = 1.55f;
     private const float BaseZombieMeleeStrikeDamage = 14f;
+    private const float EnemyHealthMultiplier = 1.25f;
 
     private ZombieStormGameController game;
     private SpriteRenderer spriteRenderer;
@@ -152,7 +153,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
         else if (Type == ZombieStormEnemyType.SmallGoblin)
         {
-            speed = BaseZombieSpeed * 1.55f;
+            speed = BaseZombieSpeed * 4.65f;
             maxHealth = BaseZombieHealth * 0.5f * hpScale;
             damagePerSecond = 6.5f;
             Radius = 0.3f;
@@ -276,6 +277,8 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             spriteRenderer.sprite = walkFrames[Mathf.FloorToInt(walkAnimTime) % walkFrames.Length];
         }
 
+        maxHealth *= EnemyHealthMultiplier;
+        damagePerSecond *= ZombieStormGameController.EnemyDamageMultiplier;
         health = maxHealth;
         UpdateRenderDepth();
         game.RegisterEnemy(this);
@@ -360,7 +363,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
                 game.SpawnAreaEffect(transform.position, 2.2f, 30f, 0.22f, 99f, new Color(1f, 0.35f, 0.05f, 0.65f), "zombie_explosion");
                 game.PlaySfx("boom", 0.54f, 0.08f);
                 game.ShakeCamera(0.16f, 0.16f);
-                game.Player.TakeDamage(22f);
+                game.Player.TakeDamage(ScaledEnemyDamage(22f));
                 Die(false);
             }
             else
@@ -368,6 +371,8 @@ public sealed class ZombieStormEnemy : MonoBehaviour
                 game.Player.TakeDamage(damagePerSecond * Time.deltaTime);
             }
         }
+
+        transform.position = game.ResolveObstacleCollision(transform.position, Radius);
 
         if (!useSideViewWalk && direction.sqrMagnitude > 0.01f)
         {
@@ -685,7 +690,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 
                 if (game.Player != null && Vector2.Distance(transform.position, game.Player.transform.position) <= Radius + finalHitRange)
                 {
-                    game.Player.TakeDamage(finalStrikeDamage);
+                    game.Player.TakeDamage(ScaledEnemyDamage(finalStrikeDamage));
                 }
             }
 
@@ -881,12 +886,10 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             return;
         }
 
-        int seeds = enraged ? 10 : 7;
-        for (int i = 0; i < seeds; i++)
-        {
-            Vector2 shotDir = ZombieStormGameController.Rotate(Vector2.up, i * (360f / seeds));
-            game.SpawnAreaEffect((Vector2)transform.position + shotDir * 1.55f, 0.3f, 0f, 0.66f, 1f, moss, "hit_spark");
-        }
+        Vector2 targetPosition = game.Player != null ? (Vector2)game.Player.transform.position : (Vector2)transform.position + direction * 3f;
+        bossTelegraphPositions.Add(targetPosition);
+        game.SpawnAreaEffect(targetPosition, enraged ? 1.55f : 1.25f, 0f, enraged ? 0.86f : 1.08f, 1f, new Color(0.5f, 1f, 0.16f, 0.26f), "toxic_pool");
+        game.SpawnAreaEffect(targetPosition, 0.38f, 0f, enraged ? 0.78f : 0.96f, 1f, moss, "hit_spark");
     }
 
     private void PrepareEmberTyrantTelegraph(int action, Vector2 direction, bool enraged)
@@ -978,7 +981,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 
         if (game.Player != null && Vector2.Distance(transform.position, game.Player.transform.position) < (enraged ? 2.75f : 2.2f))
         {
-            game.Player.TakeDamage(enraged ? 32f : 24f);
+            game.Player.TakeDamage(ScaledEnemyDamage(enraged ? 32f : 24f));
         }
 
         int shockwaves = enraged ? 12 : 8;
@@ -1001,7 +1004,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             game.SpawnAreaEffect(strikePosition, radius, 0f, 0.18f, 1f, new Color(0.34f, 0.72f, 1f, 0.56f), "lightning_flash");
             if (game.Player != null && Vector2.Distance(strikePosition, game.Player.transform.position) <= radius + 0.35f)
             {
-                game.Player.TakeDamage(enraged ? 18f : 12f);
+                game.Player.TakeDamage(ScaledEnemyDamage(enraged ? 18f : 12f));
             }
         }
 
@@ -1027,7 +1030,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             game.ShakeCamera(enraged ? 0.2f : 0.14f, 0.18f);
             if (game.Player != null && Vector2.Distance(strikePosition, game.Player.transform.position) <= radius + 0.34f)
             {
-                game.Player.TakeDamage(enraged ? 30f : 22f);
+                game.Player.TakeDamage(ScaledEnemyDamage(enraged ? 30f : 22f));
             }
         }
         else
@@ -1055,20 +1058,20 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             game.ShakeCamera(enraged ? 0.2f : 0.15f, 0.2f);
             if (game.Player != null && Vector2.Distance(strikePosition, game.Player.transform.position) <= radius + 0.34f)
             {
-                game.Player.TakeDamage(enraged ? 27f : 20f);
+                game.Player.TakeDamage(ScaledEnemyDamage(enraged ? 27f : 20f));
             }
         }
         else
         {
-            int seeds = enraged ? 10 : 7;
-            for (int i = 0; i < seeds; i++)
-            {
-                Vector2 shotDir = ZombieStormGameController.Rotate(Vector2.up, i * (360f / seeds));
-                game.SpawnEnemyProjectile(transform.position, shotDir, enraged ? 15f : 10f, enraged ? 5.9f : 4.9f, 3.4f, moss, 0.52f);
-            }
+            Vector2 poisonPosition = game.Player != null ? (Vector2)game.Player.transform.position : bossTelegraphPositions.Count > 0 ? bossTelegraphPositions[0] : (Vector2)transform.position + direction * 3f;
+            float burstRadius = enraged ? 1.65f : 1.35f;
+            game.SpawnEnemyAreaEffect(poisonPosition, burstRadius, enraged ? 24f : 18f, enraged ? 0.78f : 0.9f, 99f, new Color(0.48f, 1f, 0.14f, 0.82f), "poison_boss_blast");
+            game.SpawnEnemyAreaEffect(poisonPosition, enraged ? 1.35f : 1.08f, enraged ? 10f : 7f, enraged ? 3.2f : 2.55f, 0.45f, new Color(0.42f, 0.92f, 0.12f, 0.46f), "toxic_pool");
+            game.SpawnHitSpark(poisonPosition, new Color(0.78f, 1f, 0.18f, 0.9f), burstRadius * 0.28f);
+            game.ShakeCamera(enraged ? 0.16f : 0.11f, 0.16f);
         }
 
-        game.PlaySfx(action == 0 ? "boom" : "shoot", action == 0 ? 0.64f : 0.46f, 0.08f);
+        game.PlaySfx("boom", action == 0 ? 0.64f : 0.52f, 0.08f);
     }
 
     private void CastEmberTyrantSkill(int action, Vector2 direction, bool enraged)
@@ -1107,6 +1110,11 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 
     private float GetBossTelegraphDuration()
     {
+        if (Type == ZombieStormEnemyType.MossGolemBoss)
+        {
+            return bossQueuedEnraged ? 0.82f : 1.05f;
+        }
+
         if (Type == ZombieStormEnemyType.BruteBoss)
         {
             return bossQueuedEnraged ? 0.46f : 0.58f;
@@ -1120,11 +1128,6 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         if (Type == ZombieStormEnemyType.CrystalGolemBoss)
         {
             return bossQueuedEnraged ? 0.54f : 0.72f;
-        }
-
-        if (Type == ZombieStormEnemyType.MossGolemBoss)
-        {
-            return bossQueuedEnraged ? 0.58f : 0.78f;
         }
 
         if (Type == ZombieStormEnemyType.EmberTyrantBoss)
@@ -1173,6 +1176,11 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private static bool IsBossType(ZombieStormEnemyType enemyType)
     {
         return enemyType == ZombieStormEnemyType.Boss || enemyType == ZombieStormEnemyType.PlagueBoss || enemyType == ZombieStormEnemyType.BruteBoss || enemyType == ZombieStormEnemyType.StormBoss || enemyType == ZombieStormEnemyType.CrystalGolemBoss || enemyType == ZombieStormEnemyType.MossGolemBoss || enemyType == ZombieStormEnemyType.EmberTyrantBoss;
+    }
+
+    private static float ScaledEnemyDamage(float amount)
+    {
+        return amount * ZombieStormGameController.EnemyDamageMultiplier;
     }
 
     private static string BossName(ZombieStormEnemyType enemyType)

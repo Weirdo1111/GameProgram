@@ -19,6 +19,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     public static ZombieStormGameController Instance { get; private set; }
 
     private const string Title = "\u50f5\u5c38\u5272\u8349\u5927\u4f5c\u6218";
+    public const float EnemyDamageMultiplier = 0.75f;
 
     [Header("Run")]
     public float runDurationSeconds = 300f;
@@ -29,6 +30,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     public IReadOnlyList<ZombieStormEnemy> Enemies { get { return enemies; } }
 
     private readonly List<ZombieStormEnemy> enemies = new List<ZombieStormEnemy>(256);
+    private readonly List<ZombieStormObstacle> obstacles = new List<ZombieStormObstacle>(32);
     private readonly Dictionary<string, Queue<GameObject>> pools = new Dictionary<string, Queue<GameObject>>();
     private readonly Dictionary<ZombieStormPassiveType, int> passives = new Dictionary<ZombieStormPassiveType, int>();
     private readonly Dictionary<string, AudioClip> sfx = new Dictionary<string, AudioClip>();
@@ -366,6 +368,55 @@ public sealed class ZombieStormGameController : MonoBehaviour
         enemies.Remove(enemy);
     }
 
+    public void RegisterObstacle(ZombieStormObstacle obstacle)
+    {
+        if (obstacle != null && !obstacles.Contains(obstacle))
+        {
+            obstacles.Add(obstacle);
+        }
+    }
+
+    public void UnregisterObstacle(ZombieStormObstacle obstacle)
+    {
+        obstacles.Remove(obstacle);
+    }
+
+    public Vector2 ResolveObstacleCollision(Vector2 position, float moverRadius)
+    {
+        position = ClampToArena(position);
+        for (int pass = 0; pass < 2; pass++)
+        {
+            for (int i = obstacles.Count - 1; i >= 0; i--)
+            {
+                ZombieStormObstacle obstacle = obstacles[i];
+                if (obstacle == null)
+                {
+                    obstacles.RemoveAt(i);
+                    continue;
+                }
+
+                if (!obstacle.isActiveAndEnabled || !obstacle.gameObject.activeInHierarchy)
+                {
+                    continue;
+                }
+
+                Vector2 center = obstacle.WorldCenter;
+                float minDistance = obstacle.WorldRadius + moverRadius;
+                Vector2 offset = position - center;
+                float sqrDistance = offset.sqrMagnitude;
+                if (sqrDistance >= minDistance * minDistance)
+                {
+                    continue;
+                }
+
+                Vector2 pushDirection = sqrDistance > 0.0001f ? offset.normalized : Vector2.right;
+                position = center + pushDirection * minDistance;
+            }
+        }
+
+        return ClampToArena(position);
+    }
+
     public ZombieStormEnemy FindNearestEnemy(Vector2 origin, float maxDistance)
     {
         ZombieStormEnemy best = null;
@@ -483,7 +534,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         spriteRenderer.sprite = sprite != null ? sprite : fireSprite;
         spriteRenderer.color = color;
         ZombieStormEnemyProjectile projectile = projectileObject.GetComponent<ZombieStormEnemyProjectile>();
-        projectile.Initialize(this, direction, damage, speed, life, color, size);
+        projectile.Initialize(this, direction, damage * EnemyDamageMultiplier, speed, life, color, size);
     }
 
     public void SpawnAreaEffect(Vector2 position, float radius, float damage, float duration, float tickRate, Color color, string poolKey)
@@ -509,12 +560,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
         spriteRenderer.color = color;
         spriteRenderer.sortingOrder = IsForegroundEffect(poolKey) ? 48 : 14;
         ZombieStormAreaEffect effect = effectObject.GetComponent<ZombieStormAreaEffect>();
-        effect.Initialize(this, poolKey, radius, damage, duration, tickRate, true);
+        effect.Initialize(this, poolKey, radius, damage * EnemyDamageMultiplier, duration, tickRate, true);
     }
 
     private static bool IsForegroundEffect(string poolKey)
     {
-        return poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "foozle_explosion" || poolKey == "ember_dash_blast" || poolKey == "ember_meteor_blast";
+        return poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "foozle_explosion" || poolKey == "poison_boss_blast" || poolKey == "ember_dash_blast" || poolKey == "ember_meteor_blast";
     }
 
     public void SpawnHitSpark(Vector2 position, Color color, float radius = 0.36f)
@@ -3063,7 +3114,61 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GameObject map = CreateSpriteObject("Custom Graveyard Arena", customArenaMapSprite, Color.white, new Vector3(0f, 0f, 5f), Vector3.one * scale, -10);
         map.transform.SetParent(worldRoot, false);
         mainCamera.backgroundColor = new Color(0.015f, 0.018f, 0.014f);
+        BuildGraveyardArenaObstacles();
         return true;
+    }
+
+    private void BuildGraveyardArenaObstacles()
+    {
+        Vector3[] circles =
+        {
+            new Vector3(-27.2f, 13.5f, 1.45f),
+            new Vector3(-21.8f, 13.1f, 1.18f),
+            new Vector3(-15.6f, 12.8f, 1.05f),
+            new Vector3(-6.2f, 14.2f, 1.12f),
+            new Vector3(5.6f, 14.1f, 1.1f),
+            new Vector3(15.6f, 12.9f, 1.12f),
+            new Vector3(21.6f, 13.1f, 1.28f),
+            new Vector3(27.1f, 13.3f, 1.45f),
+            new Vector3(-27.3f, 6.6f, 1.22f),
+            new Vector3(-20.6f, 6.2f, 1.05f),
+            new Vector3(-13.7f, 5.4f, 0.95f),
+            new Vector3(13.4f, 5.5f, 0.95f),
+            new Vector3(19.6f, 6.3f, 1.18f),
+            new Vector3(26.5f, 6.1f, 1.34f),
+            new Vector3(-27.6f, -1.4f, 1.18f),
+            new Vector3(-20.8f, -1.8f, 1.02f),
+            new Vector3(20.4f, -1.7f, 1.08f),
+            new Vector3(27.0f, -2.0f, 1.28f),
+            new Vector3(-27.1f, -8.8f, 1.28f),
+            new Vector3(-21.4f, -9.5f, 1.12f),
+            new Vector3(-14.2f, -10.5f, 0.98f),
+            new Vector3(13.8f, -10.1f, 1.02f),
+            new Vector3(20.8f, -9.4f, 1.16f),
+            new Vector3(26.8f, -8.9f, 1.36f),
+            new Vector3(-27.7f, -14.1f, 1.38f),
+            new Vector3(-8.2f, -14.5f, 1.02f),
+            new Vector3(7.6f, -14.4f, 1.02f),
+            new Vector3(27.8f, -14.0f, 1.38f)
+        };
+
+        for (int i = 0; i < circles.Length; i++)
+        {
+            CreateMapObstacle("Graveyard Map Obstacle " + (i + 1), new Vector2(circles[i].x, circles[i].y), circles[i].z);
+        }
+    }
+
+    private void CreateMapObstacle(string name, Vector2 position, float radius)
+    {
+        GameObject obstacleObject = new GameObject(name);
+        obstacleObject.transform.SetParent(worldRoot, false);
+        obstacleObject.transform.position = new Vector3(position.x, position.y, 0f);
+        CircleCollider2D circle = obstacleObject.AddComponent<CircleCollider2D>();
+        circle.radius = radius;
+        circle.isTrigger = true;
+        ZombieStormObstacle obstacle = obstacleObject.AddComponent<ZombieStormObstacle>();
+        obstacle.radius = radius;
+        obstacle.extraPadding = 0.08f;
     }
 
     private void AddCrosswalk(Vector2 center, bool horizontal)
@@ -3599,6 +3704,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Effects");
         AddEffectSequence(root, "ember_dash_blast", Path.Combine("DarkVFX1", "Frames"), 38f);
         AddEffectSequence(root, "ember_meteor_blast", Path.Combine("DarkVFX2", "Frames"), 44f);
+        AddEffectSequence(root, "poison_boss_blast", "CraftpixPoisonExplosion10", 150f);
     }
 
     private void AddFoozlePixelMagicEffectSequences()

@@ -62,7 +62,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
 
         float speed = 4.6f + game.GetPassiveLevel(ZombieStormPassiveType.MoveSpeed) * 0.36f;
         transform.position += (Vector3)(input * speed * Time.deltaTime);
-        transform.position = game.ClampToArena(transform.position);
+        transform.position = game.ResolveObstacleCollision(transform.position, 0.34f);
 
         if (input.sqrMagnitude > 0.01f)
         {

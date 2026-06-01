@@ -348,7 +348,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             return;
         }
 
-        float radius = (1.45f + level * 0.18f + Mod("knife_reach") * 0.22f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.32f : 1f);
+        float radius = (2.05f + level * 0.24f + Mod("knife_reach") * 0.3f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.32f : 1f);
         float speed = 120f + level * 28f;
         if (orbitingObjects.Count == 0)
         {
@@ -431,7 +431,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         int level = GetSkillLevel(ZombieStormSkillType.OrbitingKnife);
         int count = 2 + Mathf.FloorToInt(level * 0.75f) + Mod("knife_blades") + (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 3 : 0);
-        float radius = (1.45f + level * 0.18f + Mod("knife_reach") * 0.22f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.32f : 1f);
+        float radius = (2.05f + level * 0.24f + Mod("knife_reach") * 0.3f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.32f : 1f);
         if (level > 0)
         {
             orbitingRing = new GameObject("Orbiting Blade Halo Ring");

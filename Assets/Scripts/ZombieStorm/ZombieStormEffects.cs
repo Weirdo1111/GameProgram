@@ -42,7 +42,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
 
         initialColor = spriteRenderer != null ? spriteRenderer.color : Color.white;
         initialScale = transform.localScale;
-        frameDuration = frames != null && frames.Length > 0 ? Mathf.Clamp(maxLife / frames.Length, 0.028f, 0.06f) : 0.05f;
+        frameDuration = frames != null && frames.Length > 0 ? GetFrameDuration(poolKey, maxLife, frames.Length) : 0.05f;
     }
 
     private void Update()
@@ -127,11 +127,21 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
             spriteRenderer.color = color;
         }
 
-        if (poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "zombie_explosion" || poolKey == "meteor_blast" || poolKey == "foozle_explosion" || poolKey == "ember_dash_blast" || poolKey == "ember_meteor_blast")
+        if (poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "zombie_explosion" || poolKey == "meteor_blast" || poolKey == "foozle_explosion" || poolKey == "poison_boss_blast" || poolKey == "ember_dash_blast" || poolKey == "ember_meteor_blast")
         {
             float grow = 1f + (1f - t) * 0.55f;
             transform.localScale = initialScale * grow;
         }
+    }
+
+    private static float GetFrameDuration(string key, float duration, int frameCount)
+    {
+        if (key == "poison_boss_blast")
+        {
+            return Mathf.Max(0.045f, duration / Mathf.Max(1, frameCount));
+        }
+
+        return Mathf.Clamp(duration / Mathf.Max(1, frameCount), 0.028f, 0.06f);
     }
 
     private void DamageEnemies()
