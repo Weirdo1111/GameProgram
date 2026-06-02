@@ -356,7 +356,12 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             transform.position += (Vector3)(direction * finalSpeed * Time.deltaTime);
         }
 
-        if (!UsesAnimatedMeleeAttack && Type != ZombieStormEnemyType.OrcThrower && distance <= Radius + 0.45f)
+        transform.position = game.ResolveObstacleCollision(transform.position, Radius);
+        transform.position = ResolvePlayerSeparation(transform.position);
+
+        Vector2 currentToPlayer = (Vector2)game.Player.transform.position - (Vector2)transform.position;
+        float currentDistance = currentToPlayer.magnitude;
+        if (!UsesAnimatedMeleeAttack && Type != ZombieStormEnemyType.OrcThrower && currentDistance <= Radius + 0.45f)
         {
             if (Type == ZombieStormEnemyType.Exploder)
             {
@@ -372,14 +377,33 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             }
         }
 
-        transform.position = game.ResolveObstacleCollision(transform.position, Radius);
-
         if (!useSideViewWalk && direction.sqrMagnitude > 0.01f)
         {
             transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f);
         }
 
         UpdateRenderDepth();
+    }
+
+    private Vector2 ResolvePlayerSeparation(Vector2 position)
+    {
+        if (game == null || game.Player == null || Type == ZombieStormEnemyType.Exploder)
+        {
+            return position;
+        }
+
+        const float playerRadius = 0.42f;
+        float minDistance = Radius + playerRadius;
+        Vector2 playerPosition = game.Player.transform.position;
+        Vector2 offset = position - playerPosition;
+        float sqrDistance = offset.sqrMagnitude;
+        if (sqrDistance >= minDistance * minDistance)
+        {
+            return position;
+        }
+
+        Vector2 pushDirection = sqrDistance > 0.0001f ? offset.normalized : Vector2.right;
+        return playerPosition + pushDirection * minDistance;
     }
 
     private void UpdateWalkVisual(Vector2 direction)

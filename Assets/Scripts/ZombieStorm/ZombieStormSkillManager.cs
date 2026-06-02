@@ -206,8 +206,10 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             return;
         }
 
-        Vector2 direction = ((Vector2)target.transform.position - (Vector2)transform.position).normalized;
-        Vector2 origin = (Vector2)transform.position + direction * 0.42f;
+        Vector2 toTarget = (Vector2)target.transform.position - (Vector2)transform.position;
+        float targetDistance = toTarget.magnitude;
+        Vector2 direction = targetDistance > 0.01f ? toTarget / targetDistance : Vector2.up;
+        Vector2 origin = (Vector2)transform.position + direction * Mathf.Min(0.42f, Mathf.Max(0.12f, targetDistance * 0.42f));
         int shots = (IsEvolved(ZombieStormSkillType.MagicBolt) ? 3 : level >= 4 ? 2 : 1) + Mod("magic_split");
         float damage = (10f + level * 3.4f) * (1f + Mod("magic_force") * 0.16f);
         int pierce = (level >= 3 ? 1 : 0) + Mod("magic_pierce");

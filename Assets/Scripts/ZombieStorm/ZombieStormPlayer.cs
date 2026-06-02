@@ -72,14 +72,11 @@ public sealed class ZombieStormPlayer : MonoBehaviour
                 facingDirection = DirectionToAnimation(lastMove);
             }
 
-            if (!game.HasPlayerWalkAnimation)
-            {
-                transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(lastMove.y, lastMove.x) * Mathf.Rad2Deg - 90f);
-            }
-            else
-            {
-                transform.rotation = Quaternion.identity;
-            }
+            transform.rotation = Quaternion.identity;
+        }
+        else
+        {
+            transform.rotation = Quaternion.identity;
         }
 
         if (spriteRenderer != null)
@@ -139,7 +136,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
     {
         if (!game.HasPlayerWalkAnimation)
         {
-            spriteRenderer.flipX = false;
+            spriteRenderer.flipX = lastMove.x < -0.08f;
             float pulse = Mathf.Sin(Time.time * 12f) * 0.04f;
             transform.localScale = Vector3.one * (FallbackPlayerVisualScale + pulse);
             return;
