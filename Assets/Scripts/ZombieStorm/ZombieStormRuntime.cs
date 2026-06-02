@@ -2761,7 +2761,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case ZombieStormSkillType.MagicBolt: return "Adds auto magic shots with a bright launch spark.";
             case ZombieStormSkillType.OrbitingKnife: return "Adds visible blades that orbit and cut nearby enemies.";
             case ZombieStormSkillType.MeteorStorm: return "Adds warning circles, then delayed impact blasts.";
-            case ZombieStormSkillType.FireZone: return "Fireball kills leave a 5-second burning pool.";
+            case ZombieStormSkillType.FireZone: return "Fireball hits leave a 5-second burning pool.";
             case ZombieStormSkillType.SummonDrone: return "Adds an AI drone that circles you and shoots targets.";
             case ZombieStormSkillType.ChainLightning: return "Adds jumping lightning with blue links between enemies.";
             case ZombieStormSkillType.ShieldBurst: return "Adds a close-range defensive shockwave trigger.";
@@ -2777,7 +2777,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case ZombieStormSkillType.MagicBolt: return "Lv." + nextLevel + ": faster bolts, more damage, extra pierce.";
             case ZombieStormSkillType.OrbitingKnife: return "Lv." + nextLevel + ": more blades, wider orbit, stronger ticks.";
             case ZombieStormSkillType.MeteorStorm: return "Lv." + nextLevel + ": more impacts, bigger warning circles.";
-            case ZombieStormSkillType.FireZone: return "Lv." + nextLevel + ": fireball kill pools burn wider and harder.";
+            case ZombieStormSkillType.FireZone: return "Lv." + nextLevel + ": fireball pools burn wider and harder.";
             case ZombieStormSkillType.SummonDrone: return "Lv." + nextLevel + ": more drones and faster AI fire.";
             case ZombieStormSkillType.ChainLightning: return "Lv." + nextLevel + ": more jumps and stronger chain damage.";
             case ZombieStormSkillType.ShieldBurst: return "Lv." + nextLevel + ": larger defensive ring and harder hit.";
@@ -2852,7 +2852,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case "meteor_impacts": return "Lv." + nextLevel + ": Meteor Storm drops one more impact.";
             case "meteor_blast": return "Lv." + nextLevel + ": Meteor blast radius grows.";
             case "meteor_heat": return "Lv." + nextLevel + ": Meteor impacts deal more damage.";
-            case "fire_spread": return "Lv." + nextLevel + ": Fireball kills create another nearby pool.";
+            case "fire_spread": return "Lv." + nextLevel + ": Fireball hits create another nearby pool.";
             case "fire_linger": return "Lv." + nextLevel + ": Fireball kill pools tick damage faster.";
             case "fire_heat": return "Lv." + nextLevel + ": Fireball kill pools deal more damage.";
             case "drone_swarm": return "Lv." + nextLevel + ": Summon Drone adds another drone.";

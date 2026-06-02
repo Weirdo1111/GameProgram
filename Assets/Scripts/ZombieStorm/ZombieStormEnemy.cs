@@ -584,7 +584,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
         else if (Type == ZombieStormEnemyType.MossGolemBoss)
         {
-            bossQueuedAction = UnityEngine.Random.Range(0, 2);
+            bossQueuedAction = 1;
             PrepareMossGolemTelegraph(bossQueuedAction, bossQueuedDirection, enraged);
         }
         else if (Type == ZombieStormEnemyType.EmberTyrantBoss)

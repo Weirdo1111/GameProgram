@@ -57,9 +57,9 @@ public sealed class ZombieStormProjectile : MonoBehaviour
                 Vector2 hitPosition = enemy.transform.position;
                 enemy.TakeDamage(damage, direction);
                 game.SpawnAreaEffect(transform.position, 0.62f, 0f, 0.22f, 1f, new Color(1f, 0.56f, 0.14f, 0.78f), "foozle_explosion");
-                if (createsFireZoneOnKill && enemy.IsDead && game.Skills != null)
+                if (createsFireZoneOnKill && game.Skills != null)
                 {
-                    game.Skills.SpawnFireZoneOnFireballKill(hitPosition);
+                    game.Skills.SpawnFireZoneOnFireballHit(hitPosition);
                 }
 
                 pierce--;

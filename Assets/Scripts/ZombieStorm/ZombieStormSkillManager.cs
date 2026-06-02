@@ -250,7 +250,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         cooldowns[ZombieStormSkillType.MeteorStorm] = (4.2f - level * 0.24f) * game.CooldownMultiplier;
     }
 
-    public void SpawnFireZoneOnFireballKill(Vector2 position)
+    public void SpawnFireZoneOnFireballHit(Vector2 position)
     {
         int level = GetSkillLevel(ZombieStormSkillType.FireZone);
         if (level <= 0)
