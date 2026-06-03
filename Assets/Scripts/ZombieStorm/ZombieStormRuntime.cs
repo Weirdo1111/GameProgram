@@ -19,6 +19,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
     public static ZombieStormGameController Instance { get; private set; }
 
     private const string Title = "\u50f5\u5c38\u5272\u8349\u5927\u4f5c\u6218";
+    private const float GameplayCameraOrthographicSize = 14f;
+    private const float GameplayHudScale = 0.8f;
     public const float EnemyDamageMultiplier = 0.75f;
 
     [Header("Run")]
@@ -40,6 +42,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private readonly Dictionary<string, Sprite[]> playerWalkFrames = new Dictionary<string, Sprite[]>();
     private readonly Dictionary<string, Sprite[]> effectFrames = new Dictionary<string, Sprite[]>();
     private readonly List<ZombieStormDamagePopup> damagePopups = new List<ZombieStormDamagePopup>();
+    private bool playerWalkFramesAreIdle;
     private Sprite[] playerHurtFrames = new Sprite[0];
     private Sprite[] chibiEnemyWalkFrames = new Sprite[0];
     private Sprite[] goblinRunFrames = new Sprite[0];
@@ -133,7 +136,10 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private int bossCount;
     private ZombieStormFlowState flowState = ZombieStormFlowState.MainMenu;
     private ZombieStormFlowState settingsReturnState = ZombieStormFlowState.MainMenu;
+    private ZombieStormMainMenuUI mainMenuUI;
     private float masterVolume = 0.62f;
+    private float musicVolume = 0.72f;
+    private float sfxVolume = 0.9f;
     private bool sfxMuted;
     private string feedbackText = "WASD move. Skills cast automatically. Press F for ultimate.";
 
@@ -142,6 +148,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
     public float AreaMultiplier { get { return 1f + GetPassiveLevel(ZombieStormPassiveType.Area) * 0.16f; } }
     public float CritChance { get { return Mathf.Clamp01(GetPassiveLevel(ZombieStormPassiveType.Crit) * 0.07f); } }
     public float CoinMultiplier { get { return 1f + GetPassiveLevel(ZombieStormPassiveType.CoinGain) * 0.2f; } }
+    public bool IsMainMenuActive { get { return flowState == ZombieStormFlowState.MainMenu; } }
+    public bool IsMainMenuSettingsActive { get { return flowState == ZombieStormFlowState.Settings && settingsReturnState == ZombieStormFlowState.MainMenu; } }
+    public float MasterVolume { get { return masterVolume; } }
+    public float MusicVolume { get { return musicVolume; } }
+    public float SfxVolume { get { return sfxVolume; } }
+    public bool FullscreenEnabled { get { return Screen.fullScreen; } }
 
     public Vector2 ClampToArena(Vector2 position)
     {
@@ -177,6 +189,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         Instance = this;
+        LoadMenuSettings();
         Application.targetFrameRate = targetFrameRate;
         Physics2D.gravity = Vector2.zero;
         Time.timeScale = 1f;
@@ -194,6 +207,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.Return))
             {
                 StartRun();
+            }
+            else if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                if (mainMenuUI == null || !mainMenuUI.CloseTopModal())
+                {
+                    QuitGame();
+                }
             }
 
             return;
@@ -267,6 +287,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private void OnGUI()
     {
+        if (mainMenuUI != null && mainMenuUI.IsReady && (flowState == ZombieStormFlowState.MainMenu || IsMainMenuSettingsActive))
+        {
+            return;
+        }
+
         DrawAtmosphereOverlay();
         GUI.skin.label.fontSize = 18;
         GUI.skin.button.fontSize = 16;
@@ -283,6 +308,10 @@ public sealed class ZombieStormGameController : MonoBehaviour
             DrawSettingsPanel();
             return;
         }
+
+        Matrix4x4 previousGuiMatrix = GUI.matrix;
+        float hudScreenWidth = Screen.width / GameplayHudScale;
+        GUIUtility.ScaleAroundPivot(Vector2.one * GameplayHudScale, Vector2.zero);
 
         DrawPanel(new Rect(12f, 10f, 430f, 158f), new Color(0.035f, 0.045f, 0.055f, 0.82f), new Color(0.2f, 0.75f, 1f, 0.32f));
         GUI.Label(new Rect(24f, 18f, 760f, 28f), Title + " / Zombie Storm");
@@ -302,28 +331,30 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         int remain = Mathf.Max(0, Mathf.CeilToInt(runDurationSeconds - runTime));
-        DrawPanel(new Rect(Screen.width - 224f, 10f, 206f, 48f), new Color(0.035f, 0.045f, 0.055f, 0.82f), new Color(1f, 0.85f, 0.25f, 0.28f));
+        DrawPanel(new Rect(hudScreenWidth - 224f, 10f, 206f, 48f), new Color(0.035f, 0.045f, 0.055f, 0.82f), new Color(1f, 0.85f, 0.25f, 0.28f));
         GUI.skin.label.fontSize = 24;
-        GUI.Label(new Rect(Screen.width - 206f, 18f, 190f, 32f), "Survive " + FormatTime(remain));
+        GUI.Label(new Rect(hudScreenWidth - 206f, 18f, 190f, 32f), "Survive " + FormatTime(remain));
         GUI.skin.label.fontSize = 18;
 
         if (Skills != null)
         {
-            DrawPanel(new Rect(Screen.width - 286f, 70f, 268f, 150f), new Color(0.035f, 0.045f, 0.055f, 0.74f), new Color(0.9f, 0.28f, 0.2f, 0.24f));
+            DrawPanel(new Rect(hudScreenWidth - 286f, 70f, 268f, 150f), new Color(0.035f, 0.045f, 0.055f, 0.74f), new Color(0.9f, 0.28f, 0.2f, 0.24f));
             GUI.skin.label.fontSize = 15;
-            GUI.Label(new Rect(Screen.width - 268f, 84f, 244f, 124f), Skills.GetLoadoutText());
+            GUI.Label(new Rect(hudScreenWidth - 268f, 84f, 244f, 124f), Skills.GetLoadoutText());
             GUI.skin.label.fontSize = 18;
         }
 
         if (Time.unscaledTime < feedbackUntil)
         {
-            DrawPanel(new Rect(Screen.width * 0.5f - 330f, 78f, 680f, 46f), new Color(0.05f, 0.045f, 0.02f, 0.82f), new Color(1f, 0.75f, 0.18f, 0.45f));
+            DrawPanel(new Rect(hudScreenWidth * 0.5f - 330f, 78f, 680f, 46f), new Color(0.05f, 0.045f, 0.02f, 0.82f), new Color(1f, 0.75f, 0.18f, 0.45f));
             GUI.skin.label.fontSize = 22;
             GUI.color = new Color(1f, 0.86f, 0.25f, 1f);
-            GUI.Label(new Rect(Screen.width * 0.5f - 310f, 84f, 660f, 40f), feedbackText);
+            GUI.Label(new Rect(hudScreenWidth * 0.5f - 310f, 84f, 660f, 40f), feedbackText);
             GUI.skin.label.fontSize = 18;
             GUI.color = Color.white;
         }
+
+        GUI.matrix = previousGuiMatrix;
 
         if (flowState == ZombieStormFlowState.LevelUp)
         {
@@ -743,6 +774,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         get { return playerWalkFrames.Count > 0; }
     }
 
+    public bool PlayerWalkFramesAreIdle
+    {
+        get { return playerWalkFramesAreIdle; }
+    }
+
     public Sprite GetPlayerWalkFrame(string direction, int frameIndex)
     {
         Sprite[] frames;
@@ -873,7 +909,42 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         sfxLastPlayed[key] = now;
         audioSource.pitch = UnityEngine.Random.Range(0.96f, 1.04f);
-        audioSource.PlayOneShot(clip, sfxMuted ? 0f : Mathf.Clamp01(volume * masterVolume));
+        audioSource.PlayOneShot(clip, sfxMuted ? 0f : Mathf.Clamp01(volume * masterVolume * sfxVolume));
+    }
+
+    public void RequestStartRun()
+    {
+        StartRun();
+    }
+
+    public void RequestOpenMainMenuSettings()
+    {
+        OpenSettings(ZombieStormFlowState.MainMenu);
+    }
+
+    public void RequestCloseSettings()
+    {
+        CloseSettings();
+    }
+
+    public void RequestQuit()
+    {
+        QuitGame();
+    }
+
+    public void ApplyMenuSettings(float master, float music, float sfx, bool fullscreen)
+    {
+        masterVolume = Mathf.Clamp01(master);
+        musicVolume = Mathf.Clamp01(music);
+        sfxVolume = Mathf.Clamp01(sfx);
+        sfxMuted = sfxVolume <= 0.001f;
+        Screen.fullScreen = fullscreen;
+
+        PlayerPrefs.SetFloat("ZombieStorm.MasterVolume", masterVolume);
+        PlayerPrefs.SetFloat("ZombieStorm.MusicVolume", musicVolume);
+        PlayerPrefs.SetFloat("ZombieStorm.SfxVolume", sfxVolume);
+        PlayerPrefs.SetInt("ZombieStorm.Fullscreen", fullscreen ? 1 : 0);
+        PlayerPrefs.Save();
     }
 
     private void StartRun()
@@ -984,9 +1055,10 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         mainCamera.name = "Zombie Storm Camera";
         mainCamera.orthographic = true;
-        mainCamera.orthographicSize = 10.5f;
+        mainCamera.orthographicSize = GameplayCameraOrthographicSize;
         mainCamera.clearFlags = CameraClearFlags.SolidColor;
         mainCamera.backgroundColor = new Color(0.035f, 0.04f, 0.052f);
+        SetupMainMenuUI();
 
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null)
@@ -2128,6 +2200,38 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Application.targetFrameRate = targetFrameRate;
     }
 
+    private void LoadMenuSettings()
+    {
+        masterVolume = PlayerPrefs.GetFloat("ZombieStorm.MasterVolume", masterVolume);
+        musicVolume = PlayerPrefs.GetFloat("ZombieStorm.MusicVolume", musicVolume);
+        sfxVolume = PlayerPrefs.GetFloat("ZombieStorm.SfxVolume", sfxVolume);
+        sfxMuted = sfxVolume <= 0.001f;
+        Screen.fullScreen = PlayerPrefs.GetInt("ZombieStorm.Fullscreen", Screen.fullScreen ? 1 : 0) == 1;
+    }
+
+    private void SetupMainMenuUI()
+    {
+        if (mainMenuUI == null)
+        {
+            mainMenuUI = GetComponent<ZombieStormMainMenuUI>();
+            if (mainMenuUI == null)
+            {
+                mainMenuUI = gameObject.AddComponent<ZombieStormMainMenuUI>();
+            }
+        }
+
+        mainMenuUI.Initialize(this, customArenaMapSprite);
+    }
+
+    private void QuitGame()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
     private void DrawUpgradePanel()
     {
         DrawOverlayBackdrop(0.82f);
@@ -2539,7 +2643,16 @@ public sealed class ZombieStormGameController : MonoBehaviour
             cameraShakePower = Mathf.Lerp(cameraShakePower, 0f, 7f * Time.deltaTime);
         }
 
-        mainCamera.transform.position = snap ? target : Vector3.Lerp(mainCamera.transform.position, target, 1f - Mathf.Exp(-8f * Time.deltaTime));
+        Vector3 nextPosition = snap ? target : Vector3.Lerp(mainCamera.transform.position, target, 1f - Mathf.Exp(-8f * Time.deltaTime));
+        mainCamera.transform.position = Snap2DCameraPosition(nextPosition);
+    }
+
+    private static Vector3 Snap2DCameraPosition(Vector3 position)
+    {
+        const float grid = 0.01f;
+        position.x = Mathf.Round(position.x / grid) * grid;
+        position.y = Mathf.Round(position.y / grid) * grid;
+        return position;
     }
 
     private void UpdateDamagePopups()
@@ -3316,6 +3429,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private void LoadCowboyWalkFrames()
     {
         playerWalkFrames.Clear();
+        playerWalkFramesAreIdle = false;
+
+        if (LoadChibiPyromancerIdleFrames())
+        {
+            return;
+        }
 
         if (LoadCowboySplitFrames())
         {
@@ -3373,6 +3492,40 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         StabilizeCowboyWalkFrames();
+    }
+
+    private bool LoadChibiPyromancerIdleFrames()
+    {
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Player", "chibi_pyromancer_idle");
+        if (!Directory.Exists(root))
+        {
+            return false;
+        }
+
+        string[] files = Directory.GetFiles(root, "*.png");
+        Array.Sort(files, CompareFrameFileNames);
+        List<Sprite> frames = new List<Sprite>(files.Length);
+        for (int i = 0; i < files.Length; i++)
+        {
+            Sprite frame = LoadRawSpriteFromPng(files[i], 400f, false, FilterMode.Bilinear, false);
+            if (frame != null)
+            {
+                frames.Add(frame);
+            }
+        }
+
+        if (frames.Count == 0)
+        {
+            return false;
+        }
+
+        Sprite[] idleFrames = frames.ToArray();
+        playerWalkFrames["walk_right"] = idleFrames;
+        playerWalkFrames["walk_left"] = idleFrames;
+        playerWalkFrames["walk_down"] = idleFrames;
+        playerSprite = idleFrames[0];
+        playerWalkFramesAreIdle = true;
+        return true;
     }
 
     private bool LoadCowboySplitFrames()
@@ -3892,6 +4045,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private Sprite LoadRawSpriteFromPng(string path, float pixelsPerUnit, bool removeCheckerBackground)
     {
+        return LoadRawSpriteFromPng(path, pixelsPerUnit, removeCheckerBackground, FilterMode.Bilinear, true);
+    }
+
+    private Sprite LoadRawSpriteFromPng(string path, float pixelsPerUnit, bool removeCheckerBackground, FilterMode filterMode, bool useMipMaps)
+    {
         if (!File.Exists(path))
         {
             return null;
@@ -3900,8 +4058,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         try
         {
             byte[] bytes = File.ReadAllBytes(path);
-            Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, true);
-            texture.filterMode = FilterMode.Bilinear;
+            Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, useMipMaps);
+            texture.filterMode = filterMode;
             texture.wrapMode = TextureWrapMode.Clamp;
             if (!ImageConversion.LoadImage(texture, bytes))
             {
@@ -3915,7 +4073,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             }
 
             texture.name = Path.GetFileNameWithoutExtension(path);
-            texture.Apply(true, false);
+            texture.Apply(useMipMaps, false);
             return Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), pixelsPerUnit);
         }
         catch (Exception exception)

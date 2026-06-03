@@ -157,7 +157,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
             return;
         }
 
-        if (moving)
+        if (moving || game.PlayerWalkFramesAreIdle)
         {
             animationTimer += Time.deltaTime;
             if (animationTimer >= 0.075f)
