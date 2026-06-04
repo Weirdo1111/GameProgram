@@ -19,7 +19,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     public static ZombieStormGameController Instance { get; private set; }
 
     private const string Title = "\u50f5\u5c38\u5272\u8349\u5927\u4f5c\u6218";
-    private const float GameplayCameraOrthographicSize = 14f;
+    private const float GameplayCameraOrthographicSize = 10.5f;
     private const float GameplayHudScale = 0.8f;
     public const float EnemyDamageMultiplier = 0.75f;
 
@@ -42,6 +42,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private readonly Dictionary<string, Sprite[]> playerWalkFrames = new Dictionary<string, Sprite[]>();
     private readonly Dictionary<string, Sprite[]> effectFrames = new Dictionary<string, Sprite[]>();
     private readonly List<ZombieStormDamagePopup> damagePopups = new List<ZombieStormDamagePopup>();
+    private Sprite[] playerIdleFrames = new Sprite[0];
     private bool playerWalkFramesAreIdle;
     private Sprite[] playerHurtFrames = new Sprite[0];
     private Sprite[] chibiEnemyWalkFrames = new Sprite[0];
@@ -271,7 +272,6 @@ public sealed class ZombieStormGameController : MonoBehaviour
         UpdateDynamicDifficulty();
         UpdateSpawning();
         UpdateDamagePopups();
-        FollowPlayer();
 
         if (feedbackTimer >= 15f)
         {
@@ -282,6 +282,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (runTime >= runDurationSeconds)
         {
             EndRun(true, "Dawn breaks. You survived the city.");
+        }
+    }
+
+    private void LateUpdate()
+    {
+        if (flowState == ZombieStormFlowState.Running)
+        {
+            FollowPlayer();
         }
     }
 
@@ -779,6 +787,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         get { return playerWalkFramesAreIdle; }
     }
 
+    public bool HasPlayerIdleAnimation
+    {
+        get { return playerIdleFrames != null && playerIdleFrames.Length > 0; }
+    }
+
     public Sprite GetPlayerWalkFrame(string direction, int frameIndex)
     {
         Sprite[] frames;
@@ -788,6 +801,16 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         return frames[Mathf.Abs(frameIndex) % frames.Length];
+    }
+
+    public Sprite GetPlayerIdleFrame(int frameIndex)
+    {
+        if (!HasPlayerIdleAnimation)
+        {
+            return playerSprite;
+        }
+
+        return playerIdleFrames[Mathf.Abs(frameIndex) % playerIdleFrames.Length];
     }
 
     public bool HasPlayerHurtAnimation
@@ -966,6 +989,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         BuildEnvironment();
 
         GameObject playerObject = new GameObject("Pixel Survivor");
+        TrySetPlayerTag(playerObject);
         playerObject.transform.SetParent(worldRoot, false);
         playerObject.transform.position = Vector3.zero;
         SpriteRenderer playerRenderer = playerObject.AddComponent<SpriteRenderer>();
@@ -2619,12 +2643,18 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     private void FollowPlayer(bool snap = false)
     {
-        if (mainCamera == null || Player == null)
+        if (mainCamera == null)
         {
             return;
         }
 
-        Vector3 target = new Vector3(Player.transform.position.x, Player.transform.position.y, -10f);
+        Transform targetTransform = Player != null ? Player.transform : FindTaggedPlayerTransform();
+        if (targetTransform == null)
+        {
+            return;
+        }
+
+        Vector3 target = new Vector3(targetTransform.position.x, targetTransform.position.y, -10f);
         if (usingCustomArenaMap)
         {
             float cameraHalfHeight = mainCamera.orthographicSize;
@@ -2645,6 +2675,30 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         Vector3 nextPosition = snap ? target : Vector3.Lerp(mainCamera.transform.position, target, 1f - Mathf.Exp(-8f * Time.deltaTime));
         mainCamera.transform.position = Snap2DCameraPosition(nextPosition);
+    }
+
+    private Transform FindTaggedPlayerTransform()
+    {
+        try
+        {
+            GameObject taggedPlayer = GameObject.FindGameObjectWithTag("Player");
+            return taggedPlayer != null ? taggedPlayer.transform : null;
+        }
+        catch (UnityException)
+        {
+            return null;
+        }
+    }
+
+    private static void TrySetPlayerTag(GameObject playerObject)
+    {
+        try
+        {
+            playerObject.tag = "Player";
+        }
+        catch (UnityException)
+        {
+        }
     }
 
     private static Vector3 Snap2DCameraPosition(Vector3 position)
@@ -3507,7 +3561,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         List<Sprite> frames = new List<Sprite>(files.Length);
         for (int i = 0; i < files.Length; i++)
         {
-            Sprite frame = LoadRawSpriteFromPng(files[i], 400f, false, FilterMode.Bilinear, false);
+            Sprite frame = LoadRawSpriteFromPng(files[i], 400f, false, FilterMode.Bilinear, false, true);
             if (frame != null)
             {
                 frames.Add(frame);
@@ -3520,12 +3574,48 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         Sprite[] idleFrames = frames.ToArray();
-        playerWalkFrames["walk_right"] = idleFrames;
-        playerWalkFrames["walk_left"] = idleFrames;
-        playerWalkFrames["walk_down"] = idleFrames;
+        playerIdleFrames = idleFrames;
         playerSprite = idleFrames[0];
-        playerWalkFramesAreIdle = true;
+        Sprite[] rightWalkFrames = LoadChibiPyromancerWalkRightFrames();
+        if (rightWalkFrames != null && rightWalkFrames.Length > 0)
+        {
+            playerWalkFrames["walk_right"] = rightWalkFrames;
+            playerWalkFrames["walk_left"] = rightWalkFrames;
+            playerWalkFrames["walk_down"] = rightWalkFrames;
+            playerWalkFramesAreIdle = false;
+        }
+        else
+        {
+            playerWalkFrames["walk_right"] = idleFrames;
+            playerWalkFrames["walk_left"] = idleFrames;
+            playerWalkFrames["walk_down"] = idleFrames;
+            playerWalkFramesAreIdle = true;
+        }
+
         return true;
+    }
+
+    private Sprite[] LoadChibiPyromancerWalkRightFrames()
+    {
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Player", "chibi_pyromancer_walk_right");
+        if (!Directory.Exists(root))
+        {
+            return null;
+        }
+
+        string[] files = Directory.GetFiles(root, "*.png");
+        Array.Sort(files, CompareFrameFileNames);
+        List<Sprite> frames = new List<Sprite>(files.Length);
+        for (int i = 0; i < files.Length; i++)
+        {
+            Sprite frame = LoadRawSpriteFromPng(files[i], 400f, false, FilterMode.Bilinear, false, true);
+            if (frame != null)
+            {
+                frames.Add(frame);
+            }
+        }
+
+        return frames.Count > 0 ? frames.ToArray() : null;
     }
 
     private bool LoadCowboySplitFrames()
@@ -4048,7 +4138,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return LoadRawSpriteFromPng(path, pixelsPerUnit, removeCheckerBackground, FilterMode.Bilinear, true);
     }
 
-    private Sprite LoadRawSpriteFromPng(string path, float pixelsPerUnit, bool removeCheckerBackground, FilterMode filterMode, bool useMipMaps)
+    private Sprite LoadRawSpriteFromPng(string path, float pixelsPerUnit, bool removeCheckerBackground, FilterMode filterMode, bool useMipMaps, bool pivotOnOpaqueCenter = false)
     {
         if (!File.Exists(path))
         {
@@ -4074,13 +4164,47 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
             texture.name = Path.GetFileNameWithoutExtension(path);
             texture.Apply(useMipMaps, false);
-            return Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), pixelsPerUnit);
+            Vector2 pivot = pivotOnOpaqueCenter ? CalculateOpaqueCenterPivot(texture) : new Vector2(0.5f, 0.5f);
+            return Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), pivot, pixelsPerUnit);
         }
         catch (Exception exception)
         {
             Debug.LogWarning("Failed to load external art: " + path + "\n" + exception.Message);
             return null;
         }
+    }
+
+    private static Vector2 CalculateOpaqueCenterPivot(Texture2D texture)
+    {
+        Color32[] pixels = texture.GetPixels32();
+        long sumX = 0;
+        long sumY = 0;
+        long count = 0;
+
+        for (int y = 0; y < texture.height; y++)
+        {
+            int row = y * texture.width;
+            for (int x = 0; x < texture.width; x++)
+            {
+                if (pixels[row + x].a <= 20)
+                {
+                    continue;
+                }
+
+                sumX += x;
+                sumY += y;
+                count++;
+            }
+        }
+
+        if (count == 0)
+        {
+            return new Vector2(0.5f, 0.5f);
+        }
+
+        return new Vector2(
+            Mathf.Clamp01(sumX / (float)count / Mathf.Max(1, texture.width - 1)),
+            Mathf.Clamp01(sumY / (float)count / Mathf.Max(1, texture.height - 1)));
     }
 
     private Sprite LoadSpriteFromPng(string path, float pixelsPerUnit, bool removeCheckerBackground = false)

@@ -157,7 +157,20 @@ public sealed class ZombieStormPlayer : MonoBehaviour
             return;
         }
 
-        if (moving || game.PlayerWalkFramesAreIdle)
+        if (moving)
+        {
+            animationTimer += Time.deltaTime;
+            if (animationTimer >= 0.033f)
+            {
+                animationTimer = 0f;
+                animationFrame++;
+            }
+
+            spriteRenderer.sprite = game.GetPlayerWalkFrame(facingDirection, animationFrame);
+            return;
+        }
+
+        if (game.HasPlayerIdleAnimation || game.PlayerWalkFramesAreIdle)
         {
             animationTimer += Time.deltaTime;
             if (animationTimer >= 0.075f)
@@ -165,13 +178,15 @@ public sealed class ZombieStormPlayer : MonoBehaviour
                 animationTimer = 0f;
                 animationFrame++;
             }
-        }
-        else
-        {
-            animationTimer = 0f;
-            animationFrame = 0;
+
+            spriteRenderer.sprite = game.HasPlayerIdleAnimation
+                ? game.GetPlayerIdleFrame(animationFrame)
+                : game.GetPlayerWalkFrame(facingDirection, animationFrame);
+            return;
         }
 
+        animationTimer = 0f;
+        animationFrame = 0;
         spriteRenderer.sprite = game.GetPlayerWalkFrame(facingDirection, animationFrame);
     }
 
