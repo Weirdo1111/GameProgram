@@ -10,6 +10,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
     private const float HealthBarWidth = 1.18f;
     private const float HealthBarHeight = 0.1f;
     private const float HurtAnimationDuration = 0.32f;
+    private static readonly Color FrozenTint = new Color(0.48f, 0.82f, 1f, 1f);
 
     private ZombieStormGameController game;
     private SpriteRenderer spriteRenderer;
@@ -18,6 +19,8 @@ public sealed class ZombieStormPlayer : MonoBehaviour
     private Vector2 lastMove = Vector2.down;
     private float hurtCooldown;
     private float hurtAnimationTimer;
+    private float slowTimer;
+    private float slowMultiplier = 1f;
     private float animationTimer;
     private int animationFrame;
     private int hurtAnimationFrame;
@@ -55,6 +58,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
 
         hurtCooldown -= Time.deltaTime;
         hurtAnimationTimer -= Time.deltaTime;
+        slowTimer -= Time.deltaTime;
         Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
         if (input.sqrMagnitude > 1f)
         {
@@ -62,6 +66,11 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         }
 
         float speed = 4.6f + game.GetPassiveLevel(ZombieStormPassiveType.MoveSpeed) * 0.36f;
+        if (slowTimer > 0f)
+        {
+            speed *= slowMultiplier;
+        }
+
         transform.position += (Vector3)(input * speed * Time.deltaTime);
         transform.position = game.ResolveObstacleCollision(transform.position, 0.34f);
 
@@ -82,7 +91,8 @@ public sealed class ZombieStormPlayer : MonoBehaviour
 
         if (spriteRenderer != null)
         {
-            spriteRenderer.color = Color.Lerp(spriteRenderer.color, Color.white, 6f * Time.deltaTime);
+            Color targetColor = slowTimer > 0f ? FrozenTint : Color.white;
+            spriteRenderer.color = Color.Lerp(spriteRenderer.color, targetColor, 6f * Time.deltaTime);
             UpdatePlayerAnimation(input.sqrMagnitude > 0.01f);
         }
 
@@ -245,6 +255,16 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         {
             Health = 0f;
             game.EndRun(false, "The survivor fell to the horde.");
+        }
+    }
+
+    public void ApplySlow(float multiplier, float duration)
+    {
+        slowMultiplier = Mathf.Clamp(multiplier, 0.1f, 1f);
+        slowTimer = Mathf.Max(slowTimer, duration);
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = FrozenTint;
         }
     }
 

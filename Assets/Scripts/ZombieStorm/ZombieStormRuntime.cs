@@ -45,6 +45,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Sprite[] playerIdleFrames = new Sprite[0];
     private bool playerWalkFramesAreIdle;
     private Sprite[] playerHurtFrames = new Sprite[0];
+    private Sprite[] iceBossOrbFrames = new Sprite[0];
     private Sprite[] chibiEnemyWalkFrames = new Sprite[0];
     private Sprite[] goblinRunFrames = new Sprite[0];
     private Sprite[] goblinHurtFrames = new Sprite[0];
@@ -597,6 +598,32 @@ public sealed class ZombieStormGameController : MonoBehaviour
         projectile.Initialize(this, direction, damage * EnemyDamageMultiplier, speed, life, color, size);
     }
 
+    // 生成冰 Boss 的魔法冰球投射物。
+    public void SpawnIceBossProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life)
+    {
+        GameObject projectileObject = SpawnPooled("ice_boss_orb", CreateIceBossProjectile);
+        projectileObject.transform.SetParent(worldRoot, false);
+        projectileObject.transform.position = position;
+        projectileObject.transform.localScale = Vector3.one * 1.55f;
+        SpriteRenderer spriteRenderer = projectileObject.GetComponent<SpriteRenderer>();
+        spriteRenderer.sprite = iceBossOrbFrames != null && iceBossOrbFrames.Length > 0 ? iceBossOrbFrames[0] : projectileFxSprite;
+        spriteRenderer.color = Color.white;
+        spriteRenderer.sortingOrder = 58;
+        ZombieStormIceBossProjectile projectile = projectileObject.GetComponent<ZombieStormIceBossProjectile>();
+        projectile.Initialize(this, direction, damage * EnemyDamageMultiplier, speed, life);
+        SpawnHitSpark(position, new Color(0.45f, 0.9f, 1f, 0.92f), 0.58f);
+    }
+
+    // 生成火焰 Boss 陨石下落攻击。
+    public void SpawnEmberBossMeteorStrike(Vector2 position, float damage, float radius, float fallDuration)
+    {
+        GameObject strikeObject = SpawnPooled("ember_meteor_strike", CreateEmberBossMeteorStrike);
+        strikeObject.transform.SetParent(worldRoot, false);
+        strikeObject.transform.position = position;
+        ZombieStormEmberMeteorStrike strike = strikeObject.GetComponent<ZombieStormEmberMeteorStrike>();
+        strike.Initialize(this, position, damage * EnemyDamageMultiplier, radius, fallDuration);
+    }
+
     // 生成玩家范围伤害效果。
     public void SpawnAreaEffect(Vector2 position, float radius, float damage, float duration, float tickRate, Color color, string poolKey)
     {
@@ -637,7 +664,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     // 判断特效是否应该显示在前景层。
     private static bool IsForegroundEffect(string poolKey)
     {
-        return poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "foozle_explosion" || poolKey == "poison_boss_blast" || poolKey == "ember_dash_blast" || poolKey == "ember_meteor_blast";
+        return poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "foozle_explosion" || poolKey == "poison_boss_blast" || poolKey == "ember_dash_blast" || poolKey == "ember_meteor_blast" || poolKey == "ember_boss_meteor";
     }
 
     // 在命中位置生成短暂闪光特效。
@@ -916,6 +943,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return GetEffectFrames("foozle_fireball");
     }
 
+    public Sprite[] GetIceBossOrbFrames()
+    {
+        return iceBossOrbFrames;
+    }
+
     // 按键名获取指定特效动画帧。
     public Sprite[] GetEffectFrames(string effectKey)
     {
@@ -1077,6 +1109,41 @@ public sealed class ZombieStormGameController : MonoBehaviour
         FollowPlayer(true);
         PlaySfx("start", 0.56f, 0.1f);
         ShowFeedback("Wave 1: Magic Bolt online. Move, kite, collect XP.", 3f);
+        PlayStartupEmberMeteorPreview();
+    }
+
+    // 开局播放一次火焰 Boss 陨石攻击预览。
+    private void PlayStartupEmberMeteorPreview()
+    {
+        if (Player == null)
+        {
+            return;
+        }
+
+        Vector2 center = Player.transform.position;
+        Vector2[] offsets =
+        {
+            new Vector2(-5.8f, 3.2f),
+            new Vector2(-3.5f, 1.4f),
+            new Vector2(-1.2f, 3.6f),
+            new Vector2(1.7f, 2.3f),
+            new Vector2(4.4f, 3.4f),
+            new Vector2(6.0f, 0.7f),
+            new Vector2(3.5f, -1.7f),
+            new Vector2(0.8f, -3.2f),
+            new Vector2(-2.7f, -2.4f),
+            new Vector2(-5.2f, -0.7f),
+            new Vector2(5.2f, -3.4f),
+            new Vector2(-6.8f, -3.6f),
+            new Vector2(0f, 0.9f),
+            new Vector2(2.6f, 4.8f)
+        };
+
+        for (int i = 0; i < offsets.Length; i++)
+        {
+            float radius = i % 3 == 0 ? 1.25f : i % 3 == 1 ? 1.05f : 0.92f;
+            SpawnEmberBossMeteorStrike(center + offsets[i], 0f, radius, 4f);
+        }
     }
 
     // 暂停当前游戏流程。
@@ -1233,6 +1300,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         LoadCustomArenaMap();
         LoadKenneyTopdownArt();
         LoadMikodrakSpellEffects();
+        LoadIceBossOrbFrames();
     }
 
     // 创建游戏音效资源。
@@ -1812,6 +1880,25 @@ public sealed class ZombieStormGameController : MonoBehaviour
         spriteRenderer.color = new Color(0.45f, 1f, 0.25f);
         spriteRenderer.sortingOrder = 39;
         item.AddComponent<ZombieStormEnemyProjectile>();
+        return item;
+    }
+
+    // 创建冰 Boss 魔法冰球对象。
+    private GameObject CreateIceBossProjectile()
+    {
+        GameObject item = new GameObject("Ice Boss Orb");
+        SpriteRenderer spriteRenderer = item.AddComponent<SpriteRenderer>();
+        spriteRenderer.sprite = iceBossOrbFrames != null && iceBossOrbFrames.Length > 0 ? iceBossOrbFrames[0] : projectileFxSprite;
+        spriteRenderer.sortingOrder = 58;
+        item.AddComponent<ZombieStormIceBossProjectile>();
+        return item;
+    }
+
+    // 创建火焰 Boss 陨石下落对象。
+    private GameObject CreateEmberBossMeteorStrike()
+    {
+        GameObject item = new GameObject("Ember Boss Meteor Strike");
+        item.AddComponent<ZombieStormEmberMeteorStrike>();
         return item;
     }
 
@@ -4037,12 +4124,42 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
+    // 加载冰 Boss 魔法冰球从发射到爆裂的动画帧。
+    private void LoadIceBossOrbFrames()
+    {
+        iceBossOrbFrames = new Sprite[0];
+
+        string folder = Path.Combine(Application.dataPath, "ZombieStormArt", "Effects", "IceBossOrb");
+        if (!Directory.Exists(folder))
+        {
+            return;
+        }
+
+        string[] files = Directory.GetFiles(folder, "*.png");
+        Array.Sort(files, CompareFrameFileNames);
+        List<Sprite> frames = new List<Sprite>(files.Length);
+        for (int i = 0; i < files.Length; i++)
+        {
+            Sprite frame = LoadRawSpriteFromPng(files[i], 220f, false, FilterMode.Bilinear, false, true);
+            if (frame != null)
+            {
+                frames.Add(frame);
+            }
+        }
+
+        if (frames.Count > 0)
+        {
+            iceBossOrbFrames = frames.ToArray();
+        }
+    }
+
     // 注册暗色法术特效序列。
     private void AddDarkVfxEffectSequences()
     {
         string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Effects");
         AddEffectSequence(root, "ember_dash_blast", Path.Combine("DarkVFX1", "Frames"), 38f);
         AddEffectSequence(root, "ember_meteor_blast", Path.Combine("DarkVFX2", "Frames"), 44f);
+        AddEffectSequence(root, "ember_boss_meteor", "EmberBossMeteorSelected", 180f);
         AddEffectSequence(root, "poison_boss_blast", "CraftpixPoisonExplosion10", 150f);
     }
 

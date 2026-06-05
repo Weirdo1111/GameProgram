@@ -127,7 +127,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
             spriteRenderer.color = color;
         }
 
-        if (poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "zombie_explosion" || poolKey == "meteor_blast" || poolKey == "foozle_explosion" || poolKey == "poison_boss_blast" || poolKey == "ember_dash_blast" || poolKey == "ember_meteor_blast")
+        if (poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "zombie_explosion" || poolKey == "meteor_blast" || poolKey == "foozle_explosion" || poolKey == "poison_boss_blast" || poolKey == "ember_dash_blast" || poolKey == "ember_meteor_blast" || poolKey == "ember_boss_meteor")
         {
             float grow = 1f + (1f - t) * 0.55f;
             transform.localScale = initialScale * grow;
@@ -230,6 +230,223 @@ public sealed class ZombieStormDelayedAreaEffect : MonoBehaviour
         }
 
         Destroy(gameObject);
+    }
+}
+
+public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
+{
+    private const int FlightFrameStart = 3;
+    private const int ImpactFrameStart = 10;
+    private const float FlightFrameDuration = 0.075f;
+    private const float ImpactFrameDuration = 0.085f;
+    private const float BurnHoldDuration = 0.38f;
+
+    private ZombieStormGameController game;
+    private SpriteRenderer warningRingRenderer;
+    private SpriteRenderer warningOuterRenderer;
+    private SpriteRenderer warningCoreRenderer;
+    private SpriteRenderer meteorRenderer;
+    private Sprite[] frames;
+    private Vector2 targetPosition;
+    private Vector3 skyOffset;
+    private float radius;
+    private float damage;
+    private float fallDuration;
+    private float fallTimer;
+    private float impactTimer;
+    private float meteorScale;
+    private float warningPhase;
+    private bool impacting;
+
+    public void Initialize(ZombieStormGameController owner, Vector2 impactPosition, float hitDamage, float areaRadius, float secondsToImpact)
+    {
+        game = owner;
+        targetPosition = impactPosition;
+        damage = hitDamage;
+        radius = Mathf.Max(0.2f, areaRadius);
+        fallDuration = Mathf.Max(0.25f, secondsToImpact);
+        fallTimer = 0f;
+        impactTimer = 0f;
+        impacting = false;
+        frames = game.GetEffectFrames("ember_boss_meteor");
+        skyOffset = new Vector3(UnityEngine.Random.Range(-5.2f, -2.6f), UnityEngine.Random.Range(9.6f, 12.4f), 0f);
+        meteorScale = UnityEngine.Random.Range(1.85f, 2.35f);
+        warningPhase = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+        EnsureChildren();
+        transform.position = targetPosition;
+        UpdateWarning(1f);
+        UpdateMeteorFlight(0f);
+        game.PlaySfx("shoot", 0.1f, 0.08f);
+    }
+
+    private void EnsureChildren()
+    {
+        if (warningRingRenderer == null)
+        {
+            GameObject warningRing = new GameObject("Meteor Warning Ring");
+            warningRing.transform.SetParent(transform, false);
+            warningRingRenderer = warningRing.AddComponent<SpriteRenderer>();
+            warningRingRenderer.sprite = game.GetOrbitRingSprite();
+            warningRingRenderer.sortingOrder = 48;
+        }
+
+        if (warningOuterRenderer == null)
+        {
+            GameObject warningOuter = new GameObject("Meteor Warning Outer");
+            warningOuter.transform.SetParent(transform, false);
+            warningOuterRenderer = warningOuter.AddComponent<SpriteRenderer>();
+            warningOuterRenderer.sprite = game.GetSoftGlowSprite();
+            warningOuterRenderer.sortingOrder = 46;
+        }
+
+        if (warningCoreRenderer == null)
+        {
+            GameObject warningCore = new GameObject("Meteor Warning Core");
+            warningCore.transform.SetParent(transform, false);
+            warningCoreRenderer = warningCore.AddComponent<SpriteRenderer>();
+            warningCoreRenderer.sprite = game.GetSoftGlowSprite();
+            warningCoreRenderer.sortingOrder = 47;
+        }
+
+        if (meteorRenderer == null)
+        {
+            GameObject meteor = new GameObject("Falling Meteor");
+            meteor.transform.SetParent(transform, false);
+            meteorRenderer = meteor.AddComponent<SpriteRenderer>();
+            meteorRenderer.sortingOrder = 61;
+        }
+    }
+
+    private void Update()
+    {
+        if (game == null)
+        {
+            return;
+        }
+
+        if (impacting)
+        {
+            UpdateImpact();
+            return;
+        }
+
+        fallTimer += Time.deltaTime;
+        float progress = Mathf.Clamp01(fallTimer / fallDuration);
+        UpdateWarning(1f);
+        UpdateMeteorFlight(progress);
+        if (progress >= 1f)
+        {
+            BeginImpact();
+        }
+    }
+
+    private void UpdateWarning(float fade)
+    {
+        float pulse = 0.5f + Mathf.Sin(Time.time * 16f + warningPhase) * 0.5f;
+        float scalePulse = 1f + pulse * 0.12f;
+        if (warningRingRenderer != null)
+        {
+            warningRingRenderer.transform.localPosition = Vector3.zero;
+            warningRingRenderer.transform.localScale = Vector3.one * radius * 2.3f * scalePulse;
+            warningRingRenderer.transform.rotation = Quaternion.Euler(0f, 0f, Time.time * 38f);
+            warningRingRenderer.color = new Color(1f, 0.02f, 0f, (0.46f + pulse * 0.34f) * fade);
+        }
+
+        if (warningOuterRenderer != null)
+        {
+            warningOuterRenderer.transform.localPosition = Vector3.zero;
+            warningOuterRenderer.transform.localScale = Vector3.one * radius * 3.05f * scalePulse;
+            warningOuterRenderer.color = new Color(1f, 0.02f, 0f, (0.12f + pulse * 0.16f) * fade);
+        }
+
+        if (warningCoreRenderer != null)
+        {
+            warningCoreRenderer.transform.localPosition = Vector3.zero;
+            warningCoreRenderer.transform.localScale = Vector3.one * radius * 0.95f * (1f + pulse * 0.08f);
+            warningCoreRenderer.color = new Color(1f, 0.24f, 0.02f, (0.16f + pulse * 0.16f) * fade);
+        }
+    }
+
+    private void UpdateMeteorFlight(float progress)
+    {
+        if (meteorRenderer == null)
+        {
+            return;
+        }
+
+        float eased = Mathf.SmoothStep(0f, 1f, progress);
+        Vector3 start = skyOffset;
+        Vector3 end = new Vector3(0f, 0.16f, 0f);
+        meteorRenderer.transform.localPosition = Vector3.Lerp(start, end, eased);
+        meteorRenderer.transform.localScale = Vector3.one * meteorScale * Mathf.Lerp(1.05f, 1.75f, eased);
+        meteorRenderer.transform.rotation = Quaternion.Euler(0f, 0f, -28f + Mathf.Sin(Time.time * 3f + warningPhase) * 5f);
+        meteorRenderer.color = Color.Lerp(new Color(1f, 1f, 1f, 0.72f), Color.white, progress);
+        SetMeteorFrame(FlightFrameStart + Mathf.Abs(Mathf.FloorToInt(fallTimer / FlightFrameDuration)) % Mathf.Max(1, ImpactFrameStart - FlightFrameStart));
+    }
+
+    private void BeginImpact()
+    {
+        impacting = true;
+        impactTimer = 0f;
+        if (meteorRenderer != null)
+        {
+            meteorRenderer.transform.localPosition = new Vector3(0f, 0.08f, 0f);
+            meteorRenderer.transform.localScale = Vector3.one * meteorScale * 1.85f;
+            meteorRenderer.transform.rotation = Quaternion.identity;
+            meteorRenderer.color = Color.white;
+            SetMeteorFrame(ImpactFrameStart);
+        }
+
+        if (damage > 0f && game.Player != null && Vector2.Distance(targetPosition, game.Player.transform.position) <= radius + 0.38f)
+        {
+            game.Player.TakeDamage(damage);
+        }
+
+        game.PlaySfx("boom", 0.32f, 0.08f);
+        game.ShakeCamera(0.08f, 0.16f);
+        game.FlashScreen(new Color(1f, 0.28f, 0.04f, 1f), 0.22f);
+        for (int i = 0; i < 2; i++)
+        {
+            game.SpawnHitSpark(targetPosition + UnityEngine.Random.insideUnitCircle * radius * 0.65f, new Color(1f, 0.5f, 0.08f, 0.84f), UnityEngine.Random.Range(0.18f, 0.32f));
+        }
+    }
+
+    private void UpdateImpact()
+    {
+        impactTimer += Time.deltaTime;
+        float warningFade = Mathf.Clamp01(1f - impactTimer / 0.22f);
+        UpdateWarning(warningFade);
+
+        if (frames == null || frames.Length == 0)
+        {
+            game.ReturnPooled("ember_meteor_strike", gameObject);
+            return;
+        }
+
+        int impactLength = Mathf.Max(1, frames.Length - ImpactFrameStart);
+        int impactFrame = Mathf.FloorToInt(impactTimer / ImpactFrameDuration);
+        if (impactFrame < impactLength)
+        {
+            SetMeteorFrame(ImpactFrameStart + impactFrame);
+        }
+        else
+        {
+            SetMeteorFrame(frames.Length - 1);
+            if (impactTimer >= impactLength * ImpactFrameDuration + BurnHoldDuration)
+            {
+                game.ReturnPooled("ember_meteor_strike", gameObject);
+            }
+        }
+    }
+
+    private void SetMeteorFrame(int frameIndex)
+    {
+        if (meteorRenderer == null || frames == null || frames.Length == 0)
+        {
+            return;
+        }
+
+        meteorRenderer.sprite = frames[Mathf.Clamp(frameIndex, 0, frames.Length - 1)];
     }
 }
 

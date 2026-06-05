@@ -603,7 +603,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
         else if (Type == ZombieStormEnemyType.CrystalGolemBoss)
         {
-            bossQueuedAction = UnityEngine.Random.Range(0, 2);
+            bossQueuedAction = 1;
             PrepareCrystalGolemTelegraph(bossQueuedAction, bossQueuedDirection, enraged);
         }
         else if (Type == ZombieStormEnemyType.MossGolemBoss)
@@ -1061,7 +1061,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             for (int i = 0; i < shards; i++)
             {
                 Vector2 shotDir = ZombieStormGameController.Rotate(direction, -38f + i * (76f / Mathf.Max(1, shards - 1)));
-                game.SpawnEnemyProjectile(transform.position, shotDir, enraged ? 17f : 12f, enraged ? 6.3f : 5.3f, 3.2f, crystal, 0.56f);
+                game.SpawnIceBossProjectile((Vector2)transform.position + shotDir * 0.85f, shotDir, enraged ? 17f : 12f, enraged ? 6.3f : 5.3f, 3.2f);
             }
         }
 
