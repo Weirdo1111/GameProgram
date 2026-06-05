@@ -912,8 +912,6 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 
         Vector2 targetPosition = game.Player != null ? (Vector2)game.Player.transform.position : (Vector2)transform.position + direction * 3f;
         bossTelegraphPositions.Add(targetPosition);
-        game.SpawnAreaEffect(targetPosition, enraged ? 1.55f : 1.25f, 0f, enraged ? 0.86f : 1.08f, 1f, new Color(0.5f, 1f, 0.16f, 0.26f), "toxic_pool");
-        game.SpawnAreaEffect(targetPosition, 0.38f, 0f, enraged ? 0.78f : 0.96f, 1f, moss, "hit_spark");
     }
 
     private void PrepareEmberTyrantTelegraph(int action, Vector2 direction, bool enraged)
@@ -1089,10 +1087,11 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         {
             Vector2 poisonPosition = game.Player != null ? (Vector2)game.Player.transform.position : bossTelegraphPositions.Count > 0 ? bossTelegraphPositions[0] : (Vector2)transform.position + direction * 3f;
             float burstRadius = enraged ? 1.65f : 1.35f;
-            game.SpawnEnemyAreaEffect(poisonPosition, burstRadius, enraged ? 24f : 18f, enraged ? 0.78f : 0.9f, 99f, new Color(0.48f, 1f, 0.14f, 0.82f), "poison_boss_blast");
-            game.SpawnEnemyAreaEffect(poisonPosition, enraged ? 1.35f : 1.08f, enraged ? 10f : 7f, enraged ? 3.2f : 2.55f, 0.45f, new Color(0.42f, 0.92f, 0.12f, 0.46f), "toxic_pool");
-            game.SpawnHitSpark(poisonPosition, new Color(0.78f, 1f, 0.18f, 0.9f), burstRadius * 0.28f);
-            game.ShakeCamera(enraged ? 0.16f : 0.11f, 0.16f);
+            const float poisonDelay = 2f;
+            game.SpawnAreaEffect(poisonPosition, burstRadius * 1.35f, 0f, poisonDelay, 1f, new Color(1f, 0.04f, 0.02f, 0.46f), "meteor_warning");
+            game.SpawnAreaEffect(poisonPosition, burstRadius * 0.24f, 0f, poisonDelay, 1f, new Color(1f, 0.1f, 0.06f, 0.68f), "hit_spark");
+            game.SpawnDelayedEnemyAreaEffect(poisonPosition, poisonDelay, burstRadius, enraged ? 24f : 18f, enraged ? 0.78f : 0.9f, 99f, new Color(0.48f, 1f, 0.14f, 0.82f), "poison_boss_blast", enraged ? 0.16f : 0.11f, 0.16f, 0.52f);
+            game.SpawnDelayedEnemyAreaEffect(poisonPosition, poisonDelay, enraged ? 1.35f : 1.08f, enraged ? 10f : 7f, enraged ? 3.2f : 2.55f, 0.45f, new Color(0.42f, 0.92f, 0.12f, 0.46f), "toxic_pool");
         }
 
         game.PlaySfx("boom", action == 0 ? 0.64f : 0.52f, 0.08f);

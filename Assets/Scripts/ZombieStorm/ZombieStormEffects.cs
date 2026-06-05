@@ -176,6 +176,63 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
     }
 }
 
+public sealed class ZombieStormDelayedAreaEffect : MonoBehaviour
+{
+    private ZombieStormGameController game;
+    private Vector2 position;
+    private Color color;
+    private string poolKey;
+    private float delay;
+    private float radius;
+    private float damage;
+    private float duration;
+    private float tickRate;
+    private float shakePower;
+    private float shakeDuration;
+    private float sfxVolume;
+
+    public void Initialize(ZombieStormGameController owner, Vector2 targetPosition, float waitSeconds, float areaRadius, float hitDamage, float effectDuration, float rate, Color effectColor, string key, float impactShakePower, float impactShakeDuration, float impactSfxVolume)
+    {
+        game = owner;
+        position = targetPosition;
+        delay = Mathf.Max(0f, waitSeconds);
+        radius = areaRadius;
+        damage = hitDamage;
+        duration = effectDuration;
+        tickRate = rate;
+        color = effectColor;
+        poolKey = key;
+        shakePower = impactShakePower;
+        shakeDuration = impactShakeDuration;
+        sfxVolume = impactSfxVolume;
+    }
+
+    private void Update()
+    {
+        delay -= Time.deltaTime;
+        if (delay > 0f)
+        {
+            return;
+        }
+
+        if (game != null)
+        {
+            game.SpawnEnemyAreaEffect(position, radius, damage, duration, tickRate, color, poolKey);
+            if (shakePower > 0f)
+            {
+                game.ShakeCamera(shakePower, shakeDuration);
+            }
+
+            if (sfxVolume > 0f)
+            {
+                game.PlaySfx("boom", sfxVolume, 0.08f);
+            }
+        }
+
+        Destroy(gameObject);
+    }
+}
+
 public sealed class ZombieStormTimedPooled : MonoBehaviour
 {
     private ZombieStormGameController game;

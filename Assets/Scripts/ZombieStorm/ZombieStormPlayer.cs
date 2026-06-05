@@ -9,6 +9,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
     private const float FallbackPlayerVisualScale = 1.28f;
     private const float HealthBarWidth = 1.18f;
     private const float HealthBarHeight = 0.1f;
+    private const float HurtAnimationDuration = 0.32f;
 
     private ZombieStormGameController game;
     private SpriteRenderer spriteRenderer;
@@ -146,13 +147,8 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         spriteRenderer.flipX = IsLeftFacingDirection(facingDirection);
         if (hurtAnimationTimer > 0f && game.HasPlayerHurtAnimation)
         {
-            animationTimer += Time.deltaTime;
-            if (animationTimer >= 0.055f)
-            {
-                animationTimer = 0f;
-                hurtAnimationFrame++;
-            }
-
+            float progress = 1f - Mathf.Clamp01(hurtAnimationTimer / HurtAnimationDuration);
+            hurtAnimationFrame = Mathf.Min(game.PlayerHurtFrameCount - 1, Mathf.FloorToInt(progress * game.PlayerHurtFrameCount));
             spriteRenderer.sprite = game.GetPlayerHurtFrame(hurtAnimationFrame);
             return;
         }
@@ -234,8 +230,8 @@ public sealed class ZombieStormPlayer : MonoBehaviour
 
         Health -= amount;
         hurtCooldown = 0.12f;
-        hurtAnimationTimer = 0.24f;
-        hurtAnimationFrame = 1;
+        hurtAnimationTimer = HurtAnimationDuration;
+        hurtAnimationFrame = 0;
         animationTimer = 0f;
         game.PlaySfx("hurt", 0.48f, 0.18f);
         game.ShakeCamera(0.08f, 0.12f);
