@@ -245,6 +245,7 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
     private SpriteRenderer warningRingRenderer;
     private SpriteRenderer warningOuterRenderer;
     private SpriteRenderer warningCoreRenderer;
+    private SpriteRenderer shadowRenderer;
     private SpriteRenderer meteorRenderer;
     private Sprite[] frames;
     private Vector2 targetPosition;
@@ -269,8 +270,8 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
         impactTimer = 0f;
         impacting = false;
         frames = game.GetEffectFrames("ember_boss_meteor");
-        skyOffset = new Vector3(UnityEngine.Random.Range(-5.2f, -2.6f), UnityEngine.Random.Range(9.6f, 12.4f), 0f);
-        meteorScale = UnityEngine.Random.Range(1.85f, 2.35f);
+        skyOffset = new Vector3(UnityEngine.Random.Range(3.6f, 5.8f), UnityEngine.Random.Range(8.8f, 11.4f), 0f);
+        meteorScale = UnityEngine.Random.Range(1.15f, 1.45f);
         warningPhase = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
         EnsureChildren();
         transform.position = targetPosition;
@@ -306,6 +307,15 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
             warningCoreRenderer = warningCore.AddComponent<SpriteRenderer>();
             warningCoreRenderer.sprite = game.GetSoftGlowSprite();
             warningCoreRenderer.sortingOrder = 47;
+        }
+
+        if (shadowRenderer == null)
+        {
+            GameObject shadow = new GameObject("Meteor Ground Shadow");
+            shadow.transform.SetParent(transform, false);
+            shadowRenderer = shadow.AddComponent<SpriteRenderer>();
+            shadowRenderer.sprite = game.GetSoftShadowSprite();
+            shadowRenderer.sortingOrder = 49;
         }
 
         if (meteorRenderer == null)
@@ -374,14 +384,31 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
             return;
         }
 
-        float eased = Mathf.SmoothStep(0f, 1f, progress);
+        float eased = progress * progress * (3f - 2f * progress);
         Vector3 start = skyOffset;
         Vector3 end = new Vector3(0f, 0.16f, 0f);
-        meteorRenderer.transform.localPosition = Vector3.Lerp(start, end, eased);
-        meteorRenderer.transform.localScale = Vector3.one * meteorScale * Mathf.Lerp(1.05f, 1.75f, eased);
-        meteorRenderer.transform.rotation = Quaternion.Euler(0f, 0f, -28f + Mathf.Sin(Time.time * 3f + warningPhase) * 5f);
+        Vector3 position = Vector3.Lerp(start, end, eased);
+        float arcLift = Mathf.Sin(progress * Mathf.PI) * 0.55f;
+        position.y += arcLift;
+        meteorRenderer.transform.localPosition = position;
+        meteorRenderer.transform.localScale = Vector3.one * meteorScale * Mathf.Lerp(0.82f, 1.36f, eased);
+        meteorRenderer.transform.rotation = Quaternion.Euler(0f, 0f, 42f + Mathf.Sin(Time.time * 3f + warningPhase) * 4f);
         meteorRenderer.color = Color.Lerp(new Color(1f, 1f, 1f, 0.72f), Color.white, progress);
+        UpdateGroundShadow(progress);
         SetMeteorFrame(FlightFrameStart + Mathf.Abs(Mathf.FloorToInt(fallTimer / FlightFrameDuration)) % Mathf.Max(1, ImpactFrameStart - FlightFrameStart));
+    }
+
+    private void UpdateGroundShadow(float progress)
+    {
+        if (shadowRenderer == null)
+        {
+            return;
+        }
+
+        float eased = Mathf.SmoothStep(0f, 1f, progress);
+        shadowRenderer.transform.localPosition = new Vector3(0f, -0.08f, 0f);
+        shadowRenderer.transform.localScale = new Vector3(radius * Mathf.Lerp(0.45f, 2.05f, eased), radius * Mathf.Lerp(0.16f, 0.68f, eased), 1f);
+        shadowRenderer.color = new Color(0f, 0f, 0f, Mathf.Lerp(0.04f, 0.42f, eased));
     }
 
     private void BeginImpact()
@@ -391,10 +418,15 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
         if (meteorRenderer != null)
         {
             meteorRenderer.transform.localPosition = new Vector3(0f, 0.08f, 0f);
-            meteorRenderer.transform.localScale = Vector3.one * meteorScale * 1.85f;
+            meteorRenderer.transform.localScale = Vector3.one * meteorScale * 1.42f;
             meteorRenderer.transform.rotation = Quaternion.identity;
             meteorRenderer.color = Color.white;
             SetMeteorFrame(ImpactFrameStart);
+        }
+
+        if (shadowRenderer != null)
+        {
+            shadowRenderer.color = new Color(0f, 0f, 0f, 0f);
         }
 
         if (damage > 0f && game.Player != null && Vector2.Distance(targetPosition, game.Player.transform.position) <= radius + 0.38f)
