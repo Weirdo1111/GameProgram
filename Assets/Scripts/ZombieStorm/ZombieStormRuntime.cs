@@ -113,6 +113,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Sprite bloodSplatSprite;
     private Sprite neonSignSprite;
     private Sprite customArenaMapSprite;
+    private Sprite mainMenuCoverSprite;
     private Sprite kenneyZombieSprite;
     private Sprite kenneyFastZombieSprite;
     private Sprite kenneyTankZombieSprite;
@@ -1298,6 +1299,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         LoadCraftpixMossGolemFrames();
         LoadCraftpixEmberGolemFrames();
         LoadCustomArenaMap();
+        LoadMainMenuCover();
         LoadKenneyTopdownArt();
         LoadMikodrakSpellEffects();
         LoadIceBossOrbFrames();
@@ -2055,7 +2057,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         for (int i = 0; i < values.Length; i++)
         {
             ZombieStormSkillType candidate = (ZombieStormSkillType)values.GetValue(i);
-            if (Skills.GetSkillLevel(candidate) > 0)
+            if (IsSkillKnown(candidate))
             {
                 count++;
             }
@@ -2071,7 +2073,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         for (int i = 0; i < values.Length; i++)
         {
             ZombieStormSkillType candidate = (ZombieStormSkillType)values.GetValue(i);
-            if (Skills.GetSkillLevel(candidate) <= 0)
+            if (!IsSkillKnown(candidate))
             {
                 continue;
             }
@@ -2096,9 +2098,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
         for (int guard = 0; guard < 24; guard++)
         {
             ZombieStormSkillType weaponType = (ZombieStormSkillType)values.GetValue(UnityEngine.Random.Range(0, values.Length));
-            if (Skills.GetSkillLevel(weaponType) <= 0)
+            if (!IsSkillKnown(weaponType))
             {
-                return ZombieStormUpgradeOption.Skill("unlock_" + weaponType, SkillName(weaponType) + " Lv.1", SkillSummary(weaponType), SkillAccent(weaponType), delegate { Skills.LearnSkill(weaponType); });
+                return ZombieStormUpgradeOption.Custom("unlock_" + weaponType, SkillName(weaponType) + " Lv.1", SkillSummary(weaponType), "NEW ACTIVE SKILL", SkillAccent(weaponType), delegate { Skills.LearnSkill(weaponType); });
             }
         }
 
@@ -2109,7 +2111,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private ZombieStormUpgradeOption CreateSkillLevelOption(ZombieStormSkillType weaponType)
     {
         int level = Skills.GetSkillLevel(weaponType);
-        if (level <= 0 || level >= 5)
+        if (!IsSkillKnown(weaponType) || level >= 5)
         {
             return null;
         }
@@ -2121,7 +2123,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private ZombieStormUpgradeOption CreateSkillSpecializationOption(ZombieStormSkillType weaponType)
     {
         int skillLevel = Skills.GetSkillLevel(weaponType);
-        if (skillLevel <= 0 || skillLevel >= 5)
+        if (!IsSkillKnown(weaponType) || skillLevel >= 5)
         {
             return null;
         }
@@ -2141,6 +2143,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         return null;
+    }
+
+    // 判断指定技能是否已经被玩家解锁。
+    private bool IsSkillKnown(ZombieStormSkillType weaponType)
+    {
+        return Skills != null && Skills.GetSkillLevel(weaponType) > 0;
     }
 
     // 创建被动技能升级选项。
@@ -2457,7 +2465,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             }
         }
 
-        mainMenuUI.Initialize(this, customArenaMapSprite);
+        mainMenuUI.Initialize(this, mainMenuCoverSprite != null ? mainMenuCoverSprite : customArenaMapSprite);
     }
 
     // 退出游戏或停止编辑器播放。
@@ -2473,33 +2481,38 @@ public sealed class ZombieStormGameController : MonoBehaviour
     // 绘制升级选择面板。
     private void DrawUpgradePanel()
     {
-        DrawOverlayBackdrop(0.82f);
+        DrawOverlayBackdrop(0.88f);
 
-        float panelWidth = Mathf.Min(Screen.width - 48f, 940f);
-        float panelHeight = Screen.height < 620f ? 390f : 430f;
+        bool narrow = Screen.width < 780f || Screen.height < 620f;
+        float sidePadding = narrow ? 24f : 56f;
+        float panelWidth = Mathf.Min(Mathf.Max(320f, Screen.width - sidePadding), narrow ? 640f : 1040f);
+        float panelHeight = narrow ? Mathf.Min(Screen.height - 28f, 500f) : 500f;
         Rect panel = new Rect(Screen.width * 0.5f - panelWidth * 0.5f, Screen.height * 0.5f - panelHeight * 0.5f, panelWidth, panelHeight);
         Color headerAccent = currentChoices.Count > 0 ? currentChoices[0].Accent : new Color(0.3f, 0.86f, 1f, 1f);
 
-        GUI.color = new Color(0.07f, 0.16f, 0.18f, 0.32f);
-        GUI.DrawTexture(new Rect(0f, panel.y + 58f, Screen.width, panel.height - 116f), Texture2D.whiteTexture);
-        DrawPanel(panel, new Color(0.018f, 0.024f, 0.033f, 0.96f), WithAlpha(headerAccent, 0.52f));
+        GUI.color = new Color(0.02f, 0.05f, 0.06f, 0.5f);
+        GUI.DrawTexture(new Rect(0f, panel.y + 78f, Screen.width, panel.height - 156f), Texture2D.whiteTexture);
+        GUI.color = WithAlpha(headerAccent, 0.12f);
+        GUI.DrawTexture(new Rect(panel.x - 18f, panel.y - 18f, panel.width + 36f, panel.height + 36f), Texture2D.whiteTexture);
+        GUI.color = new Color(0f, 0f, 0f, 0.46f);
+        GUI.DrawTexture(new Rect(panel.x + 10f, panel.y + 12f, panel.width, panel.height), Texture2D.whiteTexture);
 
-        GUI.color = new Color(1f, 0.86f, 0.28f, 1f);
-        GUI.skin.label.fontSize = 32;
-        GUI.skin.label.alignment = TextAnchor.UpperCenter;
-        GUI.Label(new Rect(panel.x, panel.y + 24f, panel.width, 42f), "LEVEL UP");
+        DrawPanel(panel, new Color(0.014f, 0.019f, 0.027f, 0.98f), WithAlpha(headerAccent, 0.62f));
+        GUI.color = WithAlpha(headerAccent, 0.9f);
+        GUI.DrawTexture(new Rect(panel.x + 2f, panel.y + 2f, panel.width - 4f, 4f), Texture2D.whiteTexture);
+        GUI.color = WithAlpha(headerAccent, 0.18f);
+        GUI.DrawTexture(new Rect(panel.x + 2f, panel.y + 6f, panel.width - 4f, narrow ? 82f : 96f), Texture2D.whiteTexture);
 
-        GUI.color = new Color(0.78f, 0.88f, 0.96f, 1f);
-        GUI.skin.label.fontSize = 15;
-        GUI.Label(new Rect(panel.x, panel.y + 62f, panel.width, 24f), "Choose one upgrade. Press 1 / 2 / 3 or click a card.");
-        GUI.skin.label.alignment = TextAnchor.UpperLeft;
+        DrawUpgradeHeader(panel, headerAccent, narrow);
 
-        bool narrow = panel.width < 760f;
-        float gap = narrow ? 12f : 18f;
-        float cardWidth = narrow ? panel.width - 48f : (panel.width - 84f - gap * 2f) / 3f;
-        float cardHeight = narrow ? 92f : 250f;
-        float startX = narrow ? panel.x + 24f : panel.x + 42f;
-        float startY = panel.y + (narrow ? 104f : 116f);
+        int choiceCount = Mathf.Max(1, currentChoices.Count);
+        float gap = narrow ? 10f : 20f;
+        float startX = narrow ? panel.x + 20f : panel.x + 42f;
+        float startY = panel.y + (narrow ? 126f : 142f);
+        float footerHeight = narrow ? 44f : 52f;
+        float cardWidth = narrow ? panel.width - 40f : (panel.width - 84f - gap * 2f) / 3f;
+        float availableCardHeight = panel.yMax - footerHeight - 18f - startY;
+        float cardHeight = narrow ? Mathf.Clamp((availableCardHeight - gap * (choiceCount - 1)) / choiceCount, 84f, 102f) : availableCardHeight;
 
         for (int i = 0; i < currentChoices.Count; i++)
         {
@@ -2508,6 +2521,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
                 : new Rect(startX + i * (cardWidth + gap), startY, cardWidth, cardHeight);
             DrawUpgradeCard(rect, currentChoices[i], i, narrow);
         }
+
+        DrawUpgradeFooter(new Rect(panel.x + 20f, panel.yMax - footerHeight - 12f, panel.width - 40f, footerHeight), headerAccent, narrow);
 
         GUI.skin.label.fontSize = 18;
         GUI.skin.label.alignment = TextAnchor.UpperLeft;
@@ -2521,40 +2536,53 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Event currentEvent = Event.current;
         bool hover = rect.Contains(currentEvent.mousePosition);
         Color accent = option.Accent;
-        Color edge = WithAlpha(accent, hover ? 0.96f : 0.68f);
-        Color fill = hover ? new Color(0.055f, 0.072f, 0.09f, 0.99f) : new Color(0.035f, 0.046f, 0.062f, 0.98f);
+        float pulse = 0.5f + Mathf.Sin(Time.unscaledTime * 4.8f + index * 0.7f) * 0.5f;
+        Color edge = WithAlpha(accent, hover ? 1f : 0.62f);
+        Color fill = hover ? new Color(0.046f, 0.058f, 0.074f, 0.99f) : new Color(0.027f, 0.035f, 0.05f, 0.98f);
+        Rect drawRect = hover && !compact ? new Rect(rect.x - 3f, rect.y - 3f, rect.width + 6f, rect.height + 6f) : rect;
 
-        GUI.color = new Color(0f, 0f, 0f, 0.38f);
-        GUI.DrawTexture(new Rect(rect.x + 5f, rect.y + 7f, rect.width, rect.height), Texture2D.whiteTexture);
-        DrawPanel(rect, fill, edge);
+        GUI.color = new Color(0f, 0f, 0f, 0.48f);
+        GUI.DrawTexture(new Rect(rect.x + 7f, rect.y + 9f, rect.width, rect.height), Texture2D.whiteTexture);
+        GUI.color = WithAlpha(accent, hover ? 0.2f : 0.08f);
+        GUI.DrawTexture(new Rect(drawRect.x - 5f, drawRect.y - 5f, drawRect.width + 10f, drawRect.height + 10f), Texture2D.whiteTexture);
+        DrawPanel(drawRect, fill, edge);
 
-        GUI.color = WithAlpha(accent, hover ? 0.24f : 0.14f);
-        GUI.DrawTexture(new Rect(rect.x + 2f, rect.y + 2f, rect.width - 4f, compact ? 32f : 62f), Texture2D.whiteTexture);
-        GUI.color = WithAlpha(accent, hover ? 0.95f : 0.72f);
-        GUI.DrawTexture(new Rect(rect.x + 2f, rect.y + 2f, 5f, rect.height - 4f), Texture2D.whiteTexture);
+        GUI.color = WithAlpha(accent, hover ? 0.3f : 0.16f);
+        GUI.DrawTexture(new Rect(drawRect.x + 2f, drawRect.y + 2f, drawRect.width - 4f, compact ? 40f : 84f), Texture2D.whiteTexture);
+        GUI.color = WithAlpha(accent, hover ? 1f : 0.76f);
+        GUI.DrawTexture(new Rect(drawRect.x + 2f, drawRect.y + 2f, 5f, drawRect.height - 4f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(drawRect.x + 14f, drawRect.y + 16f, compact ? 54f : 78f, 2f), Texture2D.whiteTexture);
+        GUI.color = WithAlpha(accent, hover ? 0.42f + pulse * 0.2f : 0.26f);
+        GUI.DrawTexture(new Rect(drawRect.x + drawRect.width - 44f, drawRect.y + 12f, 22f, 2f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(drawRect.x + drawRect.width - 24f, drawRect.y + 12f, 2f, 22f), Texture2D.whiteTexture);
 
-        Rect hotkey = compact ? new Rect(rect.x + 14f, rect.y + 14f, 34f, 34f) : new Rect(rect.x + 18f, rect.y + 20f, 42f, 42f);
+        Rect hotkey = compact ? new Rect(rect.x + 14f, rect.y + 12f, 34f, 34f) : new Rect(rect.x + 18f, rect.y + 20f, 44f, 44f);
         DrawUpgradeHotkey(hotkey, index + 1, accent, hover);
 
-        Rect icon = compact ? new Rect(rect.x + rect.width - 50f, rect.y + 14f, 32f, 32f) : new Rect(rect.x + rect.width - 68f, rect.y + 18f, 46f, 46f);
+        Rect icon = compact ? new Rect(rect.x + rect.width - 54f, rect.y + 12f, 34f, 34f) : new Rect(rect.x + rect.width * 0.5f - 35f, rect.y + 26f, 70f, 70f);
         DrawUpgradeIcon(icon, option, accent, hover);
 
         float textX = compact ? rect.x + 58f : rect.x + 20f;
-        float textWidth = compact ? rect.width - 118f : rect.width - 40f;
-        float titleY = compact ? rect.y + 12f : rect.y + 76f;
+        float textWidth = compact ? rect.width - 122f : rect.width - 40f;
+        float titleY = compact ? rect.y + 10f : rect.y + 112f;
 
         GUI.skin.label.wordWrap = true;
-        GUI.skin.label.fontSize = option.Title.Length > 24 ? 16 : 18;
+        GUI.skin.label.fontSize = compact ? (option.Title.Length > 24 ? 14 : 16) : (option.Title.Length > 24 ? 17 : 20);
         GUI.color = Color.white;
-        GUI.Label(new Rect(textX, titleY, textWidth, compact ? 24f : 46f), option.Title);
+        GUI.Label(new Rect(textX, titleY, textWidth, compact ? 24f : 50f), option.Title);
 
         GUI.skin.label.fontSize = 11;
         GUI.color = accent;
-        GUI.Label(new Rect(textX, compact ? rect.y + 38f : rect.y + 126f, textWidth, 18f), GetUpgradeKindLabel(option));
+        GUI.Label(new Rect(textX, compact ? rect.y + 36f : rect.y + 162f, textWidth, 18f), GetUpgradeKindLabel(option));
 
         GUI.skin.label.fontSize = compact ? 13 : 14;
         GUI.color = new Color(0.76f, 0.84f, 0.91f, 1f);
-        GUI.Label(new Rect(textX, compact ? rect.y + 56f : rect.y + 150f, textWidth, compact ? 30f : 58f), option.Description);
+        GUI.Label(new Rect(textX, compact ? rect.y + 54f : rect.y + 188f, textWidth, compact ? 34f : 60f), option.Description);
+
+        if (!compact)
+        {
+            DrawUpgradeEnergyTicks(new Rect(rect.x + 24f, rect.yMax - 66f, rect.width - 48f, 10f), accent, index, hover);
+        }
 
         if (!compact)
         {
@@ -2570,6 +2598,47 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         GUI.skin.label.wordWrap = false;
         GUI.color = Color.white;
+    }
+
+    // 绘制升级面板顶部标题区。
+    private void DrawUpgradeHeader(Rect panel, Color accent, bool compact)
+    {
+        GUI.color = new Color(0f, 0f, 0f, 0.22f);
+        GUI.DrawTexture(new Rect(panel.x + 16f, panel.y + 18f, panel.width - 32f, compact ? 84f : 94f), Texture2D.whiteTexture);
+
+        GUI.skin.label.alignment = TextAnchor.UpperLeft;
+        GUI.skin.label.wordWrap = false;
+        GUI.color = WithAlpha(accent, 0.9f);
+        GUI.skin.label.fontSize = compact ? 11 : 12;
+        GUI.Label(new Rect(panel.x + 28f, panel.y + 22f, 240f, 20f), "SURVIVOR UPGRADE");
+
+        GUI.color = new Color(1f, 0.88f, 0.32f, 1f);
+        GUI.skin.label.fontSize = compact ? 28 : 36;
+        bool showStatBlock = !compact || panel.width >= 560f;
+        float titleWidth = showStatBlock ? panel.width * 0.55f : panel.width - 56f;
+        GUI.Label(new Rect(panel.x + 28f, panel.y + 40f, titleWidth, 48f), "LEVEL UP");
+
+        GUI.color = new Color(0.76f, 0.86f, 0.94f, 1f);
+        GUI.skin.label.fontSize = compact ? 12 : 14;
+        float promptWidth = showStatBlock ? panel.width * 0.62f : panel.width - 60f;
+        GUI.Label(new Rect(panel.x + 30f, panel.y + (compact ? 76f : 88f), promptWidth, 24f), "Choose one upgrade with 1 / 2 / 3 or click a card.");
+
+        if (showStatBlock)
+        {
+            string levelText = Player != null ? "RUN LV " + Player.Level : "RUN LV --";
+            string coinText = Player != null ? Player.Coins + " COINS" : "-- COINS";
+            Rect statRect = new Rect(panel.xMax - (compact ? 178f : 240f), panel.y + 34f, compact ? 150f : 210f, compact ? 54f : 62f);
+            DrawPanel(statRect, new Color(0.012f, 0.018f, 0.026f, 0.72f), WithAlpha(accent, 0.45f));
+            GUI.color = WithAlpha(accent, 0.95f);
+            GUI.skin.label.fontSize = compact ? 18 : 24;
+            GUI.skin.label.alignment = TextAnchor.MiddleCenter;
+            GUI.Label(new Rect(statRect.x, statRect.y + 4f, statRect.width, statRect.height * 0.5f), levelText);
+            GUI.color = new Color(0.76f, 0.84f, 0.9f, 1f);
+            GUI.skin.label.fontSize = compact ? 10 : 12;
+            GUI.Label(new Rect(statRect.x, statRect.y + statRect.height * 0.5f, statRect.width, 22f), coinText);
+        }
+
+        GUI.skin.label.alignment = TextAnchor.UpperLeft;
     }
 
     // 绘制升级卡片的快捷键角标。
@@ -2609,14 +2678,48 @@ public sealed class ZombieStormGameController : MonoBehaviour
     // 绘制升级卡片的选择按钮。
     private void DrawUpgradePickButton(Rect rect, int number, Color accent, bool hover)
     {
-        GUI.color = WithAlpha(accent, hover ? 0.86f : 0.52f);
+        GUI.color = WithAlpha(accent, hover ? 0.92f : 0.58f);
         GUI.DrawTexture(rect, Texture2D.whiteTexture);
         GUI.color = hover ? new Color(0.03f, 0.045f, 0.06f, 0.88f) : new Color(0.018f, 0.026f, 0.036f, 0.88f);
         GUI.DrawTexture(new Rect(rect.x + 2f, rect.y + 2f, rect.width - 4f, rect.height - 4f), Texture2D.whiteTexture);
+        GUI.color = WithAlpha(accent, hover ? 0.88f : 0.42f);
+        GUI.DrawTexture(new Rect(rect.x + 8f, rect.y + 7f, 18f, rect.height - 14f), Texture2D.whiteTexture);
         GUI.color = Color.white;
         GUI.skin.label.fontSize = 13;
         GUI.skin.label.alignment = TextAnchor.MiddleCenter;
-        GUI.Label(rect, "PICK " + number);
+        GUI.Label(rect, "SELECT " + number);
+        GUI.skin.label.alignment = TextAnchor.UpperLeft;
+    }
+
+    // 绘制升级卡片底部能量刻度。
+    private void DrawUpgradeEnergyTicks(Rect rect, Color accent, int index, bool hover)
+    {
+        int tickCount = 7;
+        float gap = 5f;
+        float tickWidth = (rect.width - gap * (tickCount - 1)) / tickCount;
+        float pulse = 0.5f + Mathf.Sin(Time.unscaledTime * 5.4f + index) * 0.5f;
+
+        for (int i = 0; i < tickCount; i++)
+        {
+            float alpha = hover ? 0.5f + pulse * 0.4f : 0.22f + i * 0.045f;
+            GUI.color = WithAlpha(accent, Mathf.Clamp01(alpha));
+            GUI.DrawTexture(new Rect(rect.x + i * (tickWidth + gap), rect.y, tickWidth, rect.height), Texture2D.whiteTexture);
+        }
+    }
+
+    // 绘制升级面板底部操作条。
+    private void DrawUpgradeFooter(Rect rect, Color accent, bool compact)
+    {
+        DrawPanel(rect, new Color(0.012f, 0.017f, 0.024f, 0.86f), WithAlpha(accent, 0.28f));
+        GUI.color = WithAlpha(accent, 0.7f);
+        GUI.DrawTexture(new Rect(rect.x + 10f, rect.y + 9f, 3f, rect.height - 18f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.xMax - 13f, rect.y + 9f, 3f, rect.height - 18f), Texture2D.whiteTexture);
+
+        GUI.skin.label.wordWrap = false;
+        GUI.skin.label.alignment = TextAnchor.MiddleCenter;
+        GUI.skin.label.fontSize = compact ? 11 : 13;
+        GUI.color = new Color(0.78f, 0.86f, 0.92f, 1f);
+        GUI.Label(rect, compact ? "1 / 2 / 3  SELECT" : "BUILD CHOICE LOCKS IN IMMEDIATELY    |    1 / 2 / 3 SELECT");
         GUI.skin.label.alignment = TextAnchor.UpperLeft;
     }
 
@@ -4093,6 +4196,15 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         string path = Path.Combine(Application.dataPath, "ZombieStormArt", "Maps", "graveyard_arena.png");
         customArenaMapSprite = LoadRawSpriteFromPng(path, 64f, false);
+    }
+
+    // 加载主菜单封面图。
+    private void LoadMainMenuCover()
+    {
+        mainMenuCoverSprite = null;
+
+        string path = Path.Combine(Application.dataPath, "ZombieStormArt", "Menu", "main_menu_cover.png");
+        mainMenuCoverSprite = LoadRawSpriteFromPng(path, 100f, false, FilterMode.Bilinear, false);
     }
 
     // 加载 Mikodrak 法术特效序列。

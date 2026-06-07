@@ -8,6 +8,8 @@ using UnityEngine.UI;
 public sealed class ZombieStormMainMenuUI : MonoBehaviour
 {
     private const float FadeSpeed = 10f;
+    private const float CoverArtAspectRatio = 1792f / 1024f;
+    private const float CoverArtYOffset = 0f;
     private const string MasterVolumeKey = "ZombieStorm.MasterVolume";
     private const string MusicVolumeKey = "ZombieStorm.MusicVolume";
     private const string SfxVolumeKey = "ZombieStorm.SfxVolume";
@@ -32,6 +34,8 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
     private TextMeshProUGUI masterValue;
     private TextMeshProUGUI musicValue;
     private TextMeshProUGUI sfxValue;
+    private Image coverImage;
+    private AspectRatioFitter coverAspectFitter;
 
     public void Initialize(ZombieStormGameController owner, Sprite backgroundSprite)
     {
@@ -137,29 +141,11 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
     {
         menuRoot = CreateRect("CommercialMainMenu", canvas.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.one);
 
-        Image background = CreateImage("Background", menuRoot.transform, Color.white);
-        Stretch(background.rectTransform);
-        background.type = Image.Type.Simple;
-        background.preserveAspect = false;
-        background.sprite = backgroundSprite != null ? backgroundSprite : GetBackgroundFallbackSprite();
+        coverImage = CreateCoverImage(menuRoot.transform, backgroundSprite != null ? backgroundSprite : GetBackgroundFallbackSprite());
 
-        Image darkOverlay = CreateImage("DarkOverlay", menuRoot.transform, new Color(0f, 0f, 0f, 0.56f));
-        Stretch(darkOverlay.rectTransform);
-
-        Image verticalGradient = CreateImage("TopBottomGradient", menuRoot.transform, Color.white);
-        Stretch(verticalGradient.rectTransform);
-        verticalGradient.sprite = CreateVerticalGradientSprite();
-
-        Image vignette = CreateImage("Vignette", menuRoot.transform, Color.white);
-        Stretch(vignette.rectTransform);
-        vignette.sprite = CreateVignetteSprite();
-
-        RectTransform panel = CreatePanel(menuRoot.transform);
-        CreateTitle(panel);
-        CreateButtons(panel);
-        CreateBottomInfo(menuRoot.transform);
+        CreateCoverHotspots(menuRoot.transform);
         settingsRoot = CreateSettingsPanel(menuRoot.transform);
-        creditsRoot = CreateCreditsPanel(menuRoot.transform);
+        creditsRoot = CreateRect("CreditsPlaceholder", menuRoot.transform, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
         settingsRoot.SetActive(false);
         creditsRoot.SetActive(false);
     }
@@ -178,8 +164,45 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
             if (image != null)
             {
                 image.sprite = backgroundSprite != null ? backgroundSprite : GetBackgroundFallbackSprite();
+                ApplyCoverAspect(image.sprite);
             }
         }
+    }
+
+    private Image CreateCoverImage(Transform parent, Sprite sprite)
+    {
+        GameObject imageObject = CreateRect("Background", parent, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, CoverArtYOffset));
+        RectTransform rect = imageObject.GetComponent<RectTransform>();
+        rect.sizeDelta = Vector2.zero;
+
+        Image image = imageObject.AddComponent<Image>();
+        image.sprite = sprite;
+        image.color = Color.white;
+        image.type = Image.Type.Simple;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+
+        coverAspectFitter = imageObject.AddComponent<AspectRatioFitter>();
+        coverAspectFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+        coverImage = image;
+        ApplyCoverAspect(sprite);
+        return image;
+    }
+
+    private void ApplyCoverAspect(Sprite sprite)
+    {
+        if (coverAspectFitter == null)
+        {
+            return;
+        }
+
+        if (sprite != null && sprite.rect.height > 0.01f)
+        {
+            coverAspectFitter.aspectRatio = sprite.rect.width / sprite.rect.height;
+            return;
+        }
+
+        coverAspectFitter.aspectRatio = CoverArtAspectRatio;
     }
 
     private RectTransform CreatePanel(Transform parent)
@@ -255,6 +278,30 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         hint.rectTransform.pivot = new Vector2(0f, 0f);
         hint.rectTransform.anchoredPosition = new Vector2(54f, 44f);
         hint.rectTransform.sizeDelta = new Vector2(-108f, 24f);
+    }
+
+    private void CreateCoverHotspots(Transform parent)
+    {
+        CreateTransparentCoverButton(parent, "StartGameHotspot", new Vector2(570f, -228f), new Vector2(500f, 128f), delegate { controller.RequestStartRun(); });
+        CreateTransparentCoverButton(parent, "SettingsHotspot", new Vector2(570f, -356f), new Vector2(500f, 128f), delegate { controller.RequestOpenMainMenuSettings(); });
+    }
+
+    private Button CreateTransparentCoverButton(Transform parent, string name, Vector2 anchoredPosition, Vector2 size, UnityEngine.Events.UnityAction onClick)
+    {
+        GameObject buttonObject = CreateRect(name, parent, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), anchoredPosition);
+        RectTransform rect = buttonObject.GetComponent<RectTransform>();
+        rect.sizeDelta = size;
+
+        Image image = buttonObject.AddComponent<Image>();
+        image.sprite = solidSprite;
+        image.color = new Color(1f, 1f, 1f, 0.001f);
+        image.raycastTarget = true;
+
+        Button button = buttonObject.AddComponent<Button>();
+        button.transition = Selectable.Transition.None;
+        button.targetGraphic = image;
+        button.onClick.AddListener(onClick);
+        return button;
     }
 
     private Button CreateStyledButton(Transform parent, string label, int index, UnityEngine.Events.UnityAction onClick)
