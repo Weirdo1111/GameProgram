@@ -26,12 +26,12 @@ Active skills auto-cast after being learned:
 - Orbiting Knives
 - Meteor Storm
 - Fire Zone
-- Summon Drone
+- 火灵
 - Chain Lightning
 - Shield Burst
 - Ultimate Storm
 
-Each active skill is capped at Lv.5. Follow-up upgrades now bias toward skills you already own, so a lightning, fire, knife, drone, or magic build can become more coherent over a run.
+Each active skill is capped at Lv.5. Follow-up upgrades now bias toward skills you already own, so a lightning, fire, knife, 火灵, or magic build can become more coherent over a run.
 
 ## Bosses
 

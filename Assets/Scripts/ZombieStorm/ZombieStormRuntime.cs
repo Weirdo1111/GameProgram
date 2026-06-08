@@ -98,6 +98,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Sprite bossSprite;
     private Sprite bulletSprite;
     private Sprite projectileFxSprite;
+    private Sprite fireSpiritSprite;
     private Sprite xpSprite;
     private Sprite coinSprite;
     private Sprite fireSprite;
@@ -836,7 +837,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return orbitBladeSprite != null ? orbitBladeSprite : sawSprite;
         }
 
-        if (skillType == ZombieStormSkillType.SummonDrone || skillType == ZombieStormSkillType.ShieldBurst)
+        if (skillType == ZombieStormSkillType.SummonDrone)
+        {
+            return fireSpiritSprite != null ? fireSpiritSprite : GetEffectPreviewSprite("foozle_fireball", 4, fireSprite);
+        }
+
+        if (skillType == ZombieStormSkillType.ShieldBurst)
         {
             return mineSprite;
         }
@@ -1300,6 +1306,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         LoadCraftpixEmberGolemFrames();
         LoadCustomArenaMap();
         LoadMainMenuCover();
+        LoadFireSpiritSprite();
         LoadKenneyTopdownArt();
         LoadMikodrakSpellEffects();
         LoadIceBossOrbFrames();
@@ -2240,7 +2247,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         TryEvolve(ZombieStormSkillType.OrbitingKnife, ZombieStormPassiveType.MaxHealth, "Blade Halo evolved.");
         TryEvolve(ZombieStormSkillType.MeteorStorm, ZombieStormPassiveType.Area, "Judgement Meteor evolved.");
         TryEvolve(ZombieStormSkillType.ChainLightning, ZombieStormPassiveType.Crit, "Storm Chain evolved.");
-        TryEvolve(ZombieStormSkillType.SummonDrone, ZombieStormPassiveType.Damage, "Drone Swarm evolved.");
+        TryEvolve(ZombieStormSkillType.SummonDrone, ZombieStormPassiveType.Damage, "火灵 evolved.");
     }
 
     // 在技能和被动满足条件时触发进化。
@@ -3257,7 +3264,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case ZombieStormSkillType.OrbitingKnife: return "Orbiting Knives";
             case ZombieStormSkillType.MeteorStorm: return "Meteor Storm";
             case ZombieStormSkillType.FireZone: return "Fire Zone";
-            case ZombieStormSkillType.SummonDrone: return "Summon Drone";
+            case ZombieStormSkillType.SummonDrone: return "火灵";
             case ZombieStormSkillType.ChainLightning: return "Chain Lightning";
             case ZombieStormSkillType.ShieldBurst: return "Shield Burst";
             case ZombieStormSkillType.UltimateStorm: return "Ultimate: Full-Screen Thunder";
@@ -3274,7 +3281,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case ZombieStormSkillType.OrbitingKnife: return "Adds visible blades that orbit and cut nearby enemies.";
             case ZombieStormSkillType.MeteorStorm: return "Adds warning circles, then delayed impact blasts.";
             case ZombieStormSkillType.FireZone: return "Fireball hits leave a 5-second burning pool.";
-            case ZombieStormSkillType.SummonDrone: return "Adds an AI drone that circles you and shoots targets.";
+            case ZombieStormSkillType.SummonDrone: return "召唤 1 个火灵，环绕你并发射火球。";
             case ZombieStormSkillType.ChainLightning: return "Adds jumping lightning with blue links between enemies.";
             case ZombieStormSkillType.ShieldBurst: return "Adds a close-range defensive shockwave trigger.";
             case ZombieStormSkillType.UltimateStorm: return "Adds one ultimate. Press F for a full-screen storm.";
@@ -3291,11 +3298,22 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case ZombieStormSkillType.OrbitingKnife: return "Lv." + nextLevel + ": more blades, wider orbit, stronger ticks.";
             case ZombieStormSkillType.MeteorStorm: return "Lv." + nextLevel + ": more impacts, bigger warning circles.";
             case ZombieStormSkillType.FireZone: return "Lv." + nextLevel + ": fireball pools burn wider and harder.";
-            case ZombieStormSkillType.SummonDrone: return "Lv." + nextLevel + ": more drones and faster AI fire.";
+            case ZombieStormSkillType.SummonDrone: return FireSpiritLevelSummary(nextLevel);
             case ZombieStormSkillType.ChainLightning: return "Lv." + nextLevel + ": more jumps and stronger chain damage.";
             case ZombieStormSkillType.ShieldBurst: return "Lv." + nextLevel + ": larger defensive ring and harder hit.";
             case ZombieStormSkillType.UltimateStorm: return "Lv." + nextLevel + ": stronger F ultimate, shorter cooldown.";
             default: return "Lv." + nextLevel + ": improves this automatic skill.";
+        }
+    }
+
+    private static string FireSpiritLevelSummary(int nextLevel)
+    {
+        switch (nextLevel)
+        {
+            case 2: return "Lv.2: 火灵攻击速度提高。";
+            case 3: return "Lv.3: 火灵数量变 2。";
+            case 4: return "Lv.4: 火灵数量变 3。";
+            default: return "Lv." + nextLevel + ": 火灵威力提高。";
         }
     }
 
@@ -3333,9 +3351,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case "fire_spread": return "Wildfire";
             case "fire_linger": return "Searing Ground";
             case "fire_heat": return "Hotter Burn";
-            case "drone_swarm": return "Drone Bay";
-            case "drone_focus": return "Targeting Lens";
-            case "drone_overclock": return "Overclock";
+            case "drone_swarm": return "火灵";
+            case "drone_focus": return "火灵";
+            case "drone_overclock": return "火灵";
             case "lightning_jumps": return "Forked Current";
             case "lightning_reach": return "Arc Range";
             case "lightning_voltage": return "High Voltage";
@@ -3371,9 +3389,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case "fire_spread": return "Lv." + nextLevel + ": Fireball hits create another nearby pool.";
             case "fire_linger": return "Lv." + nextLevel + ": Fireball kill pools tick damage faster.";
             case "fire_heat": return "Lv." + nextLevel + ": Fireball kill pools deal more damage.";
-            case "drone_swarm": return "Lv." + nextLevel + ": Summon Drone adds another drone.";
-            case "drone_focus": return "Lv." + nextLevel + ": Drone bullets hit harder.";
-            case "drone_overclock": return "Lv." + nextLevel + ": Drone firing cooldown is reduced.";
+            case "drone_swarm": return "Lv." + nextLevel + ": 火灵 adds another 火灵.";
+            case "drone_focus": return "Lv." + nextLevel + ": 火灵 fireballs hit harder.";
+            case "drone_overclock": return "Lv." + nextLevel + ": 火灵 fireball cooldown is reduced.";
             case "shield_radius": return "Lv." + nextLevel + ": Shield Burst covers more space.";
             case "shield_force": return "Lv." + nextLevel + ": Shield Burst deals more damage.";
             case "shield_recharge": return "Lv." + nextLevel + ": Shield Burst cooldown is reduced.";
@@ -3393,7 +3411,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case ZombieStormSkillType.OrbitingKnife: return new Color(0.92f, 0.96f, 1f, 1f);
             case ZombieStormSkillType.MeteorStorm: return new Color(1f, 0.46f, 0.08f, 1f);
             case ZombieStormSkillType.FireZone: return new Color(1f, 0.28f, 0.05f, 1f);
-            case ZombieStormSkillType.SummonDrone: return new Color(0.35f, 0.9f, 1f, 1f);
+            case ZombieStormSkillType.SummonDrone: return new Color(1f, 0.42f, 0.08f, 1f);
             case ZombieStormSkillType.ChainLightning: return new Color(0.38f, 0.72f, 1f, 1f);
             case ZombieStormSkillType.ShieldBurst: return new Color(0.78f, 0.98f, 1f, 1f);
             case ZombieStormSkillType.UltimateStorm: return new Color(0.95f, 0.86f, 1f, 1f);
@@ -4205,6 +4223,15 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         string path = Path.Combine(Application.dataPath, "ZombieStormArt", "Menu", "main_menu_cover.png");
         mainMenuCoverSprite = LoadRawSpriteFromPng(path, 100f, false, FilterMode.Bilinear, false);
+    }
+
+    // 加载火灵召唤物精灵。
+    private void LoadFireSpiritSprite()
+    {
+        fireSpiritSprite = null;
+
+        string path = Path.Combine(Application.dataPath, "ZombieStormArt", "Player", "FireSpirit.png");
+        fireSpiritSprite = LoadRawSpriteFromPng(path, 720f, true, FilterMode.Bilinear, false, true);
     }
 
     // 加载 Mikodrak 法术特效序列。

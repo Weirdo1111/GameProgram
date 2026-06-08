@@ -161,7 +161,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             case ZombieStormSkillType.OrbitingKnife: return "Orbit Knives";
             case ZombieStormSkillType.MeteorStorm: return "Meteor";
             case ZombieStormSkillType.FireZone: return "Fire Zone";
-            case ZombieStormSkillType.SummonDrone: return "Drone";
+            case ZombieStormSkillType.SummonDrone: return "火灵";
             case ZombieStormSkillType.ChainLightning: return "Lightning";
             case ZombieStormSkillType.ShieldBurst: return "Shield";
             case ZombieStormSkillType.UltimateStorm: return "Ultimate";
@@ -482,14 +482,15 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         drones.Clear();
         int level = GetSkillLevel(ZombieStormSkillType.SummonDrone);
-        int count = 1 + level / 2 + Mod("drone_swarm") + (IsEvolved(ZombieStormSkillType.SummonDrone) ? 2 : 0);
+        int baseCount = level >= 4 ? 3 : level >= 3 ? 2 : 1;
+        int count = baseCount + Mod("drone_swarm") + (IsEvolved(ZombieStormSkillType.SummonDrone) ? 2 : 0);
         for (int i = 0; i < count; i++)
         {
-            GameObject drone = new GameObject("Summoned Drone");
+            GameObject drone = new GameObject("火灵");
             drone.transform.localScale = Vector3.one * 0.56f;
             SpriteRenderer spriteRenderer = drone.AddComponent<SpriteRenderer>();
             spriteRenderer.sprite = game.GetSkillSprite(ZombieStormSkillType.SummonDrone);
-            spriteRenderer.color = new Color(0.5f, 0.92f, 1f);
+            spriteRenderer.color = Color.white;
             spriteRenderer.sortingOrder = 34;
             drones.Add(drone);
         }
@@ -534,11 +535,12 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
             Vector2 direction = ((Vector2)target.transform.position - (Vector2)drones[i].transform.position).normalized;
             Vector2 muzzle = (Vector2)drones[i].transform.position + direction * 0.26f;
-            game.SpawnHitSpark(muzzle, new Color(0.35f, 0.9f, 1f, 0.78f), 0.16f);
-            game.SpawnPlayerProjectile(muzzle, direction, RollDamage((7f + level * 2.4f) * (1f + Mod("drone_focus") * 0.18f)), 12f, 1.1f, 0, new Color(0.4f, 0.92f, 1f), 0.54f);
+            game.SpawnHitSpark(muzzle, new Color(1f, 0.45f, 0.08f, 0.82f), 0.18f);
+            game.SpawnPlayerProjectile(muzzle, direction, RollDamage((7f + level * 2.4f) * (1f + Mod("drone_focus") * 0.18f)), 12f, 1.1f, 0, new Color(1f, 0.42f, 0.08f), 0.62f, true);
         }
 
-        cooldowns[ZombieStormSkillType.SummonDrone] = Mathf.Max(0.22f, 0.92f - level * 0.06f - Mod("drone_overclock") * 0.08f) * game.CooldownMultiplier;
+        float levelCooldownBonus = level >= 2 ? 0.18f : 0f;
+        cooldowns[ZombieStormSkillType.SummonDrone] = Mathf.Max(0.22f, 0.92f - levelCooldownBonus - Mod("drone_overclock") * 0.08f) * game.CooldownMultiplier;
     }
 
     private void UpdateUltimateInput()
