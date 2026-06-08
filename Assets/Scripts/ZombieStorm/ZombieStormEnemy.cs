@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
+// Controls normal enemies and bosses, including chasing, attacks, damage, and death.
 public sealed class ZombieStormEnemy : MonoBehaviour
 {
     private const float BaseZombieHealth = 22f;
@@ -61,6 +62,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private bool UsesAnimatedEnemyArt { get { return UsesAnimatedMeleeAttack || Type == ZombieStormEnemyType.OrcThrower; } }
     private bool UsesAnimatedBossArt { get { return Type == ZombieStormEnemyType.CrystalGolemBoss || Type == ZombieStormEnemyType.MossGolemBoss || Type == ZombieStormEnemyType.EmberTyrantBoss; } }
 
+    // Initializes the references and values this object needs at runtime.
     public void Initialize(ZombieStormGameController owner, ZombieStormEnemyType enemyType, string key, Sprite sprite, Sprite[] enemyWalkFrames, Sprite[] enemyAttackFrames, Sprite[] enemySpecialAttackFrames, Sprite[] enemyHurtFrames, Sprite[] enemyDeathFrames, bool framesFaceRight, float runTime, float difficulty)
     {
         game = owner;
@@ -284,6 +286,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         game.RegisterEnemy(this);
     }
 
+    // Advances movement, combat, animation, timers, and state changes each frame.
     private void Update()
     {
         if (game == null)
@@ -385,6 +388,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         UpdateRenderDepth();
     }
 
+    // Keeps enemies from overlapping the center of the player.
     private Vector2 ResolvePlayerSeparation(Vector2 position)
     {
         if (game == null || game.Player == null || Type == ZombieStormEnemyType.Exploder)
@@ -406,6 +410,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         return playerPosition + pushDirection * minDistance;
     }
 
+    // Updates enemy walk animation frames and facing direction.
     private void UpdateWalkVisual(Vector2 direction)
     {
         if (!useSideViewWalk || spriteRenderer == null || walkFrames == null || walkFrames.Length == 0)
@@ -421,6 +426,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         transform.rotation = Quaternion.identity;
     }
 
+    // Subtracts health, plays hit feedback, and triggers death at zero health.
     public void TakeDamage(float amount, Vector2 impulse)
     {
         if (IsDead)
@@ -454,6 +460,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    // Updates ranged spitter movement, aiming, and projectile firing.
     private void UpdateSpitter(Vector2 direction, float distance)
     {
         if (distance > 6.8f)
@@ -473,6 +480,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    // Updates orc thrower chasing and thrown projectile attacks.
     private void UpdateOrcThrower(Vector2 direction, float distance)
     {
         UpdateFacing(direction);
@@ -530,6 +538,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         UpdateWalkVisual(direction);
     }
 
+    // Updates boss chasing, warnings, skill casts, and enraged behavior.
     private void UpdateBoss(Vector2 direction)
     {
         bool enraged = health < maxHealth * 0.5f;
@@ -580,6 +589,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         BeginBossSkillTelegraph(direction, enraged);
     }
 
+    // Starts a boss skill warning and stores the queued action.
     private void BeginBossSkillTelegraph(Vector2 direction, bool enraged)
     {
         bossQueuedDirection = direction.sqrMagnitude > 0.01f ? direction.normalized : Vector2.up;
@@ -637,6 +647,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         game.PlaySfx(Type == ZombieStormEnemyType.StormBoss ? "lightning" : "boom", UsesAnimatedBossArt ? 0.36f : 0.22f, 0.08f);
     }
 
+    // Runs the boss skill after its warning timer finishes.
     private void ExecuteQueuedBossSkill()
     {
         if (Type == ZombieStormEnemyType.PlagueBoss)
@@ -669,11 +680,13 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    // Runs melee attack animation and applies damage on the strike frame.
     private void UpdateAnimatedMelee(Vector2 direction, float distance, float strikeDamage, float attackRange, float hitRange, float attackFrameRate, float cooldownMin, float cooldownMax, float effectRadius, float effectOffset, Color effectColor, bool heavyStrike)
     {
         UpdateAnimatedMelee(direction, distance, strikeDamage, attackRange, hitRange, attackFrameRate, cooldownMin, cooldownMax, effectRadius, effectOffset, effectColor, heavyStrike, false);
     }
 
+    // Runs melee attack animation and applies damage on the strike frame.
     private void UpdateAnimatedMelee(Vector2 direction, float distance, float strikeDamage, float attackRange, float hitRange, float attackFrameRate, float cooldownMin, float cooldownMax, float effectRadius, float effectOffset, Color effectColor, bool heavyStrike, bool canLeapStrike)
     {
         UpdateFacing(direction);
@@ -759,6 +772,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         UpdateWalkVisual(direction);
     }
 
+    // Plays the death animation and recycles the enemy object afterward.
     private void UpdateDeathAnimation()
     {
         if (deathFrames == null || deathFrames.Length == 0 || spriteRenderer == null)
@@ -775,6 +789,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    // Selects the current action sprite frame from animation progress.
     private void SetActionFrame(Sprite[] frames, float elapsed, float duration)
     {
         if (spriteRenderer == null || frames == null || frames.Length == 0)
@@ -787,6 +802,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         spriteRenderer.sprite = frames[frameIndex];
     }
 
+    // Flips enemy art based on movement or attack direction.
     private void UpdateFacing(Vector2 direction)
     {
         if (spriteRenderer != null && Mathf.Abs(direction.x) > 0.05f)
@@ -795,6 +811,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    // Updates sorting depth from Y position so overlap looks correct.
     private void UpdateRenderDepth()
     {
         Vector3 position = transform.position;
@@ -802,6 +819,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         transform.position = position;
     }
 
+    // Prepares warning positions and colors for the alpha boss skill.
     private void PrepareAlphaBossTelegraph(int action, Vector2 direction, bool enraged)
     {
         if (action == 0)
@@ -831,6 +849,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    // Prepares area warnings for the plague boss skill.
     private void PreparePlagueBossTelegraph(bool enraged)
     {
         int pools = enraged ? 10 : 7;
@@ -851,6 +870,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    // Prepares charge or heavy-strike warnings for the brute boss.
     private void PrepareBruteBossTelegraph(Vector2 direction, bool enraged)
     {
         PrepareDashTelegraph(direction, enraged ? 5.6f : 4.1f, new Color(1f, 0.36f, 0.08f, 0.5f));
@@ -859,6 +879,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         game.SpawnAreaEffect(landingPosition, enraged ? 2.45f : 2f, 0f, 0.68f, 1f, new Color(1f, 0.28f, 0.08f, 0.3f), "zombie_explosion");
     }
 
+    // Prepares multiple lightning warning points for the storm boss.
     private void PrepareStormBossTelegraph(bool enraged)
     {
         int strikes = enraged ? 6 : 4;
@@ -879,6 +900,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    // Prepares warning points for the crystal boss skill.
     private void PrepareCrystalGolemTelegraph(int action, Vector2 direction, bool enraged)
     {
         Color crystal = new Color(0.36f, 0.92f, 1f, 0.46f);
@@ -899,6 +921,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    // Prepares warning points for the moss boss skill.
     private void PrepareMossGolemTelegraph(int action, Vector2 direction, bool enraged)
     {
         Color moss = new Color(0.56f, 0.82f, 0.18f, 0.44f);
@@ -914,6 +937,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         bossTelegraphPositions.Add(targetPosition);
     }
 
+    // Prepares warning points for the ember boss skill.
     private void PrepareEmberTyrantTelegraph(int action, Vector2 direction, bool enraged)
     {
         Color ember = new Color(1f, 0.3f, 0.06f, 0.5f);
@@ -937,6 +961,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    // Places several warning markers along a dash direction.
     private void PrepareDashTelegraph(Vector2 direction, float distance, Color color)
     {
         int markers = Mathf.Clamp(Mathf.CeilToInt(distance), 3, 7);
@@ -948,6 +973,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    // Applies the selected alpha boss skill effect.
     private void CastAlphaBossSkill(int action, Vector2 direction, bool enraged)
     {
         if (action == 0)
@@ -975,6 +1001,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
     }
 
+    // Casts the plague boss persistent poison area.
     private void CastPlagueBossSkill(Vector2 direction, bool enraged)
     {
         int pools = enraged ? 10 : 7;
@@ -994,6 +1021,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         game.PlaySfx("boom", 0.42f, 0.08f);
     }
 
+    // Casts the brute boss heavy strike or charge effect.
     private void CastBruteBossSkill(Vector2 direction, bool enraged)
     {
         float dashDistance = enraged ? 5.6f : 4.1f;
@@ -1016,6 +1044,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         game.PlaySfx("boom", 0.62f, 0.08f);
     }
 
+    // Casts the storm boss lightning strikes.
     private void CastStormBossSkill(Vector2 direction, bool enraged)
     {
         int strikes = enraged ? 6 : 4;
@@ -1041,6 +1070,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         game.ShakeCamera(0.1f, 0.12f);
     }
 
+    // Casts the crystal boss projectile or area skill.
     private void CastCrystalGolemSkill(int action, Vector2 direction, bool enraged)
     {
         Color crystal = new Color(0.36f, 0.92f, 1f, 0.86f);
@@ -1068,6 +1098,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         game.PlaySfx(action == 0 ? "boom" : "shoot", action == 0 ? 0.62f : 0.48f, 0.08f);
     }
 
+    // Casts the moss boss slow and area damage skill.
     private void CastMossGolemSkill(int action, Vector2 direction, bool enraged)
     {
         Color moss = new Color(0.56f, 0.82f, 0.18f, 0.82f);
@@ -1097,6 +1128,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         game.PlaySfx("boom", action == 0 ? 0.64f : 0.52f, 0.08f);
     }
 
+    // Casts the ember boss meteor or fire area skill.
     private void CastEmberTyrantSkill(int action, Vector2 direction, bool enraged)
     {
         Color ember = new Color(1f, 0.3f, 0.05f, 0.88f);
@@ -1131,6 +1163,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         game.PlaySfx("boom", action == 0 ? 0.76f : 0.66f, 0.08f);
     }
 
+    // Returns how long the boss warning should last.
     private float GetBossTelegraphDuration()
     {
         if (Type == ZombieStormEnemyType.MossGolemBoss)
@@ -1161,6 +1194,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         return bossQueuedEnraged ? 0.52f : 0.66f;
     }
 
+    // Returns the boss skill cooldown, shortened while enraged.
     private float GetBossActionCooldown(bool enraged)
     {
         if (Type == ZombieStormEnemyType.PlagueBoss)
@@ -1196,16 +1230,19 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         return enraged ? 2.15f : 3.1f;
     }
 
+    // Checks whether an enemy type is a boss.
     private static bool IsBossType(ZombieStormEnemyType enemyType)
     {
         return enemyType == ZombieStormEnemyType.Boss || enemyType == ZombieStormEnemyType.PlagueBoss || enemyType == ZombieStormEnemyType.BruteBoss || enemyType == ZombieStormEnemyType.StormBoss || enemyType == ZombieStormEnemyType.CrystalGolemBoss || enemyType == ZombieStormEnemyType.MossGolemBoss || enemyType == ZombieStormEnemyType.EmberTyrantBoss;
     }
 
+    // Scales enemy damage by the global difficulty multiplier.
     private static float ScaledEnemyDamage(float amount)
     {
         return amount * ZombieStormGameController.EnemyDamageMultiplier;
     }
 
+    // Returns the display name for a boss type.
     private static string BossName(ZombieStormEnemyType enemyType)
     {
         if (enemyType == ZombieStormEnemyType.PlagueBoss)
@@ -1241,6 +1278,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         return "Horde Alpha";
     }
 
+    // Returns the effect or UI color used by a boss type.
     private static Color BossAccent(ZombieStormEnemyType enemyType)
     {
         if (enemyType == ZombieStormEnemyType.PlagueBoss)
@@ -1276,6 +1314,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         return new Color(1f, 0.2f, 0.15f, 0.9f);
     }
 
+    // Handles enemy death, rewards, kill count, drops, and object recycling.
     private void Die(bool reward)
     {
         if (IsDead)

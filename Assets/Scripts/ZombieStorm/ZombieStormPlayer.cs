@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
+// Controls player movement, health, experience, coins, and damage feedback.
 public sealed class ZombieStormPlayer : MonoBehaviour
 {
     private const float AnimatedPlayerVisualScale = 1.55f;
@@ -35,6 +36,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
     public int Kills { get; set; }
     public float PickupRange { get { return 1.35f + game.GetPassiveLevel(ZombieStormPassiveType.PickupRange) * 0.35f; } }
 
+    // Initializes the references and values this object needs at runtime.
     public void Initialize(ZombieStormGameController owner, SpriteRenderer renderer)
     {
         game = owner;
@@ -49,6 +51,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         BuildHealthBar();
     }
 
+    // Advances movement, combat, animation, timers, and state changes each frame.
     private void Update()
     {
         if (game == null)
@@ -99,6 +102,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         UpdateHealthBar();
     }
 
+    // Creates the health bar shown above the player.
     private void BuildHealthBar()
     {
         Sprite barSprite = game.GetHealthBarSprite();
@@ -129,6 +133,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         healthBarFill.sortingOrder = 53;
     }
 
+    // Updates the health bar fill and color from current health.
     private void UpdateHealthBar()
     {
         if (healthBarFill == null || healthBarFillTransform == null)
@@ -143,6 +148,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         healthBarFill.color = value > 0.5f ? new Color(0.92f, 0.08f, 0.08f, 0.96f) : new Color(1f, 0.58f, 0.08f, 0.98f);
     }
 
+    // Chooses player animation frames from movement and hurt state.
     private void UpdatePlayerAnimation(bool moving)
     {
         if (!game.HasPlayerWalkAnimation)
@@ -196,16 +202,19 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         spriteRenderer.sprite = game.GetPlayerWalkFrame(facingDirection, animationFrame);
     }
 
+    // Checks whether an animation direction should be flipped left.
     private static bool IsLeftFacingDirection(string direction)
     {
         return direction == "walk_left";
     }
 
+    // Converts movement direction into an animation direction name.
     private static string DirectionToAnimation(Vector2 direction)
     {
         return direction.x < -0.08f ? "walk_left" : "walk_right";
     }
 
+    // Adds XP and opens upgrade choices when the player levels up.
     public void AddExperience(int amount)
     {
         if (amount <= 0)
@@ -225,12 +234,14 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         }
     }
 
+    // Adds coins and updates the run statistics.
     public void AddCoins(int amount)
     {
         Coins += Mathf.Max(0, amount);
         game.PlaySfx("coin", 0.34f, 0.055f);
     }
 
+    // Subtracts health, plays hit feedback, and triggers death at zero health.
     public void TakeDamage(float amount)
     {
         if (hurtCooldown > 0f)
@@ -258,6 +269,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         }
     }
 
+    // Applies a temporary movement slow to the player.
     public void ApplySlow(float multiplier, float duration)
     {
         slowMultiplier = Mathf.Clamp(multiplier, 0.1f, 1f);
@@ -268,11 +280,13 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         }
     }
 
+    // Restores health without exceeding maximum health.
     public void Heal(float amount)
     {
         Health = Mathf.Min(MaxHealth, Health + amount);
     }
 
+    // Increases maximum health and heals by the same amount.
     public void IncreaseMaxHealth(float amount)
     {
         MaxHealth += amount;

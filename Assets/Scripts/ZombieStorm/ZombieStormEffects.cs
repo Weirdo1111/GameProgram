@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
+// Handles persistent area effects such as fire pools and shield bursts.
 public sealed class ZombieStormAreaEffect : MonoBehaviour
 {
     private ZombieStormGameController game;
@@ -21,6 +22,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
     private bool mineTriggered;
     private bool harmsPlayer;
 
+    // Initializes the references and values this object needs at runtime.
     public void Initialize(ZombieStormGameController owner, string key, float areaRadius, float hitDamage, float duration, float rate, bool targetsPlayer = false)
     {
         game = owner;
@@ -45,6 +47,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
         frameDuration = frames != null && frames.Length > 0 ? GetFrameDuration(poolKey, maxLife, frames.Length) : 0.05f;
     }
 
+    // Advances movement, combat, animation, timers, and state changes each frame.
     private void Update()
     {
         life -= Time.deltaTime;
@@ -102,6 +105,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
         }
     }
 
+    // Updates an area effect's scale, transparency, and animation frame.
     private void UpdateVisuals()
     {
         float t = Mathf.Clamp01(life / maxLife);
@@ -134,6 +138,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
         }
     }
 
+    // Calculates how long each effect animation frame should last.
     private static float GetFrameDuration(string key, float duration, int frameCount)
     {
         if (key == "poison_boss_blast")
@@ -144,6 +149,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
         return Mathf.Clamp(duration / Mathf.Max(1, frameCount), 0.028f, 0.06f);
     }
 
+    // Applies repeated area damage to enemies inside the radius.
     private void DamageEnemies()
     {
         if (damage <= 0f)
@@ -162,6 +168,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
         }
     }
 
+    // Applies area damage or slow effects to the player.
     private void DamagePlayer()
     {
         if (damage <= 0f || game.Player == null)
@@ -176,6 +183,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
     }
 }
 
+// Shows a warning first, then creates a delayed area damage effect.
 public sealed class ZombieStormDelayedAreaEffect : MonoBehaviour
 {
     private ZombieStormGameController game;
@@ -191,6 +199,7 @@ public sealed class ZombieStormDelayedAreaEffect : MonoBehaviour
     private float shakeDuration;
     private float sfxVolume;
 
+    // Initializes the references and values this object needs at runtime.
     public void Initialize(ZombieStormGameController owner, Vector2 targetPosition, float waitSeconds, float areaRadius, float hitDamage, float effectDuration, float rate, Color effectColor, string key, float impactShakePower, float impactShakeDuration, float impactSfxVolume)
     {
         game = owner;
@@ -207,6 +216,7 @@ public sealed class ZombieStormDelayedAreaEffect : MonoBehaviour
         sfxVolume = impactSfxVolume;
     }
 
+    // Advances movement, combat, animation, timers, and state changes each frame.
     private void Update()
     {
         delay -= Time.deltaTime;
@@ -233,6 +243,7 @@ public sealed class ZombieStormDelayedAreaEffect : MonoBehaviour
     }
 }
 
+// Controls the ember boss meteor warning, fall animation, and impact blast.
 public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
 {
     private const int FlightFrameStart = 3;
@@ -259,6 +270,7 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
     private float warningPhase;
     private bool impacting;
 
+    // Initializes the references and values this object needs at runtime.
     public void Initialize(ZombieStormGameController owner, Vector2 impactPosition, float hitDamage, float areaRadius, float secondsToImpact)
     {
         game = owner;
@@ -280,6 +292,7 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
         game.PlaySfx("shoot", 0.1f, 0.08f);
     }
 
+    // Creates child objects used by the meteor warning, shadow, and body.
     private void EnsureChildren()
     {
         if (warningRingRenderer == null)
@@ -327,6 +340,7 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
         }
     }
 
+    // Advances movement, combat, animation, timers, and state changes each frame.
     private void Update()
     {
         if (game == null)
@@ -350,6 +364,7 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
         }
     }
 
+    // Updates the flashing warning ring before meteor impact.
     private void UpdateWarning(float fade)
     {
         float pulse = 0.5f + Mathf.Sin(Time.time * 16f + warningPhase) * 0.5f;
@@ -377,6 +392,7 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
         }
     }
 
+    // Animates the meteor falling toward its target point.
     private void UpdateMeteorFlight(float progress)
     {
         if (meteorRenderer == null)
@@ -398,6 +414,7 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
         SetMeteorFrame(FlightFrameStart + Mathf.Abs(Mathf.FloorToInt(fallTimer / FlightFrameDuration)) % Mathf.Max(1, ImpactFrameStart - FlightFrameStart));
     }
 
+    // Updates meteor shadow size and transparency during the fall.
     private void UpdateGroundShadow(float progress)
     {
         if (shadowRenderer == null)
@@ -411,6 +428,7 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
         shadowRenderer.color = new Color(0f, 0f, 0f, Mathf.Lerp(0.04f, 0.42f, eased));
     }
 
+    // Starts the meteor impact, applies damage, and plays feedback.
     private void BeginImpact()
     {
         impacting = true;
@@ -443,6 +461,7 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
         }
     }
 
+    // Updates the meteor impact animation and recycles the object when finished.
     private void UpdateImpact()
     {
         impactTimer += Time.deltaTime;
@@ -471,6 +490,7 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
         }
     }
 
+    // Sets the current meteor sprite frame.
     private void SetMeteorFrame(int frameIndex)
     {
         if (meteorRenderer == null || frames == null || frames.Length == 0)
@@ -482,6 +502,7 @@ public sealed class ZombieStormEmberMeteorStrike : MonoBehaviour
     }
 }
 
+// Returns temporary visual effects to the object pool after their lifetime ends.
 public sealed class ZombieStormTimedPooled : MonoBehaviour
 {
     private ZombieStormGameController game;
@@ -491,6 +512,7 @@ public sealed class ZombieStormTimedPooled : MonoBehaviour
     private SpriteRenderer spriteRenderer;
     private Color initialColor;
 
+    // Initializes the references and values this object needs at runtime.
     public void Initialize(ZombieStormGameController owner, string key, float duration)
     {
         game = owner;
@@ -501,6 +523,7 @@ public sealed class ZombieStormTimedPooled : MonoBehaviour
         initialColor = spriteRenderer != null ? spriteRenderer.color : Color.white;
     }
 
+    // Advances movement, combat, animation, timers, and state changes each frame.
     private void Update()
     {
         life -= Time.deltaTime;

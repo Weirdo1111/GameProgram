@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
 [DefaultExecutionOrder(-100)]
+// Main game controller for startup, scene setup, UI, spawning, and upgrade flow.
 public sealed class ZombieStormGameController : MonoBehaviour
 {
     private enum ZombieStormFlowState
@@ -159,7 +160,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     public float SfxVolume { get { return sfxVolume; } }
     public bool FullscreenEnabled { get { return Screen.fullScreen; } }
 
-    // 将位置限制在自定义竞技场边界内。
+    // Clamps a world position inside the arena so actors cannot leave the combat area.
     public Vector2 ClampToArena(Vector2 position)
     {
         if (!usingCustomArenaMap)
@@ -174,7 +175,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    // 场景加载后自动创建游戏控制器。
+    // Creates the game controller automatically when the scene loads.
     private static void AutoBoot()
     {
         if (FindObjectOfType<ZombieStormGameController>() != null)
@@ -186,7 +187,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         bootstrap.AddComponent<ZombieStormGameController>();
     }
 
-    // 初始化单例、运行参数、场景和资源。
+    // Initializes references, singleton state, settings, resources, and scene objects.
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -207,7 +208,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Time.timeScale = 0f;
     }
 
-    // 按当前流程状态处理输入、计时、刷怪和胜负。
+    // Advances movement, combat, animation, timers, and state changes each frame.
     private void Update()
     {
         if (flowState == ZombieStormFlowState.MainMenu)
@@ -292,7 +293,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 在帧末更新摄像机跟随。
+    // Updates camera follow after regular frame logic has moved the player.
     private void LateUpdate()
     {
         if (flowState == ZombieStormFlowState.Running)
@@ -301,7 +302,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 绘制主菜单、HUD、升级、暂停和结算界面。
+    // Draws immediate-mode UI such as HUD, upgrade cards, pause, and result panels.
     private void OnGUI()
     {
         if (mainMenuUI != null && mainMenuUI.IsReady && (flowState == ZombieStormFlowState.MainMenu || IsMainMenuSettingsActive))
@@ -397,14 +398,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 读取指定被动技能的当前等级。
+    // Returns the passive level value for the current state.
     public int GetPassiveLevel(ZombieStormPassiveType passive)
     {
         int level;
         return passives.TryGetValue(passive, out level) ? level : 0;
     }
 
-    // 把敌人加入运行中的敌人列表。
+    // Handles register enemy logic for ZombieStormGameController.
     public void RegisterEnemy(ZombieStormEnemy enemy)
     {
         if (!enemies.Contains(enemy))
@@ -413,13 +414,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 把敌人从运行中的敌人列表移除。
+    // Handles unregister enemy logic for ZombieStormGameController.
     public void UnregisterEnemy(ZombieStormEnemy enemy)
     {
         enemies.Remove(enemy);
     }
 
-    // 把地图障碍加入碰撞检测列表。
+    // Handles register obstacle logic for ZombieStormGameController.
     public void RegisterObstacle(ZombieStormObstacle obstacle)
     {
         if (obstacle != null && !obstacles.Contains(obstacle))
@@ -428,13 +429,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 把地图障碍从碰撞检测列表移除。
+    // Handles unregister obstacle logic for ZombieStormGameController.
     public void UnregisterObstacle(ZombieStormObstacle obstacle)
     {
         obstacles.Remove(obstacle);
     }
 
-    // 修正移动位置，避免进入障碍或地图外。
+    // Handles resolve obstacle collision logic for ZombieStormGameController.
     public Vector2 ResolveObstacleCollision(Vector2 position, float moverRadius)
     {
         position = ClampToArena(position);
@@ -471,7 +472,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return ClampToArena(position);
     }
 
-    // 在指定范围内查找最近的存活敌人。
+    // Handles find nearest enemy logic for ZombieStormGameController.
     public ZombieStormEnemy FindNearestEnemy(Vector2 origin, float maxDistance)
     {
         ZombieStormEnemy best = null;
@@ -497,7 +498,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return best;
     }
 
-    // 随机挑选一个可用敌人，失败时退回最近敌人。
+    // Handles find random enemy logic for ZombieStormGameController.
     public ZombieStormEnemy FindRandomEnemy()
     {
         if (enemies.Count == 0)
@@ -517,7 +518,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return FindNearestEnemy(Player != null ? Player.transform.position : Vector3.zero, 999f);
     }
 
-    // 从对象池取出对象，池为空时创建新对象。
+    // Spawns pooled and initializes its starting values.
     public GameObject SpawnPooled(string key, Func<GameObject> factory)
     {
         Queue<GameObject> queue;
@@ -532,7 +533,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
-    // 回收对象并放回指定对象池。
+    // Handles return pooled logic for ZombieStormGameController.
     public void ReturnPooled(string key, GameObject item)
     {
         if (item == null)
@@ -553,7 +554,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         queue.Enqueue(item);
     }
 
-    // 生成玩家投射物并设置伤害、速度和穿透。
+    // Spawns player projectile and initializes its starting values.
     public void SpawnPlayerProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life, int pierce, Color color, float size, bool createsFireZoneOnKill = false)
     {
         GameObject projectileObject = SpawnPooled("player_bullet", CreatePlayerProjectile);
@@ -568,25 +569,25 @@ public sealed class ZombieStormGameController : MonoBehaviour
         PlaySfx("shoot", 0.28f, 0.055f);
     }
 
-    // 生成敌方投射物并设置外观与运动参数。
+    // Spawns enemy projectile and initializes its starting values.
     public void SpawnEnemyProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life)
     {
         SpawnEnemyProjectile(position, direction, damage, speed, life, new Color(0.5f, 1f, 0.22f, 1f), 0.44f);
     }
 
-    // 生成敌方投射物并设置外观与运动参数。
+    // Spawns enemy projectile and initializes its starting values.
     public void SpawnEnemyProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life, Color color, float size)
     {
         SpawnEnemyProjectile(position, direction, damage, speed, life, color, size, fireSprite);
     }
 
-    // 生成敌方岩石类投射物。
+    // Spawns enemy rock projectile and initializes its starting values.
     public void SpawnEnemyRockProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life)
     {
         SpawnEnemyProjectile(position, direction, damage, speed, life, new Color(0.62f, 0.54f, 0.43f, 1f), 0.48f, rockSprite);
     }
 
-    // 生成敌方投射物并设置外观与运动参数。
+    // Spawns enemy projectile and initializes its starting values.
     private void SpawnEnemyProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life, Color color, float size, Sprite sprite)
     {
         GameObject projectileObject = SpawnPooled("enemy_spit", CreateEnemyProjectile);
@@ -600,7 +601,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         projectile.Initialize(this, direction, damage * EnemyDamageMultiplier, speed, life, color, size);
     }
 
-    // 生成冰 Boss 的魔法冰球投射物。
+    // Spawns ice boss projectile and initializes its starting values.
     public void SpawnIceBossProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life)
     {
         GameObject projectileObject = SpawnPooled("ice_boss_orb", CreateIceBossProjectile);
@@ -616,7 +617,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         SpawnHitSpark(position, new Color(0.45f, 0.9f, 1f, 0.92f), 0.58f);
     }
 
-    // 生成火焰 Boss 陨石下落攻击。
+    // Spawns ember boss meteor strike and initializes its starting values.
     public void SpawnEmberBossMeteorStrike(Vector2 position, float damage, float radius, float fallDuration)
     {
         GameObject strikeObject = SpawnPooled("ember_meteor_strike", CreateEmberBossMeteorStrike);
@@ -626,7 +627,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         strike.Initialize(this, position, damage * EnemyDamageMultiplier, radius, fallDuration);
     }
 
-    // 生成玩家范围伤害效果。
+    // Spawns area effect and initializes its starting values.
     public void SpawnAreaEffect(Vector2 position, float radius, float damage, float duration, float tickRate, Color color, string poolKey)
     {
         GameObject effectObject = SpawnPooled(poolKey, CreateAreaEffect);
@@ -640,7 +641,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         effect.Initialize(this, poolKey, radius, damage, duration, tickRate);
     }
 
-    // 生成敌方范围伤害效果。
+    // Spawns enemy area effect and initializes its starting values.
     public void SpawnEnemyAreaEffect(Vector2 position, float radius, float damage, float duration, float tickRate, Color color, string poolKey)
     {
         GameObject effectObject = SpawnPooled(poolKey, CreateAreaEffect);
@@ -654,7 +655,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         effect.Initialize(this, poolKey, radius, damage * EnemyDamageMultiplier, duration, tickRate, true);
     }
 
-    // 延迟生成敌方范围伤害效果。
+    // Spawns delayed enemy area effect and initializes its starting values.
     public void SpawnDelayedEnemyAreaEffect(Vector2 position, float delay, float radius, float damage, float duration, float tickRate, Color color, string poolKey, float shakePower = 0f, float shakeDuration = 0f, float sfxVolume = 0f)
     {
         GameObject delayedObject = new GameObject("Delayed Enemy Area Effect");
@@ -663,20 +664,20 @@ public sealed class ZombieStormGameController : MonoBehaviour
         delayed.Initialize(this, position, delay, radius, damage, duration, tickRate, color, poolKey, shakePower, shakeDuration, sfxVolume);
     }
 
-    // 判断特效是否应该显示在前景层。
+    // Checks whether the current value matches the foreground effect condition.
     private static bool IsForegroundEffect(string poolKey)
     {
         return poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "foozle_explosion" || poolKey == "poison_boss_blast" || poolKey == "ember_dash_blast" || poolKey == "ember_meteor_blast" || poolKey == "ember_boss_meteor";
     }
 
-    // 在命中位置生成短暂闪光特效。
+    // Spawns hit spark and initializes its starting values.
     public void SpawnHitSpark(Vector2 position, Color color, float radius = 0.36f)
     {
         SpawnAreaEffect(position, radius, 0f, 0.12f, 1f, color, "hit_spark");
         PlaySfx("hit", 0.2f + Mathf.Clamp01(radius) * 0.18f, 0.045f);
     }
 
-    // 生成伤害数字飘字。
+    // Spawns damage number and initializes its starting values.
     public void SpawnDamageNumber(Vector2 position, float amount, bool critical)
     {
         if (damagePopups.Count > 80)
@@ -694,7 +695,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         damagePopups.Add(popup);
     }
 
-    // 生成地面血迹视觉效果。
+    // Spawns blood splat and initializes its starting values.
     public void SpawnBloodSplat(Vector2 position, float scale)
     {
         if (bloodSplatSprite == null)
@@ -713,28 +714,28 @@ public sealed class ZombieStormGameController : MonoBehaviour
         timed.Initialize(this, "blood_splat", UnityEngine.Random.Range(16f, 26f));
     }
 
-    // 触发屏幕闪光反馈。
+    // Handles flash screen logic for ZombieStormGameController.
     public void FlashScreen(float amount)
     {
         screenFlashColor = new Color(1f, 0.08f, 0.04f);
         screenFlash = Mathf.Max(screenFlash, amount);
     }
 
-    // 触发屏幕闪光反馈。
+    // Handles flash screen logic for ZombieStormGameController.
     public void FlashScreen(Color color, float amount)
     {
         screenFlashColor = color;
         screenFlash = Mathf.Max(screenFlash, amount);
     }
 
-    // 触发摄像机震动反馈。
+    // Handles shake camera logic for ZombieStormGameController.
     public void ShakeCamera(float power, float duration)
     {
         cameraShakePower = Mathf.Max(cameraShakePower, power);
         cameraShakeTime = Mathf.Max(cameraShakeTime, duration);
     }
 
-    // 生成经验或金币拾取物。
+    // Spawns pickup and initializes its starting values.
     public void SpawnPickup(Vector2 position, int xp, int coins)
     {
         if (xp > 0)
@@ -755,7 +756,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 处理敌人死亡后的奖励、反馈和胜负检查。
+    // Handles on enemy killed logic for ZombieStormGameController.
     public void OnEnemyKilled(ZombieStormEnemy enemy)
     {
         if (Player != null)
@@ -791,7 +792,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 进入升级选择流程。
+    // Handles request level up logic for ZombieStormGameController.
     public void RequestLevelUp()
     {
         if (leveling || finished || flowState != ZombieStormFlowState.Running)
@@ -808,7 +809,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ShowFeedback("Level up. Pick a build direction.", 2f);
     }
 
-    // 结束本局并进入结算状态。
+    // Handles end run logic for ZombieStormGameController.
     public void EndRun(bool victory, string message)
     {
         if (finished)
@@ -824,7 +825,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ShowFeedback(message, 999f);
     }
 
-    // 返回指定技能对应的图标精灵。
+    // Returns the skill sprite value for the current state.
     public Sprite GetSkillSprite(ZombieStormSkillType skillType)
     {
         if (skillType == ZombieStormSkillType.MagicBolt)
@@ -870,7 +871,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         get { return playerIdleFrames != null && playerIdleFrames.Length > 0; }
     }
 
-    // 按方向和序号获取玩家行走帧。
+    // Returns the player walk frame value for the current state.
     public Sprite GetPlayerWalkFrame(string direction, int frameIndex)
     {
         Sprite[] frames;
@@ -882,7 +883,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return frames[Mathf.Abs(frameIndex) % frames.Length];
     }
 
-    // 获取玩家待机动画帧。
+    // Returns the player idle frame value for the current state.
     public Sprite GetPlayerIdleFrame(int frameIndex)
     {
         if (!HasPlayerIdleAnimation)
@@ -903,7 +904,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         get { return playerHurtFrames != null ? playerHurtFrames.Length : 0; }
     }
 
-    // 获取玩家受伤动画帧。
+    // Returns the player hurt frame value for the current state.
     public Sprite GetPlayerHurtFrame(int frameIndex)
     {
         if (!HasPlayerHurtAnimation)
@@ -914,48 +915,49 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return playerHurtFrames[Mathf.Clamp(frameIndex, 0, playerHurtFrames.Length - 1)];
     }
 
-    // 获取柔和阴影精灵。
+    // Returns the soft shadow sprite value for the current state.
     public Sprite GetSoftShadowSprite()
     {
         return softShadowSprite;
     }
 
-    // 获取柔光精灵。
+    // Returns the soft glow sprite value for the current state.
     public Sprite GetSoftGlowSprite()
     {
         return softGlowSprite;
     }
 
-    // 获取环绕武器的光环精灵。
+    // Returns the orbit ring sprite value for the current state.
     public Sprite GetOrbitRingSprite()
     {
         return orbitRingSprite != null ? orbitRingSprite : softGlowSprite;
     }
 
-    // 获取血条使用的纯色精灵。
+    // Returns the health bar sprite value for the current state.
     public Sprite GetHealthBarSprite()
     {
         return tileSprite;
     }
 
-    // 获取投射物命中特效的预览精灵。
+    // Returns the projectile effect sprite value for the current state.
     public Sprite GetProjectileEffectSprite()
     {
         return GetEffectPreviewSprite("foozle_fireball", 4, projectileFxSprite != null ? projectileFxSprite : bulletSprite);
     }
 
-    // 获取投射物命中特效动画帧。
+    // Returns the projectile effect frames value for the current state.
     public Sprite[] GetProjectileEffectFrames()
     {
         return GetEffectFrames("foozle_fireball");
     }
 
+    // Returns the ice boss orb frames value for the current state.
     public Sprite[] GetIceBossOrbFrames()
     {
         return iceBossOrbFrames;
     }
 
-    // 按键名获取指定特效动画帧。
+    // Returns the effect frames value for the current state.
     public Sprite[] GetEffectFrames(string effectKey)
     {
         if (effectFrames.Count == 0)
@@ -995,7 +997,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return null;
     }
 
-    // 把二维向量旋转指定角度。
+    // Handles rotate logic for ZombieStormGameController.
     public static Vector2 Rotate(Vector2 value, float degrees)
     {
         float radians = degrees * Mathf.Deg2Rad;
@@ -1004,13 +1006,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return new Vector2(value.x * cos - value.y * sin, value.x * sin + value.y * cos);
     }
 
-    // 返回替换透明度后的颜色。
+    // Handles with alpha logic for ZombieStormGameController.
     public static Color WithAlpha(Color color, float alpha)
     {
         return new Color(color.r, color.g, color.b, alpha);
     }
 
-    // 播放音效并按最小间隔做节流。
+    // Handles play sfx logic for ZombieStormGameController.
     public void PlaySfx(string key, float volume = 1f, float minInterval = 0.02f)
     {
         if (audioSource == null)
@@ -1036,31 +1038,31 @@ public sealed class ZombieStormGameController : MonoBehaviour
         audioSource.PlayOneShot(clip, sfxMuted ? 0f : Mathf.Clamp01(volume * masterVolume * sfxVolume));
     }
 
-    // 响应菜单请求并开始新一局。
+    // Handles request start run logic for ZombieStormGameController.
     public void RequestStartRun()
     {
         StartRun();
     }
 
-    // 响应菜单请求并打开主菜单设置。
+    // Handles request open main menu settings logic for ZombieStormGameController.
     public void RequestOpenMainMenuSettings()
     {
         OpenSettings(ZombieStormFlowState.MainMenu);
     }
 
-    // 响应菜单请求并关闭设置面板。
+    // Handles request close settings logic for ZombieStormGameController.
     public void RequestCloseSettings()
     {
         CloseSettings();
     }
 
-    // 响应菜单请求并退出游戏。
+    // Handles request quit logic for ZombieStormGameController.
     public void RequestQuit()
     {
         QuitGame();
     }
 
-    // 应用音量、音效和全屏设置。
+    // Applies menu settings effects to the current game state.
     public void ApplyMenuSettings(float master, float music, float sfx, bool fullscreen)
     {
         masterVolume = Mathf.Clamp01(master);
@@ -1076,7 +1078,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         PlayerPrefs.Save();
     }
 
-    // 重置本局数据并进入运行状态。
+    // Handles start run logic for ZombieStormGameController.
     private void StartRun()
     {
         runTime = 0f;
@@ -1112,14 +1114,15 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Skills = playerObject.AddComponent<ZombieStormSkillManager>();
         Skills.Initialize(this, Player);
         Skills.LearnSkill(ZombieStormSkillType.MagicBolt);
+        Skills.LearnSkill(ZombieStormSkillType.OrbitingKnife);
 
         FollowPlayer(true);
         PlaySfx("start", 0.56f, 0.1f);
-        ShowFeedback("Wave 1: Magic Bolt online. Move, kite, collect XP.", 3f);
+        ShowFeedback("Wave 1: Magic Bolt and Orbiting Knives online. Move, kite, collect XP.", 3f);
         PlayStartupEmberMeteorPreview();
     }
 
-    // 开局播放一次火焰 Boss 陨石攻击预览。
+    // Handles play startup ember meteor preview logic for ZombieStormGameController.
     private void PlayStartupEmberMeteorPreview()
     {
         if (Player == null)
@@ -1153,7 +1156,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 暂停当前游戏流程。
+    // Handles pause run logic for ZombieStormGameController.
     private void PauseRun()
     {
         if (flowState != ZombieStormFlowState.Running)
@@ -1166,7 +1169,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ShowFeedback("Run paused.", 1.6f);
     }
 
-    // 恢复被暂停的游戏流程。
+    // Handles resume run logic for ZombieStormGameController.
     private void ResumeRun()
     {
         if (finished)
@@ -1179,7 +1182,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ShowFeedback("Back to the street.", 1.6f);
     }
 
-    // 打开设置界面并记录返回状态。
+    // Handles open settings logic for ZombieStormGameController.
     private void OpenSettings(ZombieStormFlowState returnState)
     {
         settingsReturnState = returnState;
@@ -1187,14 +1190,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Time.timeScale = 0f;
     }
 
-    // 关闭设置界面并回到原流程状态。
+    // Handles close settings logic for ZombieStormGameController.
     private void CloseSettings()
     {
         flowState = settingsReturnState;
         Time.timeScale = flowState == ZombieStormFlowState.Running ? 1f : 0f;
     }
 
-    // 清理本局并返回主菜单。
+    // Handles return to main menu logic for ZombieStormGameController.
     private void ReturnToMainMenu()
     {
         ClearActiveObjects();
@@ -1210,7 +1213,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Time.timeScale = 0f;
     }
 
-    // 创建世界根节点、摄像机、玩家和技能管理器。
+    // Builds the scene objects by combining their child elements.
     private void BuildScene()
     {
         worldRoot = new GameObject("Zombie Storm Runtime").transform;
@@ -1243,7 +1246,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         audioSource.volume = 1f;
     }
 
-    // 搭建地图、障碍和环境装饰。
+    // Builds the floor, roads, obstacles, and decorative scene objects.
     private void BuildEnvironment()
     {
         usingCustomArenaMap = false;
@@ -1267,7 +1270,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         BuildNeonAccents();
     }
 
-    // 创建并加载游戏需要的精灵资源。
+    // Creates or loads sprites used by characters, skills, pickups, effects, and UI.
     private void CreateSprites()
     {
         playerSprite = CreateSurvivorSprite();
@@ -1312,7 +1315,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         LoadIceBossOrbFrames();
     }
 
-    // 创建游戏音效资源。
+    // Generates sound clips for attacks, pickups, upgrades, hits, and feedback.
     private void CreateAudioClips()
     {
         sfx.Clear();
@@ -1333,7 +1336,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         sfx["start"] = CreateArpeggioClip("zs_start", new[] { 330f, 495f, 660f }, 0.26f, 0.34f);
     }
 
-    // 按参数合成一段简单音效。
+    // Generates a short synthetic sound clip from frequency and wave settings.
     private AudioClip CreateSynthClip(string clipName, float duration, float startFrequency, float endFrequency, float volume, float noiseAmount, ZombieStormWave wave)
     {
         const int sampleRate = 44100;
@@ -1359,7 +1362,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return clip;
     }
 
-    // 按音符序列合成琶音音效。
+    // Generates a short arpeggio sound from a list of notes.
     private AudioClip CreateArpeggioClip(string clipName, float[] notes, float duration, float volume)
     {
         const int sampleRate = 44100;
@@ -1385,7 +1388,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return clip;
     }
 
-    // 计算指定波形在当前相位的采样值。
+    // Evaluates one audio sample for the selected oscillator wave shape.
     private static float EvaluateWave(ZombieStormWave wave, float phase)
     {
         if (wave == ZombieStormWave.Square)
@@ -1411,14 +1414,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return Mathf.Sin(phase * Mathf.PI * 2f);
     }
 
-    // 生成下一个伪随机噪声采样。
+    // Generates pseudo-random noise used to make synth sounds punchier.
     private static float NextNoise(ref uint state)
     {
         state = state * 1664525u + 1013904223u;
         return ((state >> 8) / 16777215f) * 2f - 1f;
     }
 
-    // 根据存活时间更新动态难度。
+    // Scales difficulty over time so later waves spawn more dangerous enemies.
     private void UpdateDynamicDifficulty()
     {
         float timeFactor = 0.62f + runTime / 92f;
@@ -1427,7 +1430,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         difficultyScore = Mathf.Clamp(timeFactor * lowHealthMercy * dominance, 0.55f, 8f);
     }
 
-    // 按计时器和难度刷新普通敌人与精英波次。
+    // Spawns regular enemies over time and triggers boss waves at scheduled moments.
     private void UpdateSpawning()
     {
         spawnTimer -= Time.deltaTime;
@@ -1468,14 +1471,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 生成 Boss 波次并显示警告。
+    // Spawns a specific boss and shows a warning message to the player.
     private void SpawnBossWave(ZombieStormEnemyType bossType)
     {
         SpawnEnemy(bossType);
         ShowFeedback(BossWaveWarning(bossType), 3f);
     }
 
-    // 根据难度权重选择下一个敌人类型。
+    // Chooses the next enemy type using time-based random weights.
     private ZombieStormEnemyType ChooseEnemyType()
     {
         float roll = UnityEngine.Random.value;
@@ -1509,7 +1512,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return ZombieStormEnemyType.Goblin;
     }
 
-    // 生成一个指定类型的敌人并初始化属性。
+    // Creates an enemy offscreen and initializes its stats, sprite, and animation frames.
     private void SpawnEnemy(ZombieStormEnemyType enemyType)
     {
         enemyType = RemapRemovedBaseZombieType(enemyType);
@@ -1524,7 +1527,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         enemy.Initialize(this, enemyType, key, GetEnemySprite(enemyType, walkFrames), walkFrames, GetEnemyAttackFrames(enemyType), GetEnemySpecialAttackFrames(enemyType), GetEnemyHurtFrames(enemyType), GetEnemyDeathFrames(enemyType), framesFaceRight, runTime, difficultyScore);
     }
 
-    // 把已移除的基础敌人类型映射到可用类型。
+    // Maps removed base zombie types to enemy types that still exist in the project.
     private ZombieStormEnemyType RemapRemovedBaseZombieType(ZombieStormEnemyType enemyType)
     {
         if (enemyType == ZombieStormEnemyType.Grunt ||
@@ -1550,7 +1553,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return enemyType;
     }
 
-    // 获取屏幕外的敌人出生位置。
+    // Chooses a spawn point just outside the visible player area.
     private Vector2 GetOffscreenSpawnPosition()
     {
         Vector2 center = Player != null ? Player.transform.position : Vector3.zero;
@@ -1565,7 +1568,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return usingCustomArenaMap ? ClampToArena(spawnPosition) : spawnPosition;
     }
 
-    // 获取指定敌人类型的默认显示精灵。
+    // Returns the default sprite for a given enemy type.
     private Sprite GetEnemySprite(ZombieStormEnemyType enemyType, Sprite[] walkFrames)
     {
         if (walkFrames != null && walkFrames.Length > 0)
@@ -1661,7 +1664,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return zombieSprite;
     }
 
-    // 获取指定敌人类型的移动动画帧。
+    // Returns walk animation frames for a given enemy type.
     private Sprite[] GetEnemyWalkFrames(ZombieStormEnemyType enemyType)
     {
         if ((enemyType == ZombieStormEnemyType.Goblin || enemyType == ZombieStormEnemyType.SmallGoblin) && goblinRunFrames != null && goblinRunFrames.Length > 0)
@@ -1712,7 +1715,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return null;
     }
 
-    // 从特效帧中选取预览精灵。
+    // Returns a preview frame for a skill effect or warning marker.
     private Sprite GetEffectPreviewSprite(string effectKey, int preferredIndex, Sprite fallback)
     {
         Sprite[] frames = GetEffectFrames(effectKey);
@@ -1724,7 +1727,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return frames[Mathf.Clamp(preferredIndex, 0, frames.Length - 1)];
     }
 
-    // 获取指定敌人类型的普通攻击帧。
+    // Returns normal attack animation frames for a given enemy type.
     private Sprite[] GetEnemyAttackFrames(ZombieStormEnemyType enemyType)
     {
         if (enemyType == ZombieStormEnemyType.Gravedigger && gravediggerSlashFrames.Length > 0)
@@ -1760,7 +1763,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return enemyType == ZombieStormEnemyType.Slasher && villagerSlashFrames.Length > 0 ? villagerSlashFrames : null;
     }
 
-    // 获取指定敌人类型的特殊攻击帧。
+    // Returns special attack animation frames for a given enemy type.
     private Sprite[] GetEnemySpecialAttackFrames(ZombieStormEnemyType enemyType)
     {
         if (enemyType == ZombieStormEnemyType.CrystalGolemBoss && crystalGolemThrowFrames.Length > 0)
@@ -1776,7 +1779,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return enemyType == ZombieStormEnemyType.EmberTyrantBoss && emberGolemThrowFrames.Length > 0 ? emberGolemThrowFrames : null;
     }
 
-    // 获取指定敌人类型的受伤帧。
+    // Returns hurt animation frames for a given enemy type.
     private Sprite[] GetEnemyHurtFrames(ZombieStormEnemyType enemyType)
     {
         if ((enemyType == ZombieStormEnemyType.Goblin || enemyType == ZombieStormEnemyType.SmallGoblin) && goblinHurtFrames.Length > 0)
@@ -1817,7 +1820,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return enemyType == ZombieStormEnemyType.Slasher && villagerHurtFrames.Length > 0 ? villagerHurtFrames : null;
     }
 
-    // 获取指定敌人类型的死亡帧。
+    // Returns death animation frames for a given enemy type.
     private Sprite[] GetEnemyDeathFrames(ZombieStormEnemyType enemyType)
     {
         if ((enemyType == ZombieStormEnemyType.Goblin || enemyType == ZombieStormEnemyType.SmallGoblin) && goblinDeathFrames.Length > 0)
@@ -1858,7 +1861,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return enemyType == ZombieStormEnemyType.Slasher && villagerDeathFrames.Length > 0 ? villagerDeathFrames : null;
     }
 
-    // 创建敌人对象及其基础渲染组件。
+    // Creates a pooled enemy object with renderer, collider, and enemy script.
     private GameObject CreateEnemy()
     {
         GameObject item = new GameObject("Pooled Zombie");
@@ -1869,7 +1872,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
-    // 创建玩家投射物对象。
+    // Creates a pooled player projectile object.
     private GameObject CreatePlayerProjectile()
     {
         GameObject item = new GameObject("Player Bullet");
@@ -1880,7 +1883,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
-    // 创建敌方投射物对象。
+    // Creates a pooled enemy projectile object.
     private GameObject CreateEnemyProjectile()
     {
         GameObject item = new GameObject("Enemy Spit");
@@ -1892,7 +1895,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
-    // 创建冰 Boss 魔法冰球对象。
+    // Creates a pooled projectile for the ice boss.
     private GameObject CreateIceBossProjectile()
     {
         GameObject item = new GameObject("Ice Boss Orb");
@@ -1903,7 +1906,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
-    // 创建火焰 Boss 陨石下落对象。
+    // Creates a pooled meteor strike object for the ember boss.
     private GameObject CreateEmberBossMeteorStrike()
     {
         GameObject item = new GameObject("Ember Boss Meteor Strike");
@@ -1911,7 +1914,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
-    // 创建范围伤害效果对象。
+    // Creates a pooled persistent area effect object.
     private GameObject CreateAreaEffect()
     {
         GameObject item = new GameObject("Area Effect");
@@ -1922,7 +1925,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
-    // 创建经验拾取物对象。
+    // Creates a pooled XP pickup object.
     private GameObject CreateXpOrb()
     {
         GameObject item = new GameObject("XP Orb");
@@ -1934,7 +1937,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
-    // 创建金币拾取物对象。
+    // Creates a pooled coin pickup object.
     private GameObject CreateCoin()
     {
         GameObject item = new GameObject("Coin");
@@ -1946,7 +1949,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
-    // 创建血迹贴花对象。
+    // Creates a pooled blood splat visual effect.
     private GameObject CreateBloodSplat()
     {
         GameObject item = new GameObject("Blood Splat");
@@ -1957,7 +1960,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
-    // 生成本次升级可选择的选项。
+    // Builds the upgrade card choices shown when the player levels up.
     private void BuildUpgradeChoices()
     {
         choiceKeys.Clear();
@@ -1989,7 +1992,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 把升级选项加入候选列表并去重。
+    // Adds one upgrade option to the current choice list.
     private void AddUpgradeChoice(ZombieStormUpgradeOption option)
     {
         if (option != null && choiceKeys.Add(option.Key))
@@ -1998,7 +2001,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 随机创建一个升级选项。
+    // Creates a random valid upgrade option from skills, specializations, or passives.
     private ZombieStormUpgradeOption CreateRandomUpgradeOption()
     {
         if (Skills == null)
@@ -2020,7 +2023,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return CreatePassiveOption(passive);
     }
 
-    // 为已解锁技能创建升级选项。
+    // Creates an upgrade option for a skill the player already knows.
     private ZombieStormUpgradeOption CreateKnownSkillOption()
     {
         for (int guard = 0; guard < 32; guard++)
@@ -2056,7 +2059,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return null;
     }
 
-    // 随机获取一个已解锁且可升级的技能。
+    // Selects a known skill that can still be leveled or specialized.
     private bool TryGetRandomKnownSkill(out ZombieStormSkillType weaponType)
     {
         Array values = Enum.GetValues(typeof(ZombieStormSkillType));
@@ -2098,7 +2101,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return false;
     }
 
-    // 创建新技能解锁选项。
+    // Creates an upgrade option that unlocks a new skill.
     private ZombieStormUpgradeOption CreateUnlockSkillOption()
     {
         Array values = Enum.GetValues(typeof(ZombieStormSkillType));
@@ -2114,7 +2117,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return null;
     }
 
-    // 创建技能等级提升选项。
+    // Creates an upgrade option that raises a skill level.
     private ZombieStormUpgradeOption CreateSkillLevelOption(ZombieStormSkillType weaponType)
     {
         int level = Skills.GetSkillLevel(weaponType);
@@ -2126,7 +2129,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return ZombieStormUpgradeOption.Skill("level_" + weaponType, SkillName(weaponType) + " Lv." + (level + 1), SkillLevelSummary(weaponType, level + 1), SkillAccent(weaponType), delegate { Skills.LevelUpSkill(weaponType); });
     }
 
-    // 创建技能专精升级选项。
+    // Creates an upgrade option that improves one skill specialization.
     private ZombieStormUpgradeOption CreateSkillSpecializationOption(ZombieStormSkillType weaponType)
     {
         int skillLevel = Skills.GetSkillLevel(weaponType);
@@ -2152,13 +2155,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return null;
     }
 
-    // 判断指定技能是否已经被玩家解锁。
+    // Checks whether the player has already learned the selected skill.
     private bool IsSkillKnown(ZombieStormSkillType weaponType)
     {
         return Skills != null && Skills.GetSkillLevel(weaponType) > 0;
     }
 
-    // 创建被动技能升级选项。
+    // Creates an upgrade option for a passive stat.
     private ZombieStormUpgradeOption CreatePassiveOption(ZombieStormPassiveType passive)
     {
         int level = GetPassiveLevel(passive);
@@ -2170,7 +2173,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return ZombieStormUpgradeOption.Passive("passive_" + passive, PassiveName(passive) + " Lv." + (level + 1), PassiveSummary(passive, level + 1), PassiveAccent(passive), delegate { AddPassive(passive); });
     }
 
-    // 在候选不足时补充指定被动选项。
+    // Adds a passive option when there are not enough other upgrade choices.
     private void AddFallbackPassive(ZombieStormPassiveType passive)
     {
         ZombieStormUpgradeOption option = CreatePassiveOption(passive);
@@ -2180,7 +2183,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 提升指定被动技能等级并刷新反馈。
+    // Raises a passive level and immediately applies its gameplay effect.
     private void AddPassive(ZombieStormPassiveType passive)
     {
         passives[passive] = Mathf.Min(5, GetPassiveLevel(passive) + 1);
@@ -2192,7 +2195,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         CheckEvolutions();
     }
 
-    // 应用玩家选择的升级项。
+    // Applies the selected upgrade card and resumes the run.
     private void ApplyUpgrade(int index)
     {
         if (index < 0 || index >= currentChoices.Count)
@@ -2212,7 +2215,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ShowFeedback(option.Title + " acquired.", 2.2f);
     }
 
-    // 播放升级选择后的视觉和音效反馈。
+    // Plays visual and audio feedback after an upgrade is selected.
     private void PlayUpgradeBurst(ZombieStormUpgradeOption option)
     {
         if (Player == null)
@@ -2235,7 +2238,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         FlashScreen(accent, 0.46f);
     }
 
-    // 检查技能是否满足进化条件。
+    // Checks whether skill and passive combinations can evolve.
     private void CheckEvolutions()
     {
         if (Skills == null)
@@ -2250,7 +2253,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         TryEvolve(ZombieStormSkillType.SummonDrone, ZombieStormPassiveType.Damage, "火灵 evolved.");
     }
 
-    // 在技能和被动满足条件时触发进化。
+    // Evolves a skill when its required passive and level conditions are met.
     private void TryEvolve(ZombieStormSkillType weapon, ZombieStormPassiveType passive, string message)
     {
         if (Skills.GetSkillLevel(weapon) >= 5 && GetPassiveLevel(passive) > 0 && !Skills.IsEvolved(weapon))
@@ -2260,7 +2263,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 处理升级界面的数字快捷键。
+    // Handles number-key shortcuts for picking upgrade cards.
     private void HandleUpgradeHotkeys()
     {
         if (Input.GetKeyDown(KeyCode.Alpha1))
@@ -2277,7 +2280,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 绘制备用主菜单界面。
+    // Draws the fallback immediate-mode main menu.
     private void DrawMainMenu()
     {
         DrawOverlayBackdrop(0.48f);
@@ -2312,7 +2315,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.skin.label.fontSize = 18;
     }
 
-    // 绘制暂停菜单。
+    // Draws the pause panel and its buttons.
     private void DrawPausePanel()
     {
         DrawOverlayBackdrop(0.68f);
@@ -2348,7 +2351,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // 绘制设置面板。
+    // Draws settings for volume, frame rate, and fullscreen mode.
     private void DrawSettingsPanel()
     {
         DrawOverlayBackdrop(settingsReturnState == ZombieStormFlowState.MainMenu ? 0.52f : 0.72f);
@@ -2396,7 +2399,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // 绘制结算面板。
+    // Draws the end-of-run summary panel.
     private void DrawResultsPanel()
     {
         DrawOverlayBackdrop(0.74f);
@@ -2435,7 +2438,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // 绘制半透明遮罩背景。
+    // Draws a transparent backdrop behind modal panels.
     private void DrawOverlayBackdrop(float alpha)
     {
         GUI.color = new Color(0f, 0f, 0f, alpha);
@@ -2443,14 +2446,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // 设置目标帧率并同步应用参数。
+    // Applies the target frame rate, including the unlimited-frame option.
     private void SetTargetFrameRate(int frameRate)
     {
         targetFrameRate = frameRate;
         Application.targetFrameRate = targetFrameRate;
     }
 
-    // 从本地配置读取菜单设置。
+    // Loads saved menu settings and applies them to the game.
     private void LoadMenuSettings()
     {
         masterVolume = PlayerPrefs.GetFloat("ZombieStorm.MasterVolume", masterVolume);
@@ -2460,7 +2463,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Screen.fullScreen = PlayerPrefs.GetInt("ZombieStorm.Fullscreen", Screen.fullScreen ? 1 : 0) == 1;
     }
 
-    // 创建并初始化主菜单 UI。
+    // Creates the main menu UI and binds its buttons.
     private void SetupMainMenuUI()
     {
         if (mainMenuUI == null)
@@ -2475,7 +2478,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         mainMenuUI.Initialize(this, mainMenuCoverSprite != null ? mainMenuCoverSprite : customArenaMapSprite);
     }
 
-    // 退出游戏或停止编辑器播放。
+    // Quits the game, or exits play mode when running inside the Unity editor.
     private void QuitGame()
     {
 #if UNITY_EDITOR
@@ -2485,7 +2488,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
 #endif
     }
 
-    // 绘制升级选择面板。
+    // Draws the level-up upgrade selection panel.
     private void DrawUpgradePanel()
     {
         DrawOverlayBackdrop(0.88f);
@@ -2537,7 +2540,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // 绘制单张升级选项卡片。
+    // Draws one upgrade card with icon, title, description, and pick button.
     private void DrawUpgradeCard(Rect rect, ZombieStormUpgradeOption option, int index, bool compact)
     {
         Event currentEvent = Event.current;
@@ -2607,7 +2610,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // 绘制升级面板顶部标题区。
+    // Draws the title area at the top of the upgrade panel.
     private void DrawUpgradeHeader(Rect panel, Color accent, bool compact)
     {
         GUI.color = new Color(0f, 0f, 0f, 0.22f);
@@ -2648,7 +2651,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.skin.label.alignment = TextAnchor.UpperLeft;
     }
 
-    // 绘制升级卡片的快捷键角标。
+    // Draws the number-key hint on an upgrade card.
     private void DrawUpgradeHotkey(Rect rect, int number, Color accent, bool hover)
     {
         GUI.color = WithAlpha(accent, hover ? 0.92f : 0.68f);
@@ -2662,7 +2665,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.skin.label.alignment = TextAnchor.UpperLeft;
     }
 
-    // 绘制升级卡片的技能或被动图标。
+    // Draws the colored icon area for an upgrade card.
     private void DrawUpgradeIcon(Rect rect, ZombieStormUpgradeOption option, Color accent, bool hover)
     {
         GUI.color = WithAlpha(accent, hover ? 0.22f : 0.14f);
@@ -2682,7 +2685,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.skin.label.alignment = TextAnchor.UpperLeft;
     }
 
-    // 绘制升级卡片的选择按钮。
+    // Draws the pick button at the bottom of an upgrade card.
     private void DrawUpgradePickButton(Rect rect, int number, Color accent, bool hover)
     {
         GUI.color = WithAlpha(accent, hover ? 0.92f : 0.58f);
@@ -2698,7 +2701,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.skin.label.alignment = TextAnchor.UpperLeft;
     }
 
-    // 绘制升级卡片底部能量刻度。
+    // Draws decorative energy ticks on an upgrade card.
     private void DrawUpgradeEnergyTicks(Rect rect, Color accent, int index, bool hover)
     {
         int tickCount = 7;
@@ -2714,7 +2717,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 绘制升级面板底部操作条。
+    // Draws the footer hint and decoration for the upgrade panel.
     private void DrawUpgradeFooter(Rect rect, Color accent, bool compact)
     {
         DrawPanel(rect, new Color(0.012f, 0.017f, 0.024f, 0.86f), WithAlpha(accent, 0.28f));
@@ -2730,7 +2733,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.skin.label.alignment = TextAnchor.UpperLeft;
     }
 
-    // 获取升级选项的类别文案。
+    // Returns the category label shown on an upgrade card.
     private static string GetUpgradeKindLabel(ZombieStormUpgradeOption option)
     {
         if (option.Key != null && option.Key.StartsWith("unlock_", StringComparison.Ordinal))
@@ -2751,7 +2754,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return option.Category;
     }
 
-    // 获取升级选项的图标文字。
+    // Returns the short icon text for an upgrade option.
     private static string GetUpgradeIconText(ZombieStormUpgradeOption option)
     {
         string key = option.Key ?? string.Empty;
@@ -2838,7 +2841,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return "UP";
     }
 
-    // 绘制带标签的进度条。
+    // Draws a labeled progress bar such as health or experience.
     private void DrawBar(Rect rect, float value, Color color, string label)
     {
         value = Mathf.Clamp01(value);
@@ -2852,7 +2855,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.Label(new Rect(rect.x + 8f, rect.y - 2f, rect.width, rect.height + 6f), label);
     }
 
-    // 绘制环境氛围叠加层。
+    // Draws a screen overlay that adds combat atmosphere.
     private void DrawAtmosphereOverlay()
     {
         GUI.color = new Color(0f, 0f, 0f, 0.18f);
@@ -2863,7 +2866,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // 绘制屏幕闪光层。
+    // Draws screen flash feedback for damage and impacts.
     private void DrawScreenFlash()
     {
         if (screenFlash <= 0f)
@@ -2876,7 +2879,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // 绘制所有伤害飘字。
+    // Draws floating damage numbers above enemies.
     private void DrawDamagePopups()
     {
         if (mainCamera == null)
@@ -2906,7 +2909,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // 绘制 Boss 血条。
+    // Draws the boss name and health bar.
     private void DrawBossBar()
     {
         ZombieStormEnemy boss = null;
@@ -2935,7 +2938,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // 绘制精英敌人屏幕边缘指示。
+    // Draws screen markers that make elite enemies easier to spot.
     private void DrawEliteMarkers()
     {
         if (mainCamera == null)
@@ -2966,7 +2969,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // 绘制带边框的半透明面板。
+    // Draws a bordered UI panel background.
     private void DrawPanel(Rect rect, Color fill, Color edge)
     {
         GUI.color = fill;
@@ -2979,7 +2982,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // 更新摄像机位置并应用震动。
+    // Moves the camera toward the player and keeps it aligned for 2D view.
     private void FollowPlayer(bool snap = false)
     {
         if (mainCamera == null)
@@ -3016,7 +3019,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         mainCamera.transform.position = Snap2DCameraPosition(nextPosition);
     }
 
-    // 查找场景中带 Player 标签的对象。
+    // Finds the scene object tagged as Player for camera targeting.
     private Transform FindTaggedPlayerTransform()
     {
         try
@@ -3030,7 +3033,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 尝试给玩家对象设置 Player 标签。
+    // Assigns the Player tag when that tag exists in the project.
     private static void TrySetPlayerTag(GameObject playerObject)
     {
         try
@@ -3042,7 +3045,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 把摄像机位置对齐到 2D 合适深度。
+    // Snaps camera coordinates to values that render 2D sprites cleanly.
     private static Vector3 Snap2DCameraPosition(Vector3 position)
     {
         const float grid = 0.01f;
@@ -3051,7 +3054,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return position;
     }
 
-    // 更新伤害飘字的生命周期。
+    // Updates floating damage text position, fade, and lifetime.
     private void UpdateDamagePopups()
     {
         for (int i = damagePopups.Count - 1; i >= 0; i--)
@@ -3070,7 +3073,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 清理本局生成的敌人、掉落物和特效。
+    // Clears enemies, projectiles, pickups, effects, and temporary objects from the run.
     private void ClearActiveObjects()
     {
         enemies.Clear();
@@ -3098,14 +3101,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         passives.Clear();
     }
 
-    // 显示限时提示文本。
+    // Shows a temporary feedback message on the screen.
     private void ShowFeedback(string message, float seconds)
     {
         feedbackText = message;
         feedbackUntil = Time.unscaledTime + seconds;
     }
 
-    // 返回指定 Boss 类型的经验奖励。
+    // Returns the XP reward for a defeated boss type.
     private static int BossXpReward(ZombieStormEnemyType bossType)
     {
         if (bossType == ZombieStormEnemyType.CrystalGolemBoss)
@@ -3141,7 +3144,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return 55;
     }
 
-    // 返回指定 Boss 类型的金币奖励。
+    // Returns the coin reward for a defeated boss type.
     private static int BossCoinReward(ZombieStormEnemyType bossType)
     {
         if (bossType == ZombieStormEnemyType.CrystalGolemBoss)
@@ -3177,7 +3180,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return 45;
     }
 
-    // 返回指定 Boss 类型的登场提示。
+    // Returns the warning text displayed when a boss wave begins.
     private static string BossWaveWarning(ZombieStormEnemyType bossType)
     {
         if (bossType == ZombieStormEnemyType.CrystalGolemBoss)
@@ -3213,7 +3216,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return "Horde Alpha incoming. Watch the phase attacks.";
     }
 
-    // 返回指定 Boss 类型的 UI 强调色。
+    // Returns the UI accent color for a boss type.
     private static Color BossUiAccent(ZombieStormEnemyType bossType)
     {
         if (bossType == ZombieStormEnemyType.CrystalGolemBoss)
@@ -3249,13 +3252,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return new Color(0.9f, 0.08f, 0.05f, 1f);
     }
 
-    // 把秒数格式化为分秒文本。
+    // Formats seconds as a minutes-and-seconds timer string.
     private static string FormatTime(int seconds)
     {
         return (seconds / 60).ToString("00") + ":" + (seconds % 60).ToString("00");
     }
 
-    // 返回技能显示名称。
+    // Converts a skill enum value into the display name shown in UI.
     private static string SkillName(ZombieStormSkillType weapon)
     {
         switch (weapon)
@@ -3272,7 +3275,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 返回技能基础说明。
+    // Returns a short player-facing description for a skill.
     private static string SkillSummary(ZombieStormSkillType weapon)
     {
         switch (weapon)
@@ -3289,7 +3292,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 返回技能升级说明。
+    // Returns the level-up description for a skill's next level.
     private static string SkillLevelSummary(ZombieStormSkillType weapon, int nextLevel)
     {
         switch (weapon)
@@ -3306,6 +3309,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
+    // Returns the custom level-up description for Fire Spirit.
     private static string FireSpiritLevelSummary(int nextLevel)
     {
         switch (nextLevel)
@@ -3317,7 +3321,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 返回技能可用的专精键列表。
+    // Returns specialization keys that can appear for a selected skill.
     private static string[] SkillUpgradeKeys(ZombieStormSkillType weapon)
     {
         switch (weapon)
@@ -3334,7 +3338,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 返回技能专精的显示名称。
+    // Converts a specialization key into a display name.
     private static string SkillUpgradeName(string key)
     {
         switch (key)
@@ -3368,7 +3372,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 返回技能专精升级说明。
+    // Returns the effect text for a specialization level.
     private static string SkillUpgradeSummary(string key, int nextLevel)
     {
         switch (key)
@@ -3402,13 +3406,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 返回技能对应的强调色。
+    // Returns the UI accent color for a skill.
     private static Color SkillAccent(ZombieStormSkillType weapon)
     {
         switch (weapon)
         {
             case ZombieStormSkillType.MagicBolt: return new Color(0.45f, 0.95f, 1f, 1f);
-            case ZombieStormSkillType.OrbitingKnife: return new Color(0.92f, 0.96f, 1f, 1f);
+            case ZombieStormSkillType.OrbitingKnife: return new Color(1f, 0.22f, 0.12f, 1f);
             case ZombieStormSkillType.MeteorStorm: return new Color(1f, 0.46f, 0.08f, 1f);
             case ZombieStormSkillType.FireZone: return new Color(1f, 0.28f, 0.05f, 1f);
             case ZombieStormSkillType.SummonDrone: return new Color(1f, 0.42f, 0.08f, 1f);
@@ -3419,7 +3423,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 返回被动技能显示名称。
+    // Converts a passive enum value into the UI display name.
     private static string PassiveName(ZombieStormPassiveType passive)
     {
         switch (passive)
@@ -3436,7 +3440,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 返回被动技能升级说明。
+    // Returns the effect text for a passive upgrade level.
     private static string PassiveSummary(ZombieStormPassiveType passive, int nextLevel)
     {
         switch (passive)
@@ -3453,7 +3457,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 返回被动技能对应的强调色。
+    // Returns the UI accent color for a passive upgrade.
     private static Color PassiveAccent(ZombieStormPassiveType passive)
     {
         switch (passive)
@@ -3470,7 +3474,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 创建带精灵渲染器的场景对象。
+    // Creates a scene object with a SpriteRenderer and common transform settings.
     private GameObject CreateSpriteObject(string objectName, Sprite sprite, Color color, Vector3 position, Vector3 scale, int sortingOrder)
     {
         GameObject item = new GameObject(objectName);
@@ -3483,7 +3487,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
-    // 给父对象添加阴影子对象。
+    // Adds an oval shadow under an object to improve ground depth.
     private GameObject AddShadow(Transform parent, Vector3 scale, float yOffset, int sortingOrder)
     {
         if (softShadowSprite == null)
@@ -3502,7 +3506,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return shadow;
     }
 
-    // 给父对象添加发光子对象。
+    // Adds a soft glow child object for effects and decorations.
     private GameObject AddGlow(Transform parent, Color color, Vector3 scale, int sortingOrder)
     {
         if (softGlowSprite == null)
@@ -3521,7 +3525,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return glow;
     }
 
-    // 生成 Kenney 城市风格地面。
+    // Builds a city floor using Kenney top-down assets.
     private void BuildKenneyCityFloor()
     {
         const float tileStep = 3.2f;
@@ -3557,7 +3561,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         plazaRingVertical.transform.SetParent(worldRoot, false);
     }
 
-    // 根据网格类型选择城市地块颜色。
+    // Chooses a floor color based on road, curb, and plaza cell data.
     private Color ChooseCityTileColor(int x, int y, bool road, bool curb, bool plaza)
     {
         float tint = Hash01(x, y) * 0.08f - 0.04f;
@@ -3585,7 +3589,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return color;
     }
 
-    // 判断指定网格是否为道路单元。
+    // Checks whether a map grid cell belongs to a road.
     private static bool IsCityRoadCell(int x, int y)
     {
         return Mathf.Abs(x) <= 1
@@ -3596,7 +3600,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             || (y == 14 && x > -12 && x < 12);
     }
 
-    // 判断指定网格周围是否有道路。
+    // Checks whether nearby grid cells contain a road.
     private static bool HasRoadNeighbor(int x, int y)
     {
         return IsCityRoadCell(x + 1, y)
@@ -3605,7 +3609,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             || IsCityRoadCell(x, y - 1);
     }
 
-    // 根据网格坐标生成稳定随机值。
+    // Generates a stable pseudo-random value from grid coordinates.
     private static float Hash01(int x, int y)
     {
         int hash = x * 73856093 ^ y * 19349663;
@@ -3614,7 +3618,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return (hash % 10000) / 10000f;
     }
 
-    // 给道路添加车道线标记。
+    // Adds road lines and markings to the city floor.
     private void AddRoadMarkings(float tileStep, int radius)
     {
         for (int i = -radius; i <= radius; i++)
@@ -3632,14 +3636,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 添加一段道路虚线标记。
+    // Creates one short dashed road marking.
     private void AddRoadDash(Vector3 position, Vector3 scale, Color color)
     {
         GameObject dash = CreateSpriteObject("Road Paint", tileSprite, color, position, scale, -6);
         dash.transform.SetParent(worldRoot, false);
     }
 
-    // 尝试使用自定义竞技场地图。
+    // Tries to load and build the custom arena map.
     private bool BuildCustomArenaMap()
     {
         if (customArenaMapSprite == null)
@@ -3667,7 +3671,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return true;
     }
 
-    // 根据墓园地图布局创建障碍。
+    // Creates graveyard-style obstacles from the map layout.
     private void BuildGraveyardArenaObstacles()
     {
         Vector3[] circles =
@@ -3708,7 +3712,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 创建地图障碍并加入碰撞列表。
+    // Creates one map obstacle and assigns its collision radius.
     private void CreateMapObstacle(string name, Vector2 position, float radius)
     {
         GameObject obstacleObject = new GameObject(name);
@@ -3722,7 +3726,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         obstacle.extraPadding = 0.08f;
     }
 
-    // 在道路上添加斑马线。
+    // Adds a crosswalk decoration at the requested position.
     private void AddCrosswalk(Vector2 center, bool horizontal)
     {
         for (int i = -3; i <= 3; i++)
@@ -3736,7 +3740,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 生成备用霓虹地面。
+    // Builds a fallback neon floor when map art is unavailable.
     private void BuildFallbackNeonFloor()
     {
         GameObject floor = CreateSpriteObject("Neon Asphalt", tileSprite, new Color(0.06f, 0.072f, 0.075f), Vector3.forward * 4f, new Vector3(110f, 110f, 1f), -8);
@@ -3751,7 +3755,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 生成城市街区剪影。
+    // Adds city building silhouettes around the arena.
     private void BuildCityBlockSilhouettes()
     {
         AddBuildingFootprint(new Vector2(-31f, 29f), new Vector2(13f, 7f), new Color(0.055f, 0.06f, 0.065f, 0.92f), new Color(0.2f, 0.9f, 1f, 0.3f));
@@ -3762,7 +3766,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         AddBuildingFootprint(new Vector2(43f, -2f), new Vector2(8.5f, 19f), new Color(0.05f, 0.057f, 0.055f, 0.9f), new Color(0.2f, 0.95f, 0.72f, 0.2f));
     }
 
-    // 添加单个建筑占位图形。
+    // Adds one building footprint with body and accent colors.
     private void AddBuildingFootprint(Vector2 center, Vector2 size, Color bodyColor, Color accentColor)
     {
         GameObject shadow = CreateSpriteObject("Building Shadow", softShadowSprite, new Color(0f, 0f, 0f, 0.38f), new Vector3(center.x + 0.45f, center.y - 0.45f, 2.5f), new Vector3(size.x * 1.22f, size.y * 1.22f, 1f), -5);
@@ -3782,7 +3786,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 生成环境氛围细节。
+    // Adds fog, glows, and small atmosphere details.
     private void BuildAtmosphericDetails()
     {
         for (int i = 0; i < 34; i++)
@@ -3808,7 +3812,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 生成城市碎片装饰。
+    // Adds debris so the floor does not feel empty.
     private void BuildCityDebris()
     {
         int count = debrisSprites.Count > 0 ? 150 : 120;
@@ -3838,7 +3842,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 生成霓虹招牌和发光点缀。
+    // Adds neon signs and glowing decorative accents.
     private void BuildNeonAccents()
     {
         Vector2[] anchors =
@@ -3871,7 +3875,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 加载玩家行走动画帧。
+    // Loads player walk animation frames.
     private void LoadPlayerWalkFrames()
     {
         playerWalkFrames.Clear();
@@ -3883,7 +3887,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 加载玩家待机动画帧。
+    // Loads player idle animation frames and replaces the fallback sprite when found.
     private bool LoadChibiPyromancerIdleFrames()
     {
         string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Player", "chibi_pyromancer_idle");
@@ -3931,7 +3935,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return true;
     }
 
-    // 加载玩家向右行走动画帧。
+    // Loads player walk-right animation frames.
     private Sprite[] LoadChibiPyromancerWalkRightFrames()
     {
         string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Player", "chibi_pyromancer_walk_right");
@@ -3955,7 +3959,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return frames.Count > 0 ? frames.ToArray() : null;
     }
 
-    // 加载玩家受伤动画帧。
+    // Loads the hurt frames for the currently selected player art.
     private void LoadScreenSelectedHurtFrames()
     {
         if (LoadChibiPyromancerHurtFrames())
@@ -3992,7 +3996,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 加载玩家受击动画帧。
+    // Loads player hurt animation frames used during damage feedback.
     private bool LoadChibiPyromancerHurtFrames()
     {
         string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Player", "hurt");
@@ -4022,7 +4026,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return true;
     }
 
-    // 加载 Kenney 俯视角角色与道具资源。
+    // Loads Kenney top-down map and decoration assets.
     private void LoadKenneyTopdownArt()
     {
         string root = Path.Combine(Application.dataPath, "ExternalArt", "KenneyTopdownShooter", "PNG");
@@ -4055,7 +4059,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
     }
 
-    // 加载小型敌人的行走动画帧。
+    // Loads walk frames for small enemy art.
     private void LoadChibiEnemyWalkFrames()
     {
         chibiEnemyWalkFrames = new Sprite[0];
@@ -4075,7 +4079,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 加载 Craftpix 村民敌人的动画帧。
+    // Loads animation frames for the villager enemy.
     private void LoadCraftpixVillagerFrames()
     {
         villagerRunFrames = new Sprite[0];
@@ -4091,7 +4095,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         villagerDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
     }
 
-    // 加载 Craftpix 基础近战敌人的动画帧。
+    // Loads animation frames for the melee enemy.
     private void LoadCraftpixGoblinFrames()
     {
         goblinRunFrames = new Sprite[0];
@@ -4105,7 +4109,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         goblinDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
     }
 
-    // 加载 Craftpix 掘墓敌人的动画帧。
+    // Loads animation frames for the gravedigger enemy.
     private void LoadCraftpixGravediggerFrames()
     {
         gravediggerRunFrames = new Sprite[0];
@@ -4121,7 +4125,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         gravediggerDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
     }
 
-    // 加载 Craftpix 收割者敌人的动画帧。
+    // Loads animation frames for the reaper enemy.
     private void LoadCraftpixReaperFrames()
     {
         reaperRunFrames = new Sprite[0];
@@ -4137,7 +4141,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         reaperDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
     }
 
-    // 加载 Craftpix 投掷敌人的动画帧。
+    // Loads animation frames for the orc thrower enemy.
     private void LoadCraftpixOrcFrames()
     {
         orcRunFrames = new Sprite[0];
@@ -4153,7 +4157,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         orcDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
     }
 
-    // 加载 Craftpix 水晶巨像敌人的动画帧。
+    // Loads animation frames for the crystal boss.
     private void LoadCraftpixCrystalGolemFrames()
     {
         crystalGolemRunFrames = new Sprite[0];
@@ -4171,7 +4175,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         crystalGolemDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
     }
 
-    // 加载 Craftpix 苔藓巨像敌人的动画帧。
+    // Loads animation frames for the moss boss.
     private void LoadCraftpixMossGolemFrames()
     {
         mossGolemRunFrames = new Sprite[0];
@@ -4189,7 +4193,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         mossGolemDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
     }
 
-    // 加载 Craftpix 火焰巨像敌人的动画帧。
+    // Loads animation frames for the ember boss.
     private void LoadCraftpixEmberGolemFrames()
     {
         emberGolemRunFrames = new Sprite[0];
@@ -4207,7 +4211,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         emberGolemDeathFrames = LoadEnemyFrameFolder(Path.Combine(root, "Death"), pixelsPerUnit);
     }
 
-    // 加载自定义竞技场地图精灵。
+    // Loads the custom map image used by arena generation.
     private void LoadCustomArenaMap()
     {
         customArenaMapSprite = null;
@@ -4216,7 +4220,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         customArenaMapSprite = LoadRawSpriteFromPng(path, 64f, false);
     }
 
-    // 加载主菜单封面图。
+    // Loads the main menu cover image.
     private void LoadMainMenuCover()
     {
         mainMenuCoverSprite = null;
@@ -4225,7 +4229,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         mainMenuCoverSprite = LoadRawSpriteFromPng(path, 100f, false, FilterMode.Bilinear, false);
     }
 
-    // 加载火灵召唤物精灵。
+    // Loads the sprite used by the Fire Spirit summon.
     private void LoadFireSpiritSprite()
     {
         fireSpiritSprite = null;
@@ -4234,7 +4238,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         fireSpiritSprite = LoadRawSpriteFromPng(path, 720f, true, FilterMode.Bilinear, false, true);
     }
 
-    // 加载 Mikodrak 法术特效序列。
+    // Loads spell effect frame sequences such as fire and explosions.
     private void LoadMikodrakSpellEffects()
     {
         effectFrames.Clear();
@@ -4263,7 +4267,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 加载冰 Boss 魔法冰球从发射到爆裂的动画帧。
+    // Loads animation frames for the ice boss orb projectile.
     private void LoadIceBossOrbFrames()
     {
         iceBossOrbFrames = new Sprite[0];
@@ -4292,7 +4296,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 注册暗色法术特效序列。
+    // Registers dark spell effect frame sequences.
     private void AddDarkVfxEffectSequences()
     {
         string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Effects");
@@ -4302,7 +4306,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         AddEffectSequence(root, "poison_boss_blast", "CraftpixPoisonExplosion10", 150f);
     }
 
-    // 注册像素魔法特效序列。
+    // Registers pixel magic effect frame sequences.
     private void AddFoozlePixelMagicEffectSequences()
     {
         string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Effects", "FoozlePixelMagic");
@@ -4313,7 +4317,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         AddEffectSequence(root, "ultimate_storm", "Tornado", 88f);
     }
 
-    // 从文件夹加载并注册一组特效帧。
+    // Loads one effect frame sequence from a folder and stores it by key.
     private void AddEffectSequence(string root, string key, string folderName, float pixelsPerUnit)
     {
         string folder = Path.Combine(root, folderName);
@@ -4340,7 +4344,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 按帧编号比较两个文件名。
+    // Sorts frame files by the trailing number in their names.
     private static int CompareFrameFileNames(string left, string right)
     {
         int leftNumber = ExtractTrailingFrameNumber(Path.GetFileNameWithoutExtension(left));
@@ -4349,7 +4353,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return numberCompare != 0 ? numberCompare : string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
     }
 
-    // 提取文件名末尾的帧编号。
+    // Extracts the trailing frame number from a file name.
     private static int ExtractTrailingFrameNumber(string name)
     {
         int frameIndex = name.IndexOf("frame", StringComparison.OrdinalIgnoreCase);
@@ -4395,7 +4399,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return foundDigit ? value : 0;
     }
 
-    // 在文件存在时加载精灵并加入列表。
+    // Loads a sprite into a list only when the source file exists.
     private void AddSpriteIfExists(List<Sprite> target, string path, float pixelsPerUnit, bool removeCheckerBackground)
     {
         Sprite sprite = LoadRawSpriteFromPng(path, pixelsPerUnit, removeCheckerBackground);
@@ -4405,7 +4409,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 从精灵表切出敌人行走帧。
+    // Slices enemy walk frames from a sprite sheet.
     private Sprite[] LoadEnemyWalkSheet(string path, float pixelsPerUnit, bool removeCheckerBackground, int specifiedColumns = 0, int specifiedRows = 0)
     {
         if (!File.Exists(path))
@@ -4462,7 +4466,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 按前缀加载敌人帧序列。
+    // Loads enemy animation frames from numbered files.
     private Sprite[] LoadEnemyFrameSequence(string folder, string prefix, float pixelsPerUnit, bool removeCheckerBackground)
     {
         if (!Directory.Exists(folder))
@@ -4494,7 +4498,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return frames.Count > 0 ? frames.ToArray() : null;
     }
 
-    // 加载文件夹内的敌人帧序列。
+    // Loads and sorts all enemy animation frames in a folder.
     private Sprite[] LoadEnemyFrameFolder(string folder, float pixelsPerUnit)
     {
         if (!Directory.Exists(folder))
@@ -4517,13 +4521,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return frames.ToArray();
     }
 
-    // 从 PNG 原图加载精灵并保留指定参数。
+    // Loads a PNG as a sprite with optional background cleanup.
     private Sprite LoadRawSpriteFromPng(string path, float pixelsPerUnit, bool removeCheckerBackground)
     {
         return LoadRawSpriteFromPng(path, pixelsPerUnit, removeCheckerBackground, FilterMode.Bilinear, true);
     }
 
-    // 从 PNG 原图加载精灵并保留指定参数。
+    // Loads a PNG as a sprite with optional background cleanup.
     private Sprite LoadRawSpriteFromPng(string path, float pixelsPerUnit, bool removeCheckerBackground, FilterMode filterMode, bool useMipMaps, bool pivotOnOpaqueCenter = false)
     {
         if (!File.Exists(path))
@@ -4560,7 +4564,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 根据不透明像素计算精灵中心轴点。
+    // Calculates a sprite pivot from the center of its visible pixels.
     private static Vector2 CalculateOpaqueCenterPivot(Texture2D texture)
     {
         Color32[] pixels = texture.GetPixels32();
@@ -4594,7 +4598,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             Mathf.Clamp01(sumY / (float)count / Mathf.Max(1, texture.height - 1)));
     }
 
-    // 从 PNG 加载贴图并创建精灵。
+    // Loads a PNG file and converts it into a Unity sprite.
     private Sprite LoadSpriteFromPng(string path, float pixelsPerUnit, bool removeCheckerBackground = false)
     {
         try
@@ -4624,7 +4628,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 移除图片边缘的棋盘格背景。
+    // Removes checkerboard transparency background connected to image edges.
     private void RemoveEdgeCheckerBackground(Texture2D texture)
     {
         int width = texture.width;
@@ -4661,7 +4665,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         texture.Apply(true, false);
     }
 
-    // 清理透明背景周围的浅色边缘。
+    // Cleans leftover edge colors to reduce white or gray outlines.
     private void CleanBackgroundFringe(Texture2D texture)
     {
         int width = texture.width;
@@ -4715,7 +4719,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         DilateTransparentPixels(texture, pixels);
     }
 
-    // 判断像素周围是否接触透明区域。
+    // Checks whether a pixel touches transparency during edge cleanup.
     private static bool TouchesTransparentPixel(int x, int y, int width, int height, Color32[] pixels)
     {
         for (int yy = y - 1; yy <= y + 1; yy++)
@@ -4742,7 +4746,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return false;
     }
 
-    // 用邻近颜色扩展透明像素以减少边缘杂色。
+    // Fills transparent pixels with neighbor colors to prevent scaled texture borders.
     private void DilateTransparentPixels(Texture2D texture, Color32[] pixels)
     {
         int width = texture.width;
@@ -4773,7 +4777,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         texture.Apply(false, false);
     }
 
-    // 查找附近不透明像素的平均颜色。
+    // Finds a nearby opaque pixel color for transparent edge filling.
     private static bool TryFindOpaqueNeighborColor(int x, int y, int width, int height, Color32[] pixels, out Color32 color)
     {
         for (int radius = 1; radius <= 3; radius++)
@@ -4815,7 +4819,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return false;
     }
 
-    // 把符合背景条件的像素加入泛洪队列。
+    // Adds a likely background pixel to the flood-fill queue.
     private static void TryQueueBackgroundPixel(int x, int y, int width, Color32[] pixels, bool[] visited, Queue<int> queue)
     {
         int height = pixels.Length / width;
@@ -4834,7 +4838,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         queue.Enqueue(index);
     }
 
-    // 判断颜色是否属于棋盘格背景。
+    // Checks whether a pixel color looks like checkerboard background.
     private static bool IsCheckerBackground(Color32 color)
     {
         if (color.a < 10)
@@ -4854,7 +4858,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return saturation <= 48 && average >= 168;
     }
 
-    // 把玩家帧放入统一尺寸贴图。
+    // Places player frames onto a consistent texture canvas size.
     private Texture2D NormalizePlayerFrame(Texture2D source, int width, int height)
     {
         Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, true);
@@ -4870,7 +4874,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return texture;
     }
 
-    // 程序化绘制默认幸存者精灵。
+    // Programmatically draws a fallback survivor sprite.
     private Sprite CreateSurvivorSprite()
     {
         const int width = 32;
@@ -4945,7 +4949,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 24f);
     }
 
-    // 程序化创建简单像素精灵。
+    // Creates a simple pixel-art fallback sprite.
     private Sprite CreatePixelSprite(Color baseColor, Color accentColor, int size, bool character)
     {
         Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, true);
@@ -4995,7 +4999,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
     }
 
-    // 程序化绘制环绕刀刃精灵。
+    // Programmatically draws the red orbiting blade sprite.
     private Sprite CreateOrbitingBladeSprite()
     {
         const int size = 64;
@@ -5005,11 +5009,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ClearTexture(texture, Color.clear);
 
         Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
-        Color glow = new Color(0.18f, 0.86f, 1f, 0.34f);
-        Color edge = new Color(0.08f, 0.18f, 0.28f, 1f);
-        Color steel = new Color(0.82f, 0.94f, 1f, 1f);
+        Color glow = new Color(1f, 0.12f, 0.06f, 0.34f);
+        Color edge = new Color(0.34f, 0.02f, 0.02f, 1f);
+        Color steel = new Color(1f, 0.46f, 0.36f, 1f);
         Color highlight = Color.white;
-        Color hilt = new Color(0.22f, 0.58f, 0.82f, 1f);
+        Color hilt = new Color(0.82f, 0.12f, 0.08f, 1f);
 
         for (int y = 0; y < size; y++)
         {
@@ -5043,7 +5047,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
                 if (guard)
                 {
-                    pixel = Mathf.Abs(py) > 9.5f ? edge : new Color(0.72f, 0.96f, 1f, 1f);
+                    pixel = Mathf.Abs(py) > 9.5f ? edge : new Color(1f, 0.3f, 0.18f, 1f);
                 }
 
                 texture.SetPixel(x, y, pixel);
@@ -5054,7 +5058,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 64f);
     }
 
-    // 程序化绘制环绕光环精灵。
+    // Programmatically draws the red energy ring around the blades.
     private Sprite CreateOrbitingRingSprite()
     {
         const int size = 128;
@@ -5071,7 +5075,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
                 float inner = Mathf.Clamp01(1f - Mathf.Abs(d - 0.62f) / 0.025f) * 0.38f;
                 float sparkle = (x + y) % 23 == 0 && d > 0.7f && d < 0.93f ? 0.2f : 0f;
                 float alpha = Mathf.Clamp01(ring * 0.7f + inner + sparkle);
-                texture.SetPixel(x, y, new Color(0.48f, 0.9f, 1f, alpha));
+                texture.SetPixel(x, y, new Color(1f, 0.18f, 0.08f, alpha));
             }
         }
 
@@ -5079,7 +5083,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 64f);
     }
 
-    // 程序化创建柔和圆形光斑精灵。
+    // Creates a soft circular sprite used for glows, shadows, and range markers.
     private Sprite CreateSoftDiscSprite(Color color, int size, float radiusScale, float centerFade)
     {
         Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, true);
@@ -5104,7 +5108,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
     }
 
-    // 程序化绘制血迹精灵。
+    // Programmatically draws the ground blood splat sprite.
     private Sprite CreateBloodSplatSprite()
     {
         const int size = 64;
@@ -5123,7 +5127,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
     }
 
-    // 程序化绘制霓虹招牌精灵。
+    // Programmatically draws a neon sign sprite.
     private Sprite CreateNeonSignSprite()
     {
         const int width = 64;
@@ -5142,7 +5146,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), width);
     }
 
-    // 用指定颜色清空整张贴图。
+    // Fills an entire texture with one color.
     private static void ClearTexture(Texture2D texture, Color color)
     {
         for (int y = 0; y < texture.height; y++)
@@ -5154,7 +5158,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 在贴图上填充矩形区域。
+    // Fills a rectangle area on a texture.
     private static void FillRect(Texture2D texture, int x, int y, int width, int height, Color color)
     {
         for (int yy = y; yy < y + height; yy++)
@@ -5166,7 +5170,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 在贴图上填充椭圆区域。
+    // Fills an ellipse area on a texture.
     private static void FillEllipse(Texture2D texture, int centerX, int centerY, int radiusX, int radiusY, Color color)
     {
         float rx = Mathf.Max(1f, radiusX);
@@ -5185,7 +5189,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // 在边界检查后安全写入像素。
+    // Writes one texture pixel only when the coordinates are inside bounds.
     private static void SetPixelSafe(Texture2D texture, int x, int y, Color color)
     {
         if (x < 0 || x >= texture.width || y < 0 || y >= texture.height)

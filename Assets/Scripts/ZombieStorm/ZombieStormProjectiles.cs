@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
+// Controls player fireball movement, hits, pierce count, and fire-zone spawning.
 public sealed class ZombieStormProjectile : MonoBehaviour
 {
     private ZombieStormGameController game;
@@ -16,6 +17,7 @@ public sealed class ZombieStormProjectile : MonoBehaviour
     private Sprite[] fireballFrames;
     private bool createsFireZoneOnKill;
 
+    // Initializes the references and values this object needs at runtime.
     public void Initialize(ZombieStormGameController owner, Vector2 fireDirection, float hitDamage, float moveSpeed, float seconds, int pierceCount, bool fireZoneOnKill)
     {
         game = owner;
@@ -37,6 +39,7 @@ public sealed class ZombieStormProjectile : MonoBehaviour
         transform.rotation = Quaternion.Euler(0f, 0f, angle);
     }
 
+    // Advances movement, combat, animation, timers, and state changes each frame.
     private void Update()
     {
         UpdateFireballAnimation();
@@ -73,6 +76,7 @@ public sealed class ZombieStormProjectile : MonoBehaviour
         }
     }
 
+    // Updates fireball scale and spin while it flies.
     private void UpdateFireballAnimation()
     {
         if (spriteRenderer == null || fireballFrames == null || fireballFrames.Length == 0)
@@ -86,6 +90,7 @@ public sealed class ZombieStormProjectile : MonoBehaviour
     }
 }
 
+// Controls enemy ranged projectiles, movement, collision, and player damage.
 public sealed class ZombieStormEnemyProjectile : MonoBehaviour
 {
     private ZombieStormGameController game;
@@ -96,6 +101,7 @@ public sealed class ZombieStormEnemyProjectile : MonoBehaviour
     private Color hitColor;
     private float hitRadius;
 
+    // Initializes the references and values this object needs at runtime.
     public void Initialize(ZombieStormGameController owner, Vector2 fireDirection, float hitDamage, float moveSpeed, float seconds, Color impactColor, float impactRadius)
     {
         game = owner;
@@ -107,6 +113,7 @@ public sealed class ZombieStormEnemyProjectile : MonoBehaviour
         hitRadius = impactRadius;
     }
 
+    // Advances movement, combat, animation, timers, and state changes each frame.
     private void Update()
     {
         Vector2 startPosition = transform.position;
@@ -127,6 +134,7 @@ public sealed class ZombieStormEnemyProjectile : MonoBehaviour
         }
     }
 
+    // Calculates distance from a point to a line segment for trail collision.
     private static float DistanceToSegment(Vector2 point, Vector2 start, Vector2 end)
     {
         Vector2 segment = end - start;
@@ -141,6 +149,7 @@ public sealed class ZombieStormEnemyProjectile : MonoBehaviour
     }
 }
 
+// Controls the ice boss projectile flight and burst damage phases.
 public sealed class ZombieStormIceBossProjectile : MonoBehaviour
 {
     private const int LaunchFrameCount = 2;
@@ -161,6 +170,7 @@ public sealed class ZombieStormIceBossProjectile : MonoBehaviour
     private SpriteRenderer spriteRenderer;
     private Sprite[] frames;
 
+    // Initializes the references and values this object needs at runtime.
     public void Initialize(ZombieStormGameController owner, Vector2 fireDirection, float hitDamage, float moveSpeed, float seconds)
     {
         game = owner;
@@ -187,6 +197,7 @@ public sealed class ZombieStormIceBossProjectile : MonoBehaviour
         transform.rotation = Quaternion.Euler(0f, 0f, angle);
     }
 
+    // Advances movement, combat, animation, timers, and state changes each frame.
     private void Update()
     {
         if (game == null)
@@ -218,6 +229,7 @@ public sealed class ZombieStormIceBossProjectile : MonoBehaviour
         }
     }
 
+    // Updates ice projectile rotation and flicker while flying.
     private void UpdateFlightAnimation(float elapsed)
     {
         if (spriteRenderer == null || frames == null || frames.Length == 0)
@@ -240,6 +252,7 @@ public sealed class ZombieStormIceBossProjectile : MonoBehaviour
         spriteRenderer.sprite = frames[Mathf.Min(flyFrame, frames.Length - 1)];
     }
 
+    // Switches the ice projectile into burst mode and applies area damage.
     private void BeginBurst(Vector2 hitPosition)
     {
         bursting = true;
@@ -260,6 +273,7 @@ public sealed class ZombieStormIceBossProjectile : MonoBehaviour
         game.PlaySfx("hit", 0.54f, 0.08f);
     }
 
+    // Updates ice burst animation frames and transparency.
     private void UpdateBurstAnimation()
     {
         if (spriteRenderer == null || frames == null || frames.Length == 0)
@@ -281,6 +295,7 @@ public sealed class ZombieStormIceBossProjectile : MonoBehaviour
         spriteRenderer.sprite = frames[burstStart + burstFrame];
     }
 
+    // Finds the first frame used for the ice burst animation.
     private int GetBurstStartIndex()
     {
         if (frames == null || frames.Length == 0)
@@ -291,6 +306,7 @@ public sealed class ZombieStormIceBossProjectile : MonoBehaviour
         return Mathf.Clamp(frames.Length - BurstFrameCount, 0, frames.Length - 1);
     }
 
+    // Calculates distance from a point to a line segment for trail collision.
     private static float DistanceToSegment(Vector2 point, Vector2 start, Vector2 end)
     {
         Vector2 segment = end - start;

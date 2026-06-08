@@ -1,6 +1,7 @@
 using UnityEngine;
 
 [DisallowMultipleComponent]
+// Registers map obstacles so the controller can use them for collision limits.
 public sealed class ZombieStormObstacle : MonoBehaviour
 {
     [Min(0.05f)]
@@ -34,6 +35,7 @@ public sealed class ZombieStormObstacle : MonoBehaviour
         }
     }
 
+    // Initializes references, singleton state, settings, resources, and scene objects.
     private void Awake()
     {
         circleCollider = GetComponent<CircleCollider2D>();
@@ -43,16 +45,19 @@ public sealed class ZombieStormObstacle : MonoBehaviour
         }
     }
 
+    // Registers this object when Unity enables it.
     private void OnEnable()
     {
         Register();
     }
 
+    // Runs first-frame setup such as registration after the object is enabled.
     private void Start()
     {
         Register();
     }
 
+    // Unregisters this object so disabled references are not used later.
     private void OnDisable()
     {
         if (ZombieStormGameController.Instance != null)
@@ -61,17 +66,20 @@ public sealed class ZombieStormObstacle : MonoBehaviour
         }
     }
 
+    // Keeps inspector values valid while editing in Unity.
     private void OnValidate()
     {
         radius = Mathf.Max(0.05f, radius);
     }
 
+    // Draws editor gizmos that show the obstacle radius while selected.
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = new Color(0.15f, 0.95f, 0.35f, 0.75f);
         Gizmos.DrawWireSphere(WorldCenter, WorldRadius);
     }
 
+    // Registers this object with the game controller.
     private void Register()
     {
         if (ZombieStormGameController.Instance != null)

@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
+// Moves XP or coin pickups toward the player and applies the reward.
 public sealed class ZombieStormPickup : MonoBehaviour
 {
     private ZombieStormGameController game;
@@ -11,6 +12,7 @@ public sealed class ZombieStormPickup : MonoBehaviour
     private int coins;
     private float bobOffset;
 
+    // Initializes the references and values this object needs at runtime.
     public void Initialize(ZombieStormGameController owner, string key, int xpAmount, int coinAmount)
     {
         game = owner;
@@ -20,6 +22,7 @@ public sealed class ZombieStormPickup : MonoBehaviour
         bobOffset = UnityEngine.Random.value * 10f;
     }
 
+    // Advances movement, combat, animation, timers, and state changes each frame.
     private void Update()
     {
         if (game == null || game.Player == null)
