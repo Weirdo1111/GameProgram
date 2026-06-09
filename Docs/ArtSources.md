@@ -21,10 +21,18 @@ The downloaded archive includes `License.txt`, which states that the assets may 
 ## Custom Zombie Storm Images
 
 - Source: AI-generated images supplied by the project owner.
-- Local paths: `Assets/ZombieStormArt/Enemies`, `Assets/ZombieStormArt/Maps`, `Assets/cowboy_spritesheet_transparent_split (1)`, `Assets/screen_selected`
+- Local paths: `Assets/ZombieStormArt/Enemies`, `Assets/ZombieStormArt/Maps`, `Assets/ZombieStormArt/Menu`, `Assets/cowboy_spritesheet_transparent_split (1)`, `Assets/screen_selected`
 - Used for: Q-style base zombie animation, graveyard arena background, main protagonist walk frames, and protagonist hurt frames.
 
 The graveyard arena background image (`Assets/ZombieStormArt/Maps/graveyard_arena.png`) and the main protagonist images in `Assets/cowboy_spritesheet_transparent_split (1)` / `Assets/screen_selected` were generated with AI tools and then supplied by the project owner for use in this project.
+
+## Main Menu Cover
+
+- Source: AI-generated image supplied by the project owner.
+- Local path: `Assets/ZombieStormArt/Menu/main_menu_cover.png`
+- Used for: Zombie Storm main menu cover art and embedded visual button labels.
+
+This cover image was generated with AI tools, then supplied by the project owner for use as the game's main menu cover. The runtime overlays transparent Unity buttons on top of the rendered `Start Game` and `Settings` areas.
 
 ## Dark VFX 01 - 02
 
@@ -42,6 +50,23 @@ No license file was found in the supplied download folder during import. Review 
 - License: Creative Commons Zero (CC0), as stated in `Readme.txt`.
 - Local path: `Assets/ZombieStormArt/Effects/FoozlePixelMagic`
 - Used for: player fireball projectile animation, player fireball impact sparks, Meteor Storm blast visuals, Fire Zone ignition bursts, Shield Burst wind visuals, and Ultimate Storm tornado visuals.
+
+## Pixlab24 Fire Bomb Effect
+
+- Source: https://pixlab24.com/
+- Local source folder supplied by the project owner: `C:\Users\ken\Downloads\5f06fc6b255498ab\Pixel Art VFX - Fire Mage - FREE Version\VFX2`
+- Local path: `Assets/ZombieStormArt/Effects/FireBomb`
+- Used for: Fire Zone's thrown fire bomb projectile animation.
+
+This fire bomb effect was imported from a Pixlab24 asset download supplied by the project owner. Review the specific asset page and license terms before redistributing the raw PNG files publicly.
+
+## Tekila 2D Fire Pack
+
+- Source: local download supplied by the project owner from `C:\Users\ken\Downloads\2a2476b47d8dbb21\2D Fire Pack 2 by Tekila\Sheets\Fire01`
+- Local path: `Assets/ZombieStormArt/Effects/GroundFire/TekilaFire01`
+- Used for: Fire Zone's lingering ground fire left by fire bombs.
+
+No license file was found in the supplied folder during import. Review the original download source before redistributing the raw PNG files publicly.
 
 ## CraftPix Zombie Villager Chibi
 

@@ -8,10 +8,9 @@ public enum ZombieStormSkillType
 {
     MagicBolt,
     OrbitingKnife,
-    MeteorStorm,
+    Regeneration,
     FireZone,
     SummonDrone,
-    ChainLightning,
     ShieldBurst,
     UltimateStorm
 }

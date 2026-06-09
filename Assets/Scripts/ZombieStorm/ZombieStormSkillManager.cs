@@ -17,8 +17,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
     private ZombieStormGameController game;
     private ZombieStormPlayer player;
     private float ultimateCooldown;
-    private GameObject orbitingRing;
-    private float orbitVisualPulseTimer;
+    private int fireBombAttackCounter;
 
     public int KnownSkillCount
     {
@@ -32,6 +31,12 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         player = survivor;
     }
 
+    // Cleans up childless helper objects when the player or skill manager is destroyed.
+    private void OnDestroy()
+    {
+        CleanupPersistentSkillObjects();
+    }
+
     // Advances movement, combat, animation, timers, and state changes each frame.
     private void Update()
     {
@@ -41,8 +46,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
 
         TickSkill(ZombieStormSkillType.MagicBolt, CastMagicBolt);
-        TickSkill(ZombieStormSkillType.MeteorStorm, CastMeteorStorm);
-        TickSkill(ZombieStormSkillType.ChainLightning, CastChainLightning);
+        TickSkill(ZombieStormSkillType.Regeneration, CastRegeneration);
         TickSkill(ZombieStormSkillType.ShieldBurst, CastShieldBurst);
         UpdatePendingBlasts();
         UpdateOrbitingKnives();
@@ -59,7 +63,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
 
         levels[weapon] = 1;
-        cooldowns[weapon] = 0.05f;
+        cooldowns[weapon] = weapon == ZombieStormSkillType.Regeneration ? 3f : 0.05f;
         if (weapon == ZombieStormSkillType.OrbitingKnife)
         {
             RebuildOrbitingKnives();
@@ -73,8 +77,20 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
     // Raises a skill level and rebuilds level-dependent skill objects.
     public void LevelUpSkill(ZombieStormSkillType weapon)
     {
-        int next = Mathf.Min(5, GetSkillLevel(weapon) + 1);
+        int current = GetSkillLevel(weapon);
+        int maxLevel = weapon == ZombieStormSkillType.Regeneration ? 3 : weapon == ZombieStormSkillType.FireZone ? 4 : 5;
+        int next = Mathf.Min(maxLevel, current + 1);
+        if (next == current)
+        {
+            return;
+        }
+
         levels[weapon] = next;
+        if (weapon == ZombieStormSkillType.Regeneration && next == 2)
+        {
+            player.IncreaseMaxHealth(30f);
+        }
+
         if (weapon == ZombieStormSkillType.OrbitingKnife)
         {
             RebuildOrbitingKnives();
@@ -170,11 +186,10 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         switch (weapon)
         {
             case ZombieStormSkillType.MagicBolt: return "Magic Bolt";
-            case ZombieStormSkillType.OrbitingKnife: return "Orbit Knives";
-            case ZombieStormSkillType.MeteorStorm: return "Meteor";
+            case ZombieStormSkillType.OrbitingKnife: return "Fire Blades";
+            case ZombieStormSkillType.Regeneration: return "Regen";
             case ZombieStormSkillType.FireZone: return "Fire Zone";
-            case ZombieStormSkillType.SummonDrone: return "火灵";
-            case ZombieStormSkillType.ChainLightning: return "Lightning";
+            case ZombieStormSkillType.SummonDrone: return "Fire Spirit";
             case ZombieStormSkillType.ShieldBurst: return "Shield";
             case ZombieStormSkillType.UltimateStorm: return "Ultimate";
             default: return weapon.ToString();
@@ -236,39 +251,23 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         {
             float spreadStep = shots <= 3 ? 9f : 7f;
             float angle = shots == 1 ? 0f : -(shots - 1) * spreadStep * 0.5f + i * spreadStep;
-            game.SpawnPlayerProjectile(origin, ZombieStormGameController.Rotate(direction, angle), RollDamage(damage), 13.5f, 1.4f, pierce, fireballColor, fireballSize, true);
+            game.SpawnPlayerProjectile(origin, ZombieStormGameController.Rotate(direction, angle), RollDamage(damage), 13.5f, 1.4f, pierce, fireballColor, fireballSize);
         }
 
+        CountFireZoneAttack(origin, target.transform.position);
         float baseCooldown = IsEvolved(ZombieStormSkillType.MagicBolt) ? 0.18f : 0.62f - level * 0.055f;
         cooldowns[ZombieStormSkillType.MagicBolt] = baseCooldown * game.CooldownMultiplier;
     }
 
-    // Creates meteor warnings and delayed explosions near enemies.
-    private void CastMeteorStorm(int level)
+    // Restores one health on a fixed timer.
+    private void CastRegeneration(int level)
     {
-        int impacts = 1 + Mathf.FloorToInt(level * 0.55f) + Mod("meteor_impacts") + (IsEvolved(ZombieStormSkillType.MeteorStorm) ? 2 : 0);
-        for (int i = 0; i < impacts; i++)
-        {
-            ZombieStormEnemy target = game.FindRandomEnemy();
-            Vector2 position = target != null ? (Vector2)target.transform.position : (Vector2)transform.position + UnityEngine.Random.insideUnitCircle * 5.5f;
-            float radius = (0.95f + level * 0.18f + Mod("meteor_blast") * 0.2f) * game.AreaMultiplier;
-            game.SpawnAreaEffect(position, radius * 1.35f, 0f, 0.48f, 1f, new Color(1f, 0.75f, 0.18f, 0.3f), "meteor_warning");
-            game.SpawnAreaEffect(position, radius * 0.36f, 0f, 0.48f, 1f, new Color(1f, 0.92f, 0.3f, 0.52f), "meteor_warning");
-            pendingBlasts.Add(new ZombieStormPendingSkillBlast
-            {
-                Position = position,
-                Radius = radius,
-                Damage = RollDamage((20f + level * 5.5f) * (1f + Mod("meteor_heat") * 0.16f)),
-                Delay = 0.42f,
-                Color = new Color(1f, 0.28f, 0.05f, 0.72f),
-                Key = "meteor_blast"
-            });
-        }
-
-        cooldowns[ZombieStormSkillType.MeteorStorm] = (4.2f - level * 0.24f) * game.CooldownMultiplier;
+        player.Heal(1f);
+        game.SpawnHitSpark(player.transform.position + Vector3.up * 0.35f, new Color(0.42f, 1f, 0.58f, 0.68f), 0.2f);
+        cooldowns[ZombieStormSkillType.Regeneration] = level >= 3 ? 2f : 3f;
     }
 
-    // Creates burning ground when a fireball hit should leave a fire zone.
+    // Creates the Fire Zone bomb impact at a target point.
     public void SpawnFireZoneOnFireballHit(Vector2 position)
     {
         int level = GetSkillLevel(ZombieStormSkillType.FireZone);
@@ -277,58 +276,55 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             return;
         }
 
-        int pools = 1 + Mod("fire_spread") + (IsEvolved(ZombieStormSkillType.FireZone) ? 2 : 0);
-        float baseRadius = (1.18f + level * 0.16f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.FireZone) ? 1.18f : 1f);
-        float burnDamage = RollDamage((4.6f + level * 1.55f) * (1f + Mod("fire_heat") * 0.2f));
-        float tickRate = Mathf.Max(0.18f, 0.42f - Mod("fire_linger") * 0.06f);
-
-        for (int i = 0; i < pools; i++)
-        {
-            Vector2 poolPosition = position;
-            float radius = baseRadius;
-            if (i > 0)
-            {
-                poolPosition += UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(0.65f, 1.3f);
-                radius *= 0.72f;
-            }
-
-            game.SpawnAreaEffect(poolPosition, Mathf.Min(radius * 0.72f, 1.35f), 0f, 0.26f, 1f, new Color(1f, 0.48f, 0.08f, 0.66f), "foozle_explosion");
-            game.SpawnAreaEffect(poolPosition, radius, burnDamage, 5f, tickRate, new Color(1f, 0.25f, 0.05f, 0.62f), "fire_pool");
-            for (int spark = 0; spark < 4; spark++)
-            {
-                game.SpawnHitSpark(poolPosition + UnityEngine.Random.insideUnitCircle * radius * 0.65f, new Color(1f, 0.68f, 0.12f, 0.78f), 0.16f);
-            }
-        }
+        SpawnFireBombImpact(position, level);
     }
 
-    // Casts lightning that jumps between multiple enemies.
-    private void CastChainLightning(int level)
+    // Counts Magic Bolt attacks and throws a Fire Zone bomb when the level threshold is met.
+    private void CountFireZoneAttack(Vector2 origin, Vector2 targetPosition)
     {
-        ZombieStormEnemy current = game.FindRandomEnemy();
-        if (current == null)
+        int level = GetSkillLevel(ZombieStormSkillType.FireZone);
+        if (level <= 0)
         {
-            cooldowns[ZombieStormSkillType.ChainLightning] = 0.25f;
+            fireBombAttackCounter = 0;
             return;
         }
 
-        int jumps = 2 + level + Mod("lightning_jumps") + (IsEvolved(ZombieStormSkillType.ChainLightning) ? 4 : 0);
-        float chainReach = 4.2f + level * 0.35f + Mod("lightning_reach") * 0.8f;
-        float lightningDamage = (13f + level * 4f) * (1f + Mod("lightning_voltage") * 0.18f);
-        game.PlaySfx("lightning", 0.48f, 0.12f);
-        HashSet<ZombieStormEnemy> hit = new HashSet<ZombieStormEnemy>();
-        Vector2 previous = transform.position;
-        for (int i = 0; i < jumps && current != null; i++)
+        fireBombAttackCounter++;
+        int threshold = GetFireBombAttackThreshold(level);
+        if (fireBombAttackCounter < threshold)
         {
-            Vector2 currentPosition = current.transform.position;
-            hit.Add(current);
-            SpawnLightningSegment(previous, currentPosition, level);
-            current.TakeDamage(RollDamage(lightningDamage), (currentPosition - (Vector2)transform.position).normalized);
-            game.SpawnAreaEffect(currentPosition, (0.6f + Mod("lightning_reach") * 0.08f) * game.AreaMultiplier, 0f, 0.18f, 1f, new Color(0.25f, 0.85f, 1f, 0.86f), "lightning_flash");
-            previous = currentPosition;
-            current = FindNearestUnhitEnemy(currentPosition, chainReach, hit);
+            return;
         }
 
-        cooldowns[ZombieStormSkillType.ChainLightning] = Mathf.Max(0.82f, 3.5f - level * 0.22f - Mod("lightning_tempo") * 0.24f) * game.CooldownMultiplier;
+        fireBombAttackCounter = 0;
+        Vector2 scatter = UnityEngine.Random.insideUnitCircle * 0.34f;
+        float impactRadius = (1.18f + level * 0.12f) * game.AreaMultiplier;
+        float impactDamage = RollDamage(10f + level * 3.2f);
+        float burnRadius = (1.05f + level * 0.12f) * game.AreaMultiplier * 0.5f;
+        float burnDamage = RollDamage(4.8f + level * 1.4f);
+        game.SpawnFireBombProjectile(origin, targetPosition + scatter, impactDamage, impactRadius, level >= 2, burnDamage, burnRadius, 5f, 0.42f);
+    }
+
+    // Applies the Fire Zone bomb impact immediately for compatibility with older projectile hooks.
+    private void SpawnFireBombImpact(Vector2 position, int level)
+    {
+        float impactRadius = (1.18f + level * 0.12f) * game.AreaMultiplier;
+        game.SpawnAreaEffect(position, impactRadius, RollDamage(10f + level * 3.2f), 0.18f, 99f, new Color(1f, 0.52f, 0.08f, 0.78f), "foozle_explosion");
+        if (level >= 2)
+        {
+            game.SpawnAreaEffect(position, (1.05f + level * 0.12f) * game.AreaMultiplier * 0.5f, RollDamage(4.8f + level * 1.4f), 5f, 0.42f, new Color(1f, 0.42f, 0.08f, 0.72f), game.GetRandomGroundFireEffectKey());
+        }
+    }
+
+    // Returns how many attacks Fire Zone needs before throwing a bomb.
+    private static int GetFireBombAttackThreshold(int level)
+    {
+        if (level >= 4)
+        {
+            return 2;
+        }
+
+        return level >= 3 ? 3 : 4;
     }
 
     // Casts a shield burst that damages and knocks back nearby enemies.
@@ -347,21 +343,6 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         cooldowns[ZombieStormSkillType.ShieldBurst] = Mathf.Max(0.65f, 2.4f - level * 0.16f - Mod("shield_recharge") * 0.18f) * game.CooldownMultiplier;
     }
 
-    // Creates small damage points along a lightning arc path.
-    private void SpawnLightningSegment(Vector2 from, Vector2 to, int level)
-    {
-        float distance = Vector2.Distance(from, to);
-        int steps = Mathf.Clamp(Mathf.CeilToInt(distance / 0.42f), 2, 12);
-        for (int i = 1; i <= steps; i++)
-        {
-            float t = i / (float)steps;
-            Vector2 point = Vector2.Lerp(from, to, t);
-            point += UnityEngine.Random.insideUnitCircle * 0.06f;
-            float radius = (0.12f + level * 0.012f + Mod("lightning_reach") * 0.01f + Mod("lightning_voltage") * 0.006f) * game.AreaMultiplier;
-            game.SpawnAreaEffect(point, radius, 0f, 0.1f, 1f, new Color(0.35f, 0.9f, 1f, 0.72f), "lightning_flash");
-        }
-    }
-
     // Updates orbiting blade position, rotation, collision damage, and visual effects.
     private void UpdateOrbitingKnives()
     {
@@ -378,19 +359,6 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             RebuildOrbitingKnives();
         }
 
-        if (orbitingRing != null)
-        {
-            orbitingRing.transform.position = transform.position;
-            orbitingRing.transform.rotation = Quaternion.Euler(0f, 0f, -Time.time * (speed * 0.42f));
-            orbitingRing.transform.localScale = Vector3.one * radius;
-            SpriteRenderer ringRenderer = orbitingRing.GetComponent<SpriteRenderer>();
-            if (ringRenderer != null)
-            {
-                float pulse = 0.52f + Mathf.PingPong(Time.time * 1.8f, 0.18f);
-                ringRenderer.color = IsEvolved(ZombieStormSkillType.OrbitingKnife) ? new Color(1f, 0.38f, 0.22f, pulse) : new Color(1f, 0.18f, 0.08f, pulse);
-            }
-        }
-
         for (int i = 0; i < orbitingObjects.Count; i++)
         {
             float angle = Time.time * speed + i * (360f / Mathf.Max(1, orbitingObjects.Count));
@@ -399,15 +367,6 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             orbitingObjects[i].transform.rotation = Quaternion.Euler(0f, 0f, angle + 90f);
             float bladeScale = (0.78f + level * 0.035f + Mod("knife_edge") * 0.035f) * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.08f : 1f);
             orbitingObjects[i].transform.localScale = Vector3.one * bladeScale;
-        }
-
-        orbitVisualPulseTimer -= Time.deltaTime;
-        if (orbitVisualPulseTimer <= 0f && orbitingObjects.Count > 0)
-        {
-            int bladeIndex = Mathf.Abs(Mathf.FloorToInt(Time.time * 10f)) % orbitingObjects.Count;
-            Color sparkleColor = IsEvolved(ZombieStormSkillType.OrbitingKnife) ? new Color(1f, 0.44f, 0.24f, 0.55f) : new Color(1f, 0.18f, 0.08f, 0.48f);
-            game.SpawnAreaEffect(orbitingObjects[bladeIndex].transform.position, 0.16f, 0f, 0.09f, 1f, sparkleColor, "hit_spark");
-            orbitVisualPulseTimer = 0.11f;
         }
 
         float current;
@@ -431,47 +390,21 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             }
         }
 
-        game.SpawnAreaEffect(transform.position, radius, 0f, 0.1f, 1f, new Color(1f, 0.16f, 0.06f, 0.12f), "shield_burst");
         cooldowns[ZombieStormSkillType.OrbitingKnife] = 0.24f * game.CooldownMultiplier;
     }
 
     // Rebuilds the orbiting blade count and glow objects from current upgrades.
     private void RebuildOrbitingKnives()
     {
-        for (int i = 0; i < orbitingObjects.Count; i++)
-        {
-            if (orbitingObjects[i] != null)
-            {
-                Destroy(orbitingObjects[i]);
-            }
-        }
-
-        orbitingObjects.Clear();
-        if (orbitingRing != null)
-        {
-            Destroy(orbitingRing);
-            orbitingRing = null;
-        }
+        CleanupOrbitingKnives();
 
         int level = GetSkillLevel(ZombieStormSkillType.OrbitingKnife);
         int count = 2 + Mathf.FloorToInt(level * 0.75f) + Mod("knife_blades") + (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 3 : 0);
         float radius = (2.05f + level * 0.24f + Mod("knife_reach") * 0.3f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.32f : 1f);
-        if (level > 0)
-        {
-            orbitingRing = new GameObject("Orbiting Blade Halo Ring");
-            orbitingRing.transform.position = transform.position;
-            orbitingRing.transform.localScale = Vector3.one * radius;
-            SpriteRenderer ringRenderer = orbitingRing.AddComponent<SpriteRenderer>();
-            ringRenderer.sprite = game.GetOrbitRingSprite();
-            ringRenderer.color = new Color(1f, 0.18f, 0.08f, 0.56f);
-            ringRenderer.sortingOrder = 33;
-            game.SpawnAreaEffect(transform.position, radius * 1.04f, 0f, 0.28f, 1f, new Color(1f, 0.18f, 0.08f, 0.38f), "upgrade_ring");
-            game.SpawnAreaEffect(transform.position, 0.55f, 0f, 0.2f, 1f, new Color(1f, 0.42f, 0.24f, 0.56f), "upgrade_pulse");
-        }
-
         for (int i = 0; i < count; i++)
         {
             GameObject blade = new GameObject("Orbiting Skill Blade");
+            blade.transform.SetParent(transform, true);
             float angle = i * (360f / Mathf.Max(1, count));
             Vector2 offset = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * radius;
             blade.transform.position = (Vector2)transform.position + offset;
@@ -481,13 +414,6 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             spriteRenderer.sprite = game.GetSkillSprite(ZombieStormSkillType.OrbitingKnife);
             spriteRenderer.color = new Color(1f, 0.94f, 0.92f, 1f);
             spriteRenderer.sortingOrder = 42;
-            GameObject glow = new GameObject("Blade Glow");
-            glow.transform.SetParent(blade.transform, false);
-            glow.transform.localScale = Vector3.one * 1.55f;
-            SpriteRenderer glowRenderer = glow.AddComponent<SpriteRenderer>();
-            glowRenderer.sprite = game.GetSoftGlowSprite();
-            glowRenderer.color = new Color(1f, 0.12f, 0.04f, 0.26f);
-            glowRenderer.sortingOrder = 41;
             orbitingObjects.Add(blade);
         }
     }
@@ -495,21 +421,14 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
     // Rebuilds the Fire Spirit count from skill level and upgrades.
     private void RebuildDrones()
     {
-        for (int i = 0; i < drones.Count; i++)
-        {
-            if (drones[i] != null)
-            {
-                Destroy(drones[i]);
-            }
-        }
-
-        drones.Clear();
+        CleanupDrones();
         int level = GetSkillLevel(ZombieStormSkillType.SummonDrone);
-        int baseCount = level >= 4 ? 3 : level >= 3 ? 2 : 1;
+        int baseCount = Mathf.Max(1, level);
         int count = baseCount + Mod("drone_swarm") + (IsEvolved(ZombieStormSkillType.SummonDrone) ? 2 : 0);
         for (int i = 0; i < count; i++)
         {
-            GameObject drone = new GameObject("火灵");
+            GameObject drone = new GameObject("Fire Spirit");
+            drone.transform.SetParent(transform, true);
             drone.transform.localScale = Vector3.one * 0.56f;
             SpriteRenderer spriteRenderer = drone.AddComponent<SpriteRenderer>();
             spriteRenderer.sprite = game.GetSkillSprite(ZombieStormSkillType.SummonDrone);
@@ -565,6 +484,41 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         float levelCooldownBonus = level >= 2 ? 0.18f : 0f;
         cooldowns[ZombieStormSkillType.SummonDrone] = Mathf.Max(0.22f, 0.92f - levelCooldownBonus - Mod("drone_overclock") * 0.08f) * game.CooldownMultiplier;
+    }
+
+    // Destroys all persistent helper objects owned by continuous skills.
+    private void CleanupPersistentSkillObjects()
+    {
+        CleanupOrbitingKnives();
+        CleanupDrones();
+    }
+
+    // Destroys orbiting blade objects and their halo ring.
+    private void CleanupOrbitingKnives()
+    {
+        for (int i = 0; i < orbitingObjects.Count; i++)
+        {
+            if (orbitingObjects[i] != null)
+            {
+                Destroy(orbitingObjects[i]);
+            }
+        }
+
+        orbitingObjects.Clear();
+    }
+
+    // Destroys Fire Spirit helper objects.
+    private void CleanupDrones()
+    {
+        for (int i = 0; i < drones.Count; i++)
+        {
+            if (drones[i] != null)
+            {
+                Destroy(drones[i]);
+            }
+        }
+
+        drones.Clear();
     }
 
     // Checks the ultimate key and casts the storm when energy is full.

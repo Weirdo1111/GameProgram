@@ -90,6 +90,108 @@ public sealed class ZombieStormProjectile : MonoBehaviour
     }
 }
 
+// Controls thrown fire bombs, impact area damage, and optional burning ground.
+public sealed class ZombieStormFireBombProjectile : MonoBehaviour
+{
+    private ZombieStormGameController game;
+    private Vector2 startPosition;
+    private Vector2 targetPosition;
+    private float impactDamage;
+    private float impactRadius;
+    private bool leavesFire;
+    private float burnDamage;
+    private float burnRadius;
+    private float burnDuration;
+    private float burnTickRate;
+    private float travelTime;
+    private float elapsed;
+    private SpriteRenderer spriteRenderer;
+    private Sprite[] frames;
+
+    // Initializes the references and values this object needs at runtime.
+    public void Initialize(ZombieStormGameController owner, Vector2 origin, Vector2 target, float hitDamage, float hitRadius, bool createsFire, float lingeringDamage, float lingeringRadius, float lingeringDuration, float lingeringTickRate)
+    {
+        game = owner;
+        startPosition = origin;
+        targetPosition = target;
+        impactDamage = hitDamage;
+        impactRadius = hitRadius;
+        leavesFire = createsFire;
+        burnDamage = lingeringDamage;
+        burnRadius = lingeringRadius;
+        burnDuration = lingeringDuration;
+        burnTickRate = lingeringTickRate;
+        travelTime = Mathf.Clamp(Vector2.Distance(origin, target) / 12f, 0.34f, 0.58f);
+        elapsed = 0f;
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        frames = game.GetFireBombEffectFrames();
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = Color.white;
+            if (frames != null && frames.Length > 0)
+            {
+                spriteRenderer.sprite = frames[0];
+            }
+        }
+
+        transform.position = origin;
+        transform.localScale = Vector3.one * 1.08f;
+    }
+
+    // Advances the throw arc and detonates once the bomb reaches its target.
+    private void Update()
+    {
+        if (game == null)
+        {
+            return;
+        }
+
+        elapsed += Time.deltaTime;
+        float t = Mathf.Clamp01(elapsed / travelTime);
+        Vector2 flatPosition = Vector2.Lerp(startPosition, targetPosition, t);
+        float arc = Mathf.Sin(t * Mathf.PI) * 0.92f;
+        transform.position = flatPosition + Vector2.up * arc;
+        transform.localScale = Vector3.one * (1.02f + Mathf.Sin(t * Mathf.PI) * 0.18f);
+        UpdateAnimation(t);
+
+        if (t >= 1f)
+        {
+            Detonate();
+        }
+    }
+
+    // Updates the fire bomb sprite frame and spin while it flies.
+    private void UpdateAnimation(float t)
+    {
+        if (spriteRenderer != null && frames != null && frames.Length > 0)
+        {
+            int frameIndex = Mathf.Clamp(Mathf.FloorToInt(t * frames.Length), 0, frames.Length - 1);
+            spriteRenderer.sprite = frames[frameIndex];
+        }
+
+        transform.rotation = Quaternion.Euler(0f, 0f, elapsed * 320f);
+    }
+
+    // Applies impact damage and optional lingering fire, then returns the projectile to its pool.
+    private void Detonate()
+    {
+        game.SpawnAreaEffect(targetPosition, impactRadius, impactDamage, 0.18f, 99f, new Color(1f, 0.52f, 0.08f, 0.78f), "foozle_explosion");
+        if (leavesFire)
+        {
+            string fireKey = game.GetRandomGroundFireEffectKey();
+            game.SpawnAreaEffect(targetPosition, burnRadius, burnDamage, burnDuration, burnTickRate, new Color(1f, 0.42f, 0.08f, 0.72f), fireKey);
+        }
+
+        for (int i = 0; i < 5; i++)
+        {
+            game.SpawnHitSpark(targetPosition + UnityEngine.Random.insideUnitCircle * impactRadius * 0.72f, new Color(1f, 0.68f, 0.12f, 0.78f), 0.14f);
+        }
+
+        game.ShakeCamera(0.045f, 0.08f);
+        game.ReturnPooled("fire_bomb_projectile", gameObject);
+    }
+}
+
 // Controls enemy ranged projectiles, movement, collision, and player damage.
 public sealed class ZombieStormEnemyProjectile : MonoBehaviour
 {

@@ -23,15 +23,13 @@ Zombie Storm is a Unity 2D survival action prototype inspired by horde survival 
 Active skills auto-cast after being learned:
 
 - Magic Bolt
-- Orbiting Knives
-- Meteor Storm
+- Fire Blades
+- Regeneration
 - Fire Zone
-- 火灵
-- Chain Lightning
-- Shield Burst
+- Fire Spirit
 - Ultimate Storm
 
-Each active skill is capped at Lv.5. Follow-up upgrades now bias toward skills you already own, so a lightning, fire, knife, 火灵, or magic build can become more coherent over a run.
+Most active skills are capped at Lv.5. Fire Zone is capped at Lv.4 and Regeneration is capped at Lv.3. Follow-up upgrades now bias toward skills you already own, so a fire, fire-blade, fire-spirit, or magic build can become more coherent over a run.
 
 ## Bosses
 
@@ -62,6 +60,8 @@ Documented external art sources are listed in `Docs/ArtSources.md`.
 
 - Kenney Topdown Shooter Pack: CC0
 - Mikodrak 2D Spell Effects: CC0
+- Fire bomb effect: imported from a Pixlab24 asset download supplied by the project owner, documented in `Docs/ArtSources.md`.
+- Main menu cover: AI-generated image supplied by the project owner, documented in `Docs/ArtSources.md`.
 
 Some local prototype assets still need a final source/license audit before any commercial release. Treat the current project as a playable prototype, not a store-ready build.
 

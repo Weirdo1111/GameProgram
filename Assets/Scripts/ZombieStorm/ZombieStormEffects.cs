@@ -114,7 +114,7 @@ public sealed class ZombieStormAreaEffect : MonoBehaviour
             if (frames != null && frames.Length > 0)
             {
                 int frameIndex = Mathf.FloorToInt((maxLife - life) / frameDuration);
-                if (life > 0.08f && (poolKey == "fire_pool" || poolKey == "toxic_pool" || poolKey == "ultimate_storm"))
+                if (life > 0.08f && (poolKey == "fire_pool" || poolKey.StartsWith("fire_pool_", StringComparison.Ordinal) || poolKey == "toxic_pool" || poolKey == "ultimate_storm"))
                 {
                     frameIndex %= frames.Length;
                 }

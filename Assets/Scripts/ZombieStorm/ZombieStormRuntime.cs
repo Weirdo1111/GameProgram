@@ -23,6 +23,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private const float GameplayCameraOrthographicSize = 10.5f;
     private const float GameplayHudScale = 0.8f;
     public const float EnemyDamageMultiplier = 0.75f;
+    private static readonly string[] GroundFireEffectKeys = { "fire_pool_tekila_01" };
 
     [Header("Run")]
     public float runDurationSeconds = 300f;
@@ -569,6 +570,23 @@ public sealed class ZombieStormGameController : MonoBehaviour
         PlaySfx("shoot", 0.28f, 0.055f);
     }
 
+    // Spawns a thrown fire bomb projectile and initializes its starting values.
+    public void SpawnFireBombProjectile(Vector2 position, Vector2 targetPosition, float impactDamage, float impactRadius, bool leavesFire, float burnDamage, float burnRadius, float burnDuration, float burnTickRate)
+    {
+        GameObject projectileObject = SpawnPooled("fire_bomb_projectile", CreateFireBombProjectile);
+        projectileObject.transform.SetParent(worldRoot, false);
+        projectileObject.transform.position = position;
+        projectileObject.transform.localScale = Vector3.one * 1.08f;
+        SpriteRenderer spriteRenderer = projectileObject.GetComponent<SpriteRenderer>();
+        Sprite[] frames = GetFireBombEffectFrames();
+        spriteRenderer.sprite = frames != null && frames.Length > 0 ? frames[0] : fireSprite;
+        spriteRenderer.color = Color.white;
+        spriteRenderer.sortingOrder = 44;
+        ZombieStormFireBombProjectile projectile = projectileObject.GetComponent<ZombieStormFireBombProjectile>();
+        projectile.Initialize(this, position, targetPosition, impactDamage, impactRadius, leavesFire, burnDamage, burnRadius, burnDuration, burnTickRate);
+        PlaySfx("shoot", 0.22f, 0.045f);
+    }
+
     // Spawns enemy projectile and initializes its starting values.
     public void SpawnEnemyProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life)
     {
@@ -848,9 +866,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return mineSprite;
         }
 
-        if (skillType == ZombieStormSkillType.FireZone || skillType == ZombieStormSkillType.MeteorStorm)
+        if (skillType == ZombieStormSkillType.Regeneration)
         {
-            return GetEffectPreviewSprite("meteor_blast", 3, fireSprite);
+            return softGlowSprite != null ? softGlowSprite : mineSprite;
+        }
+
+        if (skillType == ZombieStormSkillType.FireZone)
+        {
+            return GetEffectPreviewSprite("fire_bomb", 5, fireSprite);
         }
 
         return bulletSprite;
@@ -951,6 +974,24 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return GetEffectFrames("foozle_fireball");
     }
 
+    // Returns the fire bomb effect sprite value for the current state.
+    public Sprite GetFireBombEffectSprite()
+    {
+        return GetEffectPreviewSprite("fire_bomb", 5, fireSprite);
+    }
+
+    // Returns the fire bomb effect frames value for the current state.
+    public Sprite[] GetFireBombEffectFrames()
+    {
+        return GetEffectFrames("fire_bomb");
+    }
+
+    // Returns one of the imported ground-fire effect keys.
+    public string GetRandomGroundFireEffectKey()
+    {
+        return GroundFireEffectKeys[UnityEngine.Random.Range(0, GroundFireEffectKeys.Length)];
+    }
+
     // Returns the ice boss orb frames value for the current state.
     public Sprite[] GetIceBossOrbFrames()
     {
@@ -972,7 +1013,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         string sequenceKey = "spark";
-        if (effectKey == "fire_pool" || effectKey == "toxic_pool" || effectKey == "meteor_blast" || effectKey == "meteor_warning")
+        if (effectKey == "fire_pool" || effectKey.StartsWith("fire_pool_", StringComparison.Ordinal) || effectKey == "toxic_pool" || effectKey == "meteor_blast" || effectKey == "meteor_warning")
         {
             sequenceKey = "fire";
         }
@@ -1115,10 +1156,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Skills.Initialize(this, Player);
         Skills.LearnSkill(ZombieStormSkillType.MagicBolt);
         Skills.LearnSkill(ZombieStormSkillType.OrbitingKnife);
+        Skills.LearnSkill(ZombieStormSkillType.FireZone);
+        Skills.LevelUpSkill(ZombieStormSkillType.FireZone);
+        Skills.LevelUpSkill(ZombieStormSkillType.FireZone);
+        Skills.LevelUpSkill(ZombieStormSkillType.FireZone);
 
         FollowPlayer(true);
         PlaySfx("start", 0.56f, 0.1f);
-        ShowFeedback("Wave 1: Magic Bolt and Orbiting Knives online. Move, kite, collect XP.", 3f);
+        ShowFeedback("Wave 1: Magic Bolt, Fire Blades, and Fire Zone Lv.4 online. Move, kite, collect XP.", 3f);
         PlayStartupEmberMeteorPreview();
     }
 
@@ -1883,6 +1928,17 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
+    // Creates a pooled fire bomb projectile object.
+    private GameObject CreateFireBombProjectile()
+    {
+        GameObject item = new GameObject("Fire Bomb");
+        SpriteRenderer spriteRenderer = item.AddComponent<SpriteRenderer>();
+        spriteRenderer.sprite = GetFireBombEffectSprite();
+        spriteRenderer.sortingOrder = 44;
+        item.AddComponent<ZombieStormFireBombProjectile>();
+        return item;
+    }
+
     // Creates a pooled enemy projectile object.
     private GameObject CreateEnemyProjectile()
     {
@@ -2067,7 +2123,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         for (int i = 0; i < values.Length; i++)
         {
             ZombieStormSkillType candidate = (ZombieStormSkillType)values.GetValue(i);
-            if (IsSkillKnown(candidate))
+            if (CanOfferSkill(candidate) && IsSkillKnown(candidate))
             {
                 count++;
             }
@@ -2083,7 +2139,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         for (int i = 0; i < values.Length; i++)
         {
             ZombieStormSkillType candidate = (ZombieStormSkillType)values.GetValue(i);
-            if (!IsSkillKnown(candidate))
+            if (!CanOfferSkill(candidate) || !IsSkillKnown(candidate))
             {
                 continue;
             }
@@ -2108,7 +2164,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         for (int guard = 0; guard < 24; guard++)
         {
             ZombieStormSkillType weaponType = (ZombieStormSkillType)values.GetValue(UnityEngine.Random.Range(0, values.Length));
-            if (!IsSkillKnown(weaponType))
+            if (CanOfferSkill(weaponType) && !IsSkillKnown(weaponType))
             {
                 return ZombieStormUpgradeOption.Custom("unlock_" + weaponType, SkillName(weaponType) + " Lv.1", SkillSummary(weaponType), "NEW ACTIVE SKILL", SkillAccent(weaponType), delegate { Skills.LearnSkill(weaponType); });
             }
@@ -2121,7 +2177,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private ZombieStormUpgradeOption CreateSkillLevelOption(ZombieStormSkillType weaponType)
     {
         int level = Skills.GetSkillLevel(weaponType);
-        if (!IsSkillKnown(weaponType) || level >= 5)
+        if (!CanOfferSkill(weaponType) || !IsSkillKnown(weaponType) || level >= SkillMaxLevel(weaponType))
         {
             return null;
         }
@@ -2133,12 +2189,17 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private ZombieStormUpgradeOption CreateSkillSpecializationOption(ZombieStormSkillType weaponType)
     {
         int skillLevel = Skills.GetSkillLevel(weaponType);
-        if (!IsSkillKnown(weaponType) || skillLevel >= 5)
+        if (!CanOfferSkill(weaponType) || !IsSkillKnown(weaponType) || skillLevel >= SkillMaxLevel(weaponType))
         {
             return null;
         }
 
         string[] keys = SkillUpgradeKeys(weaponType);
+        if (keys.Length == 0)
+        {
+            return null;
+        }
+
         for (int guard = 0; guard < 18; guard++)
         {
             string key = keys[UnityEngine.Random.Range(0, keys.Length)];
@@ -2159,6 +2220,18 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private bool IsSkillKnown(ZombieStormSkillType weaponType)
     {
         return Skills != null && Skills.GetSkillLevel(weaponType) > 0;
+    }
+
+    // Checks whether a skill is currently allowed to appear as an upgrade card.
+    private static bool CanOfferSkill(ZombieStormSkillType weaponType)
+    {
+        return weaponType != ZombieStormSkillType.ShieldBurst;
+    }
+
+    // Returns the highest level allowed for a skill.
+    private static int SkillMaxLevel(ZombieStormSkillType weaponType)
+    {
+        return weaponType == ZombieStormSkillType.Regeneration ? 3 : weaponType == ZombieStormSkillType.FireZone ? 4 : 5;
     }
 
     // Creates an upgrade option for a passive stat.
@@ -2247,10 +2320,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         TryEvolve(ZombieStormSkillType.MagicBolt, ZombieStormPassiveType.FireRate, "Arcane Barrage evolved.");
-        TryEvolve(ZombieStormSkillType.OrbitingKnife, ZombieStormPassiveType.MaxHealth, "Blade Halo evolved.");
-        TryEvolve(ZombieStormSkillType.MeteorStorm, ZombieStormPassiveType.Area, "Judgement Meteor evolved.");
-        TryEvolve(ZombieStormSkillType.ChainLightning, ZombieStormPassiveType.Crit, "Storm Chain evolved.");
-        TryEvolve(ZombieStormSkillType.SummonDrone, ZombieStormPassiveType.Damage, "火灵 evolved.");
+        TryEvolve(ZombieStormSkillType.OrbitingKnife, ZombieStormPassiveType.MaxHealth, "Fire Blade Halo evolved.");
+        TryEvolve(ZombieStormSkillType.SummonDrone, ZombieStormPassiveType.Damage, "Fire Spirit evolved.");
     }
 
     // Evolves a skill when its required passive and level conditions are met.
@@ -2765,12 +2836,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         if (key.Contains("OrbitingKnife") || key.Contains("knife_"))
         {
-            return "OK";
+            return "FB";
         }
 
-        if (key.Contains("MeteorStorm") || key.Contains("meteor_"))
+        if (key.Contains("Regeneration") || key.Contains("regen_"))
         {
-            return "MT";
+            return "RG";
         }
 
         if (key.Contains("FireZone") || key.Contains("fire_"))
@@ -2780,12 +2851,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         if (key.Contains("SummonDrone") || key.Contains("drone_"))
         {
-            return "DR";
-        }
-
-        if (key.Contains("ChainLightning") || key.Contains("lightning_"))
-        {
-            return "CL";
+            return "FS";
         }
 
         if (key.Contains("ShieldBurst") || key.Contains("shield_"))
@@ -3264,11 +3330,10 @@ public sealed class ZombieStormGameController : MonoBehaviour
         switch (weapon)
         {
             case ZombieStormSkillType.MagicBolt: return "Magic Bolt";
-            case ZombieStormSkillType.OrbitingKnife: return "Orbiting Knives";
-            case ZombieStormSkillType.MeteorStorm: return "Meteor Storm";
+            case ZombieStormSkillType.OrbitingKnife: return "Fire Blades";
+            case ZombieStormSkillType.Regeneration: return "Regeneration";
             case ZombieStormSkillType.FireZone: return "Fire Zone";
-            case ZombieStormSkillType.SummonDrone: return "火灵";
-            case ZombieStormSkillType.ChainLightning: return "Chain Lightning";
+            case ZombieStormSkillType.SummonDrone: return "Fire Spirit";
             case ZombieStormSkillType.ShieldBurst: return "Shield Burst";
             case ZombieStormSkillType.UltimateStorm: return "Ultimate: Full-Screen Thunder";
             default: return weapon.ToString();
@@ -3281,11 +3346,10 @@ public sealed class ZombieStormGameController : MonoBehaviour
         switch (weapon)
         {
             case ZombieStormSkillType.MagicBolt: return "Adds auto magic shots with a bright launch spark.";
-            case ZombieStormSkillType.OrbitingKnife: return "Adds visible blades that orbit and cut nearby enemies.";
-            case ZombieStormSkillType.MeteorStorm: return "Adds warning circles, then delayed impact blasts.";
-            case ZombieStormSkillType.FireZone: return "Fireball hits leave a 5-second burning pool.";
-            case ZombieStormSkillType.SummonDrone: return "召唤 1 个火灵，环绕你并发射火球。";
-            case ZombieStormSkillType.ChainLightning: return "Adds jumping lightning with blue links between enemies.";
+            case ZombieStormSkillType.OrbitingKnife: return "Adds orbiting fire blades that burn through nearby enemies.";
+            case ZombieStormSkillType.Regeneration: return "Restores 1 health every 3 seconds.";
+            case ZombieStormSkillType.FireZone: return "Every 4 Magic Bolt attacks throws a fire bomb.";
+            case ZombieStormSkillType.SummonDrone: return "Summons 1 Fire Spirit that circles you and shoots fireballs.";
             case ZombieStormSkillType.ShieldBurst: return "Adds a close-range defensive shockwave trigger.";
             case ZombieStormSkillType.UltimateStorm: return "Adds one ultimate. Press F for a full-screen storm.";
             default: return "Adds another automatic skill.";
@@ -3298,14 +3362,36 @@ public sealed class ZombieStormGameController : MonoBehaviour
         switch (weapon)
         {
             case ZombieStormSkillType.MagicBolt: return "Lv." + nextLevel + ": faster bolts, more damage, extra pierce.";
-            case ZombieStormSkillType.OrbitingKnife: return "Lv." + nextLevel + ": more blades, wider orbit, stronger ticks.";
-            case ZombieStormSkillType.MeteorStorm: return "Lv." + nextLevel + ": more impacts, bigger warning circles.";
-            case ZombieStormSkillType.FireZone: return "Lv." + nextLevel + ": fireball pools burn wider and harder.";
+            case ZombieStormSkillType.OrbitingKnife: return "Lv." + nextLevel + ": more fire blades, wider orbit, stronger burns.";
+            case ZombieStormSkillType.Regeneration: return RegenerationLevelSummary(nextLevel);
+            case ZombieStormSkillType.FireZone: return FireZoneLevelSummary(nextLevel);
             case ZombieStormSkillType.SummonDrone: return FireSpiritLevelSummary(nextLevel);
-            case ZombieStormSkillType.ChainLightning: return "Lv." + nextLevel + ": more jumps and stronger chain damage.";
             case ZombieStormSkillType.ShieldBurst: return "Lv." + nextLevel + ": larger defensive ring and harder hit.";
             case ZombieStormSkillType.UltimateStorm: return "Lv." + nextLevel + ": stronger F ultimate, shorter cooldown.";
             default: return "Lv." + nextLevel + ": improves this automatic skill.";
+        }
+    }
+
+    // Returns the custom level-up description for Regeneration.
+    private static string RegenerationLevelSummary(int nextLevel)
+    {
+        switch (nextLevel)
+        {
+            case 2: return "Lv.2: max health +30 and heal 30 immediately.";
+            case 3: return "Lv.3: restores 1 health every 2 seconds.";
+            default: return "Lv." + nextLevel + ": improves survival recovery.";
+        }
+    }
+
+    // Returns the custom level-up description for Fire Zone.
+    private static string FireZoneLevelSummary(int nextLevel)
+    {
+        switch (nextLevel)
+        {
+            case 2: return "Lv.2: fire bombs leave burning flames on the ground.";
+            case 3: return "Lv.3: fire bombs trigger every 3 attacks.";
+            case 4: return "Lv.4: fire bombs trigger every 2 attacks.";
+            default: return "Lv." + nextLevel + ": throws fire bombs after repeated attacks.";
         }
     }
 
@@ -3314,10 +3400,10 @@ public sealed class ZombieStormGameController : MonoBehaviour
     {
         switch (nextLevel)
         {
-            case 2: return "Lv.2: 火灵攻击速度提高。";
-            case 3: return "Lv.3: 火灵数量变 2。";
-            case 4: return "Lv.4: 火灵数量变 3。";
-            default: return "Lv." + nextLevel + ": 火灵威力提高。";
+            case 2: return "Lv.2: Fire Spirit count becomes 2 and attack speed increases.";
+            case 3: return "Lv.3: Fire Spirit count becomes 3.";
+            case 4: return "Lv.4: Fire Spirit count becomes 4.";
+            default: return "Lv." + nextLevel + ": adds more Fire Spirits and increases power.";
         }
     }
 
@@ -3328,10 +3414,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
         {
             case ZombieStormSkillType.MagicBolt: return new[] { "magic_force", "magic_split", "magic_pierce" };
             case ZombieStormSkillType.OrbitingKnife: return new[] { "knife_blades", "knife_reach", "knife_edge" };
-            case ZombieStormSkillType.MeteorStorm: return new[] { "meteor_impacts", "meteor_blast", "meteor_heat" };
-            case ZombieStormSkillType.FireZone: return new[] { "fire_spread", "fire_linger", "fire_heat" };
+            case ZombieStormSkillType.Regeneration: return new string[0];
+            case ZombieStormSkillType.FireZone: return new string[0];
             case ZombieStormSkillType.SummonDrone: return new[] { "drone_swarm", "drone_focus", "drone_overclock" };
-            case ZombieStormSkillType.ChainLightning: return new[] { "lightning_jumps", "lightning_reach", "lightning_voltage", "lightning_tempo" };
             case ZombieStormSkillType.ShieldBurst: return new[] { "shield_radius", "shield_force", "shield_recharge" };
             case ZombieStormSkillType.UltimateStorm: return new[] { "ultimate_voltage", "ultimate_radius", "ultimate_recharge" };
             default: return new[] { "magic_force" };
@@ -3346,22 +3431,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case "magic_force": return "Focused Mana";
             case "magic_split": return "Split Casting";
             case "magic_pierce": return "Piercing Glyph";
-            case "knife_blades": return "Extra Blades";
-            case "knife_reach": return "Wide Orbit";
-            case "knife_edge": return "Sharper Edge";
-            case "meteor_impacts": return "Meteor Shower";
-            case "meteor_blast": return "Impact Crater";
-            case "meteor_heat": return "Molten Core";
-            case "fire_spread": return "Wildfire";
-            case "fire_linger": return "Searing Ground";
-            case "fire_heat": return "Hotter Burn";
-            case "drone_swarm": return "火灵";
-            case "drone_focus": return "火灵";
-            case "drone_overclock": return "火灵";
-            case "lightning_jumps": return "Forked Current";
-            case "lightning_reach": return "Arc Range";
-            case "lightning_voltage": return "High Voltage";
-            case "lightning_tempo": return "Fast Charge";
+            case "knife_blades": return "Extra Fire Blades";
+            case "knife_reach": return "Wide Flame Orbit";
+            case "knife_edge": return "Searing Edge";
+            case "drone_swarm": return "Spirit Swarm";
+            case "drone_focus": return "Focused Flame";
+            case "drone_overclock": return "Spirit Overclock";
             case "shield_radius": return "Wider Guard";
             case "shield_force": return "Repulsion Core";
             case "shield_recharge": return "Quick Recharge";
@@ -3377,25 +3452,15 @@ public sealed class ZombieStormGameController : MonoBehaviour
     {
         switch (key)
         {
-            case "lightning_jumps": return "Lv." + nextLevel + ": Chain Lightning jumps to one more enemy.";
-            case "lightning_reach": return "Lv." + nextLevel + ": Chain Lightning links farther and flashes wider.";
-            case "lightning_voltage": return "Lv." + nextLevel + ": Chain Lightning deals 18% more damage.";
-            case "lightning_tempo": return "Lv." + nextLevel + ": Chain Lightning cooldown is reduced.";
             case "magic_force": return "Lv." + nextLevel + ": Magic Bolt deals more damage.";
             case "magic_split": return "Lv." + nextLevel + ": Magic Bolt can fire additional angled shots.";
             case "magic_pierce": return "Lv." + nextLevel + ": Magic Bolt pierces more enemies.";
-            case "knife_blades": return "Lv." + nextLevel + ": Orbiting Knives adds another blade.";
-            case "knife_reach": return "Lv." + nextLevel + ": Orbiting Knives circle farther out.";
-            case "knife_edge": return "Lv." + nextLevel + ": Orbiting Knives hit harder.";
-            case "meteor_impacts": return "Lv." + nextLevel + ": Meteor Storm drops one more impact.";
-            case "meteor_blast": return "Lv." + nextLevel + ": Meteor blast radius grows.";
-            case "meteor_heat": return "Lv." + nextLevel + ": Meteor impacts deal more damage.";
-            case "fire_spread": return "Lv." + nextLevel + ": Fireball hits create another nearby pool.";
-            case "fire_linger": return "Lv." + nextLevel + ": Fireball kill pools tick damage faster.";
-            case "fire_heat": return "Lv." + nextLevel + ": Fireball kill pools deal more damage.";
-            case "drone_swarm": return "Lv." + nextLevel + ": 火灵 adds another 火灵.";
-            case "drone_focus": return "Lv." + nextLevel + ": 火灵 fireballs hit harder.";
-            case "drone_overclock": return "Lv." + nextLevel + ": 火灵 fireball cooldown is reduced.";
+            case "knife_blades": return "Lv." + nextLevel + ": Fire Blades adds another fire blade.";
+            case "knife_reach": return "Lv." + nextLevel + ": Fire Blades orbit farther out.";
+            case "knife_edge": return "Lv." + nextLevel + ": Fire Blades burn harder.";
+            case "drone_swarm": return "Lv." + nextLevel + ": Fire Spirit adds another Fire Spirit.";
+            case "drone_focus": return "Lv." + nextLevel + ": Fire Spirit fireballs hit harder.";
+            case "drone_overclock": return "Lv." + nextLevel + ": Fire Spirit fireball cooldown is reduced.";
             case "shield_radius": return "Lv." + nextLevel + ": Shield Burst covers more space.";
             case "shield_force": return "Lv." + nextLevel + ": Shield Burst deals more damage.";
             case "shield_recharge": return "Lv." + nextLevel + ": Shield Burst cooldown is reduced.";
@@ -3413,10 +3478,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
         {
             case ZombieStormSkillType.MagicBolt: return new Color(0.45f, 0.95f, 1f, 1f);
             case ZombieStormSkillType.OrbitingKnife: return new Color(1f, 0.22f, 0.12f, 1f);
-            case ZombieStormSkillType.MeteorStorm: return new Color(1f, 0.46f, 0.08f, 1f);
+            case ZombieStormSkillType.Regeneration: return new Color(0.42f, 1f, 0.58f, 1f);
             case ZombieStormSkillType.FireZone: return new Color(1f, 0.28f, 0.05f, 1f);
             case ZombieStormSkillType.SummonDrone: return new Color(1f, 0.42f, 0.08f, 1f);
-            case ZombieStormSkillType.ChainLightning: return new Color(0.38f, 0.72f, 1f, 1f);
             case ZombieStormSkillType.ShieldBurst: return new Color(0.78f, 0.98f, 1f, 1f);
             case ZombieStormSkillType.UltimateStorm: return new Color(0.95f, 0.86f, 1f, 1f);
             default: return new Color(0.5f, 0.9f, 1f, 1f);
@@ -4249,6 +4313,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         {
             AddDarkVfxEffectSequences();
             AddFoozlePixelMagicEffectSequences();
+            AddFireZoneEffectSequences();
             return;
         }
 
@@ -4259,6 +4324,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         AddEffectSequence(root, "explosion", "fx10_blackExplosion", 240f);
         AddDarkVfxEffectSequences();
         AddFoozlePixelMagicEffectSequences();
+        AddFireZoneEffectSequences();
 
         Sprite[] projectileFrames;
         if (effectFrames.TryGetValue("burst", out projectileFrames) && projectileFrames != null && projectileFrames.Length > 0)
@@ -4317,6 +4383,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         AddEffectSequence(root, "ultimate_storm", "Tornado", 88f);
     }
 
+    // Registers Fire Zone bomb and ground-fire effect frame sequences.
+    private void AddFireZoneEffectSequences()
+    {
+        string root = Path.Combine(Application.dataPath, "ZombieStormArt", "Effects");
+        AddEffectSequence(root, "fire_bomb", "FireBomb", 96f);
+        AddEffectSheetSequence(root, "fire_pool_tekila_01", Path.Combine("GroundFire", "TekilaFire01", "Fire-01_320x160_Sheet.png"), 5, 1, 96f, true);
+    }
+
     // Loads one effect frame sequence from a folder and stores it by key.
     private void AddEffectSequence(string root, string key, string folderName, float pixelsPerUnit)
     {
@@ -4341,6 +4415,60 @@ public sealed class ZombieStormGameController : MonoBehaviour
         if (frames.Count > 0)
         {
             effectFrames[key] = frames.ToArray();
+        }
+    }
+
+    // Loads one effect sprite sheet and stores sliced frames by key.
+    private void AddEffectSheetSequence(string root, string key, string sheetName, int columns, int rows, float pixelsPerUnit, bool removeBlackBackground)
+    {
+        string path = Path.Combine(root, sheetName);
+        if (!File.Exists(path) || columns <= 0 || rows <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Point;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            if (!ImageConversion.LoadImage(texture, bytes))
+            {
+                return;
+            }
+
+            if (removeBlackBackground)
+            {
+                RemoveBlackBackground(texture);
+            }
+
+            texture.name = Path.GetFileNameWithoutExtension(path);
+            texture.Apply(false, false);
+            List<Sprite> frames = new List<Sprite>(columns * rows);
+            for (int row = 0; row < rows; row++)
+            {
+                int sourceRow = rows - row - 1;
+                for (int column = 0; column < columns; column++)
+                {
+                    int left = Mathf.RoundToInt(column * texture.width / (float)columns);
+                    int right = Mathf.RoundToInt((column + 1) * texture.width / (float)columns);
+                    int bottom = Mathf.RoundToInt(sourceRow * texture.height / (float)rows);
+                    int top = Mathf.RoundToInt((sourceRow + 1) * texture.height / (float)rows);
+                    Sprite frame = Sprite.Create(texture, new Rect(left, bottom, right - left, top - bottom), new Vector2(0.5f, 0.5f), pixelsPerUnit);
+                    frame.name = texture.name + "_" + (frames.Count + 1).ToString("00");
+                    frames.Add(frame);
+                }
+            }
+
+            if (frames.Count > 0)
+            {
+                effectFrames[key] = frames.ToArray();
+            }
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning("Failed to load effect sheet: " + path + "\n" + exception.Message);
         }
     }
 
@@ -4626,6 +4754,29 @@ public sealed class ZombieStormGameController : MonoBehaviour
             Debug.LogWarning("Failed to load player frame: " + path + "\n" + exception.Message);
             return null;
         }
+    }
+
+    // Makes near-black sprite-sheet backgrounds transparent while preserving fire colors.
+    private static void RemoveBlackBackground(Texture2D texture)
+    {
+        Color32[] pixels = texture.GetPixels32();
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            Color32 color = pixels[i];
+            if (color.a < 10)
+            {
+                continue;
+            }
+
+            int brightness = color.r + color.g + color.b;
+            if (brightness <= 34 && color.r <= 18 && color.g <= 18 && color.b <= 18)
+            {
+                color.a = 0;
+                pixels[i] = color;
+            }
+        }
+
+        texture.SetPixels32(pixels);
     }
 
     // Removes checkerboard transparency background connected to image edges.
