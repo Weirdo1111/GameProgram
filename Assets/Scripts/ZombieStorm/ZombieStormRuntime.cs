@@ -117,6 +117,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Sprite neonSignSprite;
     private Sprite customArenaMapSprite;
     private Sprite mainMenuCoverSprite;
+    private Texture2D upgradeCardTemplateTexture;
+    private Texture2D magicBoltCardTemplateTexture;
+    private Texture2D fireBladesCardTemplateTexture;
+    private Texture2D fireZoneCardTemplateTexture;
+    private Texture2D stormCardTemplateTexture;
+    private Font upgradeCardTitleFont;
+    private Font upgradeCardBodyFont;
     private Sprite kenneyZombieSprite;
     private Sprite kenneyFastZombieSprite;
     private Sprite kenneyTankZombieSprite;
@@ -1165,6 +1172,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         PlaySfx("start", 0.56f, 0.1f);
         ShowFeedback("Wave 1: Magic Bolt, Fire Blades, and Fire Zone Lv.4 online. Move, kite, collect XP.", 3f);
         PlayStartupEmberMeteorPreview();
+        RequestLevelUp();
     }
 
     // Handles play startup ember meteor preview logic for ZombieStormGameController.
@@ -1354,6 +1362,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         LoadCraftpixEmberGolemFrames();
         LoadCustomArenaMap();
         LoadMainMenuCover();
+        LoadUpgradeCardTemplate();
+        LoadUpgradeCardFonts();
         LoadFireSpiritSprite();
         LoadKenneyTopdownArt();
         LoadMikodrakSpellEffects();
@@ -2565,9 +2575,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
         DrawOverlayBackdrop(0.88f);
 
         bool narrow = Screen.width < 780f || Screen.height < 620f;
-        float sidePadding = narrow ? 24f : 56f;
-        float panelWidth = Mathf.Min(Mathf.Max(320f, Screen.width - sidePadding), narrow ? 640f : 1040f);
-        float panelHeight = narrow ? Mathf.Min(Screen.height - 28f, 500f) : 500f;
+        float sidePadding = narrow ? 18f : 28f;
+        float panelWidth = Mathf.Min(Mathf.Max(320f, Screen.width - sidePadding), narrow ? 680f : 1320f);
+        float panelHeight = narrow ? Mathf.Min(Screen.height - 20f, 540f) : Mathf.Min(Screen.height - 24f, 760f);
         Rect panel = new Rect(Screen.width * 0.5f - panelWidth * 0.5f, Screen.height * 0.5f - panelHeight * 0.5f, panelWidth, panelHeight);
         Color headerAccent = currentChoices.Count > 0 ? currentChoices[0].Accent : new Color(0.3f, 0.86f, 1f, 1f);
 
@@ -2587,11 +2597,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         DrawUpgradeHeader(panel, headerAccent, narrow);
 
         int choiceCount = Mathf.Max(1, currentChoices.Count);
-        float gap = narrow ? 10f : 20f;
-        float startX = narrow ? panel.x + 20f : panel.x + 42f;
-        float startY = panel.y + (narrow ? 126f : 142f);
+        float gap = narrow ? 10f : 22f;
+        float startX = narrow ? panel.x + 18f : panel.x + 30f;
+        float startY = panel.y + (narrow ? 118f : 122f);
         float footerHeight = narrow ? 44f : 52f;
-        float cardWidth = narrow ? panel.width - 40f : (panel.width - 84f - gap * 2f) / 3f;
+        float cardWidth = narrow ? panel.width - 36f : (panel.width - 60f - gap * 2f) / 3f;
         float availableCardHeight = panel.yMax - footerHeight - 18f - startY;
         float cardHeight = narrow ? Mathf.Clamp((availableCardHeight - gap * (choiceCount - 1)) / choiceCount, 84f, 102f) : availableCardHeight;
 
@@ -2621,34 +2631,78 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Color edge = WithAlpha(accent, hover ? 1f : 0.62f);
         Color fill = hover ? new Color(0.046f, 0.058f, 0.074f, 0.99f) : new Color(0.027f, 0.035f, 0.05f, 0.98f);
         Rect drawRect = hover && !compact ? new Rect(rect.x - 3f, rect.y - 3f, rect.width + 6f, rect.height + 6f) : rect;
+        Texture2D cardTemplate = GetUpgradeCardTemplate(option);
+        bool useTemplateArt = cardTemplate != null && !compact;
 
         GUI.color = new Color(0f, 0f, 0f, 0.48f);
         GUI.DrawTexture(new Rect(rect.x + 7f, rect.y + 9f, rect.width, rect.height), Texture2D.whiteTexture);
         GUI.color = WithAlpha(accent, hover ? 0.2f : 0.08f);
         GUI.DrawTexture(new Rect(drawRect.x - 5f, drawRect.y - 5f, drawRect.width + 10f, drawRect.height + 10f), Texture2D.whiteTexture);
-        DrawPanel(drawRect, fill, edge);
 
-        GUI.color = WithAlpha(accent, hover ? 0.3f : 0.16f);
-        GUI.DrawTexture(new Rect(drawRect.x + 2f, drawRect.y + 2f, drawRect.width - 4f, compact ? 40f : 84f), Texture2D.whiteTexture);
-        GUI.color = WithAlpha(accent, hover ? 1f : 0.76f);
-        GUI.DrawTexture(new Rect(drawRect.x + 2f, drawRect.y + 2f, 5f, drawRect.height - 4f), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(drawRect.x + 14f, drawRect.y + 16f, compact ? 54f : 78f, 2f), Texture2D.whiteTexture);
-        GUI.color = WithAlpha(accent, hover ? 0.42f + pulse * 0.2f : 0.26f);
-        GUI.DrawTexture(new Rect(drawRect.x + drawRect.width - 44f, drawRect.y + 12f, 22f, 2f), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(drawRect.x + drawRect.width - 24f, drawRect.y + 12f, 2f, 22f), Texture2D.whiteTexture);
+        if (useTemplateArt)
+        {
+            GUI.color = Color.white;
+            GUI.DrawTexture(drawRect, cardTemplate, ScaleMode.StretchToFill, true);
+            GUI.color = WithAlpha(accent, hover ? 0.12f + pulse * 0.05f : 0.04f);
+            GUI.DrawTexture(new Rect(drawRect.x + 18f, drawRect.y + 18f, drawRect.width - 36f, drawRect.height - 36f), Texture2D.whiteTexture);
+        }
+        else
+        {
+            DrawPanel(drawRect, fill, edge);
 
-        Rect hotkey = compact ? new Rect(rect.x + 14f, rect.y + 12f, 34f, 34f) : new Rect(rect.x + 18f, rect.y + 20f, 44f, 44f);
-        DrawUpgradeHotkey(hotkey, index + 1, accent, hover);
+            GUI.color = WithAlpha(accent, hover ? 0.3f : 0.16f);
+            GUI.DrawTexture(new Rect(drawRect.x + 2f, drawRect.y + 2f, drawRect.width - 4f, compact ? 40f : 84f), Texture2D.whiteTexture);
+            GUI.color = WithAlpha(accent, hover ? 1f : 0.76f);
+            GUI.DrawTexture(new Rect(drawRect.x + 2f, drawRect.y + 2f, 5f, drawRect.height - 4f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(drawRect.x + 14f, drawRect.y + 16f, compact ? 54f : 78f, 2f), Texture2D.whiteTexture);
+            GUI.color = WithAlpha(accent, hover ? 0.42f + pulse * 0.2f : 0.26f);
+            GUI.DrawTexture(new Rect(drawRect.x + drawRect.width - 44f, drawRect.y + 12f, 22f, 2f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(drawRect.x + drawRect.width - 24f, drawRect.y + 12f, 2f, 22f), Texture2D.whiteTexture);
+        }
 
-        Rect icon = compact ? new Rect(rect.x + rect.width - 54f, rect.y + 12f, 34f, 34f) : new Rect(rect.x + rect.width * 0.5f - 35f, rect.y + 26f, 70f, 70f);
-        DrawUpgradeIcon(icon, option, accent, hover);
+        if (!useTemplateArt)
+        {
+            Rect hotkey = compact ? new Rect(rect.x + 14f, rect.y + 12f, 34f, 34f) : new Rect(rect.x + 18f, rect.y + 20f, 44f, 44f);
+            DrawUpgradeHotkey(hotkey, index + 1, accent, hover);
+        }
 
-        float textX = compact ? rect.x + 58f : rect.x + 20f;
-        float textWidth = compact ? rect.width - 122f : rect.width - 40f;
-        float titleY = compact ? rect.y + 10f : rect.y + 112f;
+        if (!useTemplateArt)
+        {
+            Rect icon = compact ? new Rect(rect.x + rect.width - 54f, rect.y + 12f, 34f, 34f) : new Rect(rect.x + rect.width * 0.5f - 35f, rect.y + 26f, 70f, 70f);
+            DrawUpgradeIcon(icon, option, accent, hover);
+        }
 
+        float textX = useTemplateArt ? drawRect.x + 38f : compact ? rect.x + 58f : rect.x + 20f;
+        float textWidth = useTemplateArt ? drawRect.width - 76f : compact ? rect.width - 122f : rect.width - 40f;
+        float titleY = useTemplateArt ? drawRect.y + drawRect.height * 0.405f + 1f : compact ? rect.y + 10f : rect.y + 112f;
+
+        if (useTemplateArt)
+        {
+            GUIStyle titleStyle = CreateUpgradeCardTextStyle(option.Title.Length > 24 ? 15 : 19, FontStyle.Bold, TextAnchor.MiddleCenter, false, upgradeCardTitleFont);
+            GUIStyle kindStyle = CreateUpgradeCardTextStyle(12, FontStyle.Bold, TextAnchor.MiddleCenter, false, upgradeCardTitleFont);
+            GUIStyle bodyStyle = CreateUpgradeCardTextStyle(16, FontStyle.Normal, TextAnchor.MiddleCenter, true, upgradeCardBodyFont);
+            GUIStyle buttonStyle = CreateUpgradeCardTextStyle(16, FontStyle.Bold, TextAnchor.MiddleCenter, false, upgradeCardTitleFont);
+            GUIStyle hotkeyStyle = CreateUpgradeCardTextStyle(11, FontStyle.Bold, TextAnchor.MiddleCenter, false, upgradeCardBodyFont);
+            string cardDescription = FormatUpgradeCardDescription(option.Description);
+
+            DrawShadowedUpgradeLabel(new Rect(drawRect.x + 22f, drawRect.y + 22f, 30f, 28f), (index + 1).ToString(), hotkeyStyle, new Color(0.95f, 0.66f, 0.28f, 0.92f), new Color(0.02f, 0f, 0f, 0.7f), new Vector2(1f, 1f));
+            DrawShadowedUpgradeLabel(new Rect(textX, titleY, textWidth, 31f), option.Title, titleStyle, new Color(0.98f, 0.94f, 0.82f, 1f), new Color(0.07f, 0.015f, 0f, 0.82f), new Vector2(1.5f, 1.5f));
+            DrawShadowedUpgradeLabel(new Rect(textX, drawRect.y + drawRect.height * 0.532f, textWidth, 24f), GetUpgradeKindLabel(option), kindStyle, new Color(1f, 0.82f, 0.52f, 1f), new Color(0.08f, 0.015f, 0f, 0.76f), new Vector2(1.1f, 1.1f));
+            DrawShadowedUpgradeLabel(new Rect(textX + 18f, drawRect.y + drawRect.height * 0.628f - 1f, textWidth - 36f, 96f), cardDescription, bodyStyle, new Color(0.96f, 0.9f, 0.78f, 1f), new Color(0f, 0f, 0f, 0.8f), new Vector2(1f, 1f));
+
+            if (!compact)
+            {
+                Rect button = new Rect(drawRect.x + 48f, drawRect.yMax - 72f, drawRect.width - 96f, 34f);
+                DrawShadowedUpgradeLabel(button, "SELECT " + (index + 1), buttonStyle, new Color(1f, 0.9f, 0.72f, 1f), new Color(0.06f, 0f, 0f, 0.86f), new Vector2(1.4f, 1.4f));
+            }
+        }
+        else
+        {
+        GUI.skin.label.alignment = TextAnchor.UpperLeft;
         GUI.skin.label.wordWrap = true;
         GUI.skin.label.fontSize = compact ? (option.Title.Length > 24 ? 14 : 16) : (option.Title.Length > 24 ? 17 : 20);
+        GUI.color = new Color(0.08f, 0.02f, 0f, 0.72f);
+        GUI.Label(new Rect(textX + 2f, titleY + 2f, textWidth, compact ? 24f : 50f), option.Title);
         GUI.color = Color.white;
         GUI.Label(new Rect(textX, titleY, textWidth, compact ? 24f : 50f), option.Title);
 
@@ -2658,14 +2712,15 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         GUI.skin.label.fontSize = compact ? 13 : 14;
         GUI.color = new Color(0.76f, 0.84f, 0.91f, 1f);
-        GUI.Label(new Rect(textX, compact ? rect.y + 54f : rect.y + 188f, textWidth, compact ? 34f : 60f), option.Description);
+        GUI.Label(new Rect(textX + 4f, compact ? rect.y + 54f : rect.y + 188f, textWidth - 8f, compact ? 34f : 60f), option.Description);
+        }
 
-        if (!compact)
+        if (!compact && !useTemplateArt)
         {
             DrawUpgradeEnergyTicks(new Rect(rect.x + 24f, rect.yMax - 66f, rect.width - 48f, 10f), accent, index, hover);
         }
 
-        if (!compact)
+        if (!compact && !useTemplateArt)
         {
             Rect button = new Rect(rect.x + 26f, rect.yMax - 44f, rect.width - 52f, 30f);
             DrawUpgradePickButton(button, index + 1, accent, hover);
@@ -2678,7 +2733,93 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         GUI.skin.label.wordWrap = false;
+        GUI.skin.label.alignment = TextAnchor.UpperLeft;
         GUI.color = Color.white;
+    }
+
+    // Creates a card-specific text style so upgrade art does not look like raw debug UI.
+    private GUIStyle CreateUpgradeCardTextStyle(int fontSize, FontStyle fontStyle, TextAnchor alignment, bool wordWrap, Font font)
+    {
+        GUIStyle style = new GUIStyle(GUI.skin.label);
+        style.font = font;
+        style.fontSize = fontSize;
+        style.fontStyle = fontStyle;
+        style.alignment = alignment;
+        style.wordWrap = wordWrap;
+        style.clipping = TextClipping.Clip;
+        style.padding = new RectOffset(0, 0, 0, 0);
+        style.normal.textColor = Color.white;
+        return style;
+    }
+
+    // Draws readable card text with a soft shadow instead of hard programmatic labels.
+    private void DrawShadowedUpgradeLabel(Rect rect, string text, GUIStyle style, Color color, Color shadowColor, Vector2 shadowOffset)
+    {
+        GUI.color = shadowColor;
+        GUI.Label(new Rect(rect.x + shadowOffset.x, rect.y + shadowOffset.y, rect.width, rect.height), text, style);
+        GUI.color = color;
+        GUI.Label(rect, text, style);
+    }
+
+    // Selects the card art template that matches the skill family.
+    private Texture2D GetUpgradeCardTemplate(ZombieStormUpgradeOption option)
+    {
+        if (option == null || string.IsNullOrEmpty(option.Key))
+        {
+            return upgradeCardTemplateTexture;
+        }
+
+        string key = option.Key;
+        if (key.Contains("MagicBolt") || key.Contains("magic_"))
+        {
+            return magicBoltCardTemplateTexture != null ? magicBoltCardTemplateTexture : upgradeCardTemplateTexture;
+        }
+
+        if (key.Contains("OrbitingKnife") || key.Contains("knife_"))
+        {
+            return fireBladesCardTemplateTexture != null ? fireBladesCardTemplateTexture : upgradeCardTemplateTexture;
+        }
+
+        if (key.Contains("FireZone"))
+        {
+            return fireZoneCardTemplateTexture != null ? fireZoneCardTemplateTexture : upgradeCardTemplateTexture;
+        }
+
+        if (key.Contains("UltimateStorm") || key.Contains("ultimate_"))
+        {
+            return stormCardTemplateTexture != null ? stormCardTemplateTexture : upgradeCardTemplateTexture;
+        }
+
+        return upgradeCardTemplateTexture;
+    }
+
+    // Makes compact card descriptions read like two-line card copy.
+    private static string FormatUpgradeCardDescription(string description)
+    {
+        if (string.IsNullOrEmpty(description))
+        {
+            return string.Empty;
+        }
+
+        int colonIndex = description.IndexOf(": ", StringComparison.Ordinal);
+        if (colonIndex > 0 && description.Length > 28)
+        {
+            return description.Substring(0, colonIndex + 1) + "\n" + description.Substring(colonIndex + 2);
+        }
+
+        if (description.Length <= 34)
+        {
+            return description;
+        }
+
+        int midpoint = description.Length / 2;
+        int bestBreak = description.IndexOf(' ', midpoint);
+        if (bestBreak < 0 || bestBreak > midpoint + 12)
+        {
+            bestBreak = description.LastIndexOf(' ', midpoint);
+        }
+
+        return bestBreak > 0 ? description.Substring(0, bestBreak) + "\n" + description.Substring(bestBreak + 1) : description;
     }
 
     // Draws the title area at the top of the upgrade panel.
@@ -4293,6 +4434,44 @@ public sealed class ZombieStormGameController : MonoBehaviour
         mainMenuCoverSprite = LoadRawSpriteFromPng(path, 100f, false, FilterMode.Bilinear, false);
     }
 
+    // Loads the chibi card art used behind upgrade option text.
+    private void LoadUpgradeCardTemplate()
+    {
+        upgradeCardTemplateTexture = LoadTextureFromPng(Path.Combine(Application.dataPath, "ZombieStormArt", "UI", "skill_card_chibi_fire_template.png"));
+        magicBoltCardTemplateTexture = LoadTextureFromPng(Path.Combine(Application.dataPath, "ZombieStormArt", "UI", "skill_card_magic_bolt_template.png"));
+        fireBladesCardTemplateTexture = LoadTextureFromPng(Path.Combine(Application.dataPath, "ZombieStormArt", "UI", "skill_card_fire_blades_template.png"));
+        fireZoneCardTemplateTexture = LoadTextureFromPng(Path.Combine(Application.dataPath, "ZombieStormArt", "UI", "skill_card_fire_zone_template.png"));
+        stormCardTemplateTexture = LoadTextureFromPng(Path.Combine(Application.dataPath, "ZombieStormArt", "UI", "skill_card_storm_template.png"));
+    }
+
+    // Uses softer system fonts for card text when available.
+    private void LoadUpgradeCardFonts()
+    {
+        upgradeCardTitleFont = CreateRuntimeFont(new[] { "Georgia", "Cambria", "Palatino Linotype", "Times New Roman" }, 24);
+        upgradeCardBodyFont = CreateRuntimeFont(new[] { "Trebuchet MS", "Segoe UI Semibold", "Segoe UI", "Arial" }, 16);
+    }
+
+    // Creates a dynamic font from the first installed candidate Unity can resolve.
+    private static Font CreateRuntimeFont(string[] names, int size)
+    {
+        for (int i = 0; i < names.Length; i++)
+        {
+            try
+            {
+                Font font = Font.CreateDynamicFontFromOSFont(names[i], size);
+                if (font != null)
+                {
+                    return font;
+                }
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        return null;
+    }
+
     // Loads the sprite used by the Fire Spirit summon.
     private void LoadFireSpiritSprite()
     {
@@ -4653,6 +4832,36 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Sprite LoadRawSpriteFromPng(string path, float pixelsPerUnit, bool removeCheckerBackground)
     {
         return LoadRawSpriteFromPng(path, pixelsPerUnit, removeCheckerBackground, FilterMode.Bilinear, true);
+    }
+
+    // Loads a PNG as a UI texture.
+    private Texture2D LoadTextureFromPng(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            if (!ImageConversion.LoadImage(texture, bytes))
+            {
+                return null;
+            }
+
+            texture.name = Path.GetFileNameWithoutExtension(path);
+            texture.Apply(false, false);
+            return texture;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning("Failed to load UI texture: " + path + "\n" + exception.Message);
+            return null;
+        }
     }
 
     // Loads a PNG as a sprite with optional background cleanup.
