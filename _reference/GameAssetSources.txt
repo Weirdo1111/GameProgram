@@ -1,5 +1,5 @@
 Zombie Storm - Game Asset Source Reference
-Last updated: 2026-06-09
+Last updated: 2026-06-10
 
 This file consolidates the known sources for visual/game art assets used by the
 Zombie Storm Unity prototype. License notes reflect the source files and project
@@ -47,10 +47,10 @@ Runtime projectile, spark, fire, lightning, burst, and explosion effect frames.
 3. AI-Generated Custom Zombie Storm Images
 
 Source:
-AI-generated images supplied by the project owner.
+AI-generated images created with ChatGPT and supplied by the project owner.
 
 License / usage note:
-Generated with AI tools and supplied by the project owner for this project.
+Generated with ChatGPT and supplied by the project owner for this project.
 
 Local paths:
 Assets/ZombieStormArt/Enemies
@@ -73,10 +73,10 @@ Assets/screen_selected
 4. Main Menu Cover
 
 Source:
-AI-generated image supplied by the project owner.
+AI-generated image created with ChatGPT and supplied by the project owner.
 
 License / usage note:
-Generated with AI tools and supplied by the project owner for this project.
+Generated with ChatGPT and supplied by the project owner for this project.
 
 Local path:
 Assets/ZombieStormArt/Menu/main_menu_cover.png
@@ -87,15 +87,35 @@ overlays transparent Unity buttons on top of the rendered Start Game and Setting
 areas.
 
 
-5. Dark VFX 01 - 02
+5. Story Sequence Images
 
 Source:
-Local download supplied by the project owner from:
+Storyline images supplied by the project owner from:
+C:\Users\ken\Desktop\story
+
+License / usage note:
+Generation tool, original public source, and license metadata are not recorded in
+the repository. Re-check ownership and redistribution terms before publishing raw
+asset files publicly.
+
+Local path:
+Assets/ZombieStormArt/Story
+
+Used for:
+Pre-run story sequence shown after Start Run and advanced with Space.
+
+
+6. Dark VFX 01 - 02
+
+Source:
+https://pixlab24.com/tilesets/effects/34816/
+
+Local source folder supplied by the project owner:
 C:\Users\ken\Downloads\Dark VFX 01 - 02
 
 License:
-No license file was found in the supplied download folder during import. Review
-the original download source before redistributing the raw PNG files publicly.
+Review the specific Pixlab24 asset page and license terms before redistributing
+the raw PNG files publicly.
 
 Local paths:
 Assets/ZombieStormArt/Effects/DarkVFX1
@@ -105,7 +125,7 @@ Used for:
 EmberTyrantBoss / Golem_3 dash impact and falling magma impact attack effects.
 
 
-6. Foozle Pixel Magic Effects
+7. Foozle Pixel Magic Effects
 
 Source:
 Pixel Magic Effects (1.0) local download supplied by the project owner from:
@@ -129,10 +149,10 @@ blast visuals, Fire Zone ignition bursts, Shield Burst wind visuals, and Ultimat
 Storm tornado visuals.
 
 
-7. Pixlab24 Fire Bomb Effect
+8. Pixlab24 Fire Bomb Effect
 
 Source:
-https://pixlab24.com/
+https://pixlab24.com/tilesets/effects/48436/
 
 Local source folder supplied by the project owner:
 C:\Users\ken\Downloads\5f06fc6b255498ab\Pixel Art VFX - Fire Mage - FREE Version\VFX2
@@ -148,7 +168,28 @@ Used for:
 Fire Zone's thrown fire bomb projectile animation.
 
 
-8. Tekila 2D Fire Pack
+9. Pixlab24 Fire Bomb Burn Circle Effect
+
+Source:
+https://pixlab24.com/tilesets/effects/48436/
+
+License:
+Review the specific Pixlab24 asset page and license terms before redistributing
+the raw PNG files publicly.
+
+Local path:
+Assets/ZombieStormArt/Effects/GroundFire/TekilaFire01
+
+Used for:
+Fire Zone's lingering burning circle / ground fire left after a fire bomb lands.
+
+Notes:
+The project owner identified this Pixlab24 page as the source website for the
+burning circle related to the fire bomb's lingering fire area. Re-check the
+downloaded files and page license before public redistribution.
+
+
+10. Tekila 2D Fire Pack
 
 Source:
 Local download supplied by the project owner from:
@@ -165,7 +206,68 @@ Used for:
 Fire Zone's lingering ground fire left by fire bombs.
 
 
-9. CraftPix Zombie Villager Chibi
+11. Skill Card UI Templates
+
+Source:
+AI-generated images created with ChatGPT and supplied by the project owner.
+
+License / usage note:
+Generated with ChatGPT and supplied by the project owner for this project.
+
+Local path:
+Assets/ZombieStormArt/UI
+
+Used for:
+Skill-card art templates for Fire Spirit/default cards, Magic Bolt, Fire Blades,
+Regeneration, Fire Zone, Storm / Ultimate cards, and damage / critical upgrade
+cards, cooldown / recharge upgrade cards, and experience / pickup-range upgrade
+cards.
+
+Notes:
+All current skill-card UI template images in this folder were generated with
+ChatGPT and supplied by the project owner.
+
+
+12. Health Potion Pickup Icon
+
+Source:
+AI-generated image created with ChatGPT and supplied by the project owner.
+
+License / usage note:
+Generated with ChatGPT and supplied by the project owner for this project.
+
+Local path:
+Assets/ZombieStormArt/UI/health_potion.png
+
+Used for:
+Health potion pickup dropped by zombies.
+
+Notes:
+The health potion art was generated with ChatGPT and supplied by the project
+owner.
+
+
+13. Player Status HUD Card
+
+Source:
+AI-generated image created with ChatGPT and supplied by the project owner.
+
+License / usage note:
+Generated with ChatGPT and supplied by the project owner for this project.
+
+Local paths:
+Assets/ZombieStormArt/UI/player_status_card.png
+Assets/ZombieStormArt/UI/player_status_card_cropped.png
+
+Used for:
+Top-left player HUD card with dynamic health and experience bars.
+
+Notes:
+The cropped file is a game-ready version derived from the supplied ChatGPT
+image.
+
+
+14. CraftPix Zombie Villager Chibi
 
 Source:
 Free Zombie Villager Chibi Character Sprites
@@ -189,7 +291,7 @@ redistribution conditions before committing raw source PNG files to a public
 repository.
 
 
-10. CraftPix Orc Chibi
+15. CraftPix Orc Chibi
 
 Source:
 Free Orc, Ogre and Goblin Chibi 2D Game Sprites
@@ -211,7 +313,7 @@ redistribution conditions before committing raw source PNG files to a public
 repository.
 
 
-11. CraftPix Goblin Chibi
+16. CraftPix Goblin Chibi
 
 Source:
 Free Orc, Ogre and Goblin Chibi 2D Game Sprites
@@ -233,7 +335,7 @@ redistribution conditions before committing raw source PNG files to a public
 repository.
 
 
-12. CraftPix Reaper Man Chibi
+17. CraftPix Reaper Man Chibi
 
 Source:
 Free Reaper Man Chibi 2D Game Sprites
@@ -258,7 +360,7 @@ redistribution conditions before committing raw source PNG files to a public
 repository.
 
 
-13. CraftPix Golems Chibi
+18. CraftPix Golems Chibi
 
 Source:
 Free Golems Chibi 2D Game Sprites / Golem_1, Golem_2, and Golem_3
@@ -284,7 +386,7 @@ source pack points to the CraftPix license in TXT/license.txt. Keep the same
 redistribution review requirement before making raw PNG frames public.
 
 
-14. TextMesh Pro Package Assets
+19. TextMesh Pro Package Assets
 
 Source:
 Unity TextMesh Pro package assets included in the Unity project.
@@ -298,15 +400,3 @@ Fonts, shaders, sprite assets, and text rendering support.
 Notes:
 These are package/support assets rather than custom game art. Follow the Unity
 package terms that apply to the installed TextMesh Pro package.
-
-
-Current audit gaps
-
-- Dark VFX 01 - 02: original public source and license were not found in the
-  supplied folder.
-- Pixlab24 Fire Bomb Effect: source domain is documented, but the exact asset
-  page and license should be rechecked before public redistribution.
-- Tekila 2D Fire Pack: original download page and license were not found in the
-  supplied folder.
-- AI-generated art: generation tool, prompt, and model/license metadata are not
-  recorded in the repository.

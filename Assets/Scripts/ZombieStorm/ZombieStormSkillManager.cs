@@ -78,7 +78,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
     public void LevelUpSkill(ZombieStormSkillType weapon)
     {
         int current = GetSkillLevel(weapon);
-        int maxLevel = weapon == ZombieStormSkillType.Regeneration ? 3 : weapon == ZombieStormSkillType.FireZone ? 4 : 5;
+        int maxLevel = weapon == ZombieStormSkillType.Regeneration ? 3 : weapon == ZombieStormSkillType.FireZone || weapon == ZombieStormSkillType.OrbitingKnife ? 4 : 5;
         int next = Mathf.Min(maxLevel, current + 1);
         if (next == current)
         {
@@ -399,7 +399,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         CleanupOrbitingKnives();
 
         int level = GetSkillLevel(ZombieStormSkillType.OrbitingKnife);
-        int count = 2 + Mathf.FloorToInt(level * 0.75f) + Mod("knife_blades") + (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 3 : 0);
+        int count = GetFireBladeCount(level) + Mod("knife_blades") + (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 3 : 0);
         float radius = (2.05f + level * 0.24f + Mod("knife_reach") * 0.3f) * game.AreaMultiplier * (IsEvolved(ZombieStormSkillType.OrbitingKnife) ? 1.32f : 1f);
         for (int i = 0; i < count; i++)
         {
@@ -429,7 +429,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         {
             GameObject drone = new GameObject("Fire Spirit");
             drone.transform.SetParent(transform, true);
-            drone.transform.localScale = Vector3.one * 0.56f;
+            drone.transform.localScale = Vector3.one * 0.46f;
             SpriteRenderer spriteRenderer = drone.AddComponent<SpriteRenderer>();
             spriteRenderer.sprite = game.GetSkillSprite(ZombieStormSkillType.SummonDrone);
             spriteRenderer.color = Color.white;
@@ -454,9 +454,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         for (int i = 0; i < drones.Count; i++)
         {
-            float angle = Time.time * 92f + i * (360f / Mathf.Max(1, drones.Count));
-            Vector2 desired = (Vector2)transform.position + new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * 1.15f;
-            drones[i].transform.position = Vector2.Lerp(drones[i].transform.position, desired, 9f * Time.deltaTime);
+            Vector2 desired = (Vector2)transform.position + GetFixedFireSpiritOffset(i, drones.Count);
+            drones[i].transform.position = desired;
         }
 
         float current;
@@ -484,6 +483,57 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         float levelCooldownBonus = level >= 2 ? 0.18f : 0f;
         cooldowns[ZombieStormSkillType.SummonDrone] = Mathf.Max(0.22f, 0.92f - levelCooldownBonus - Mod("drone_overclock") * 0.08f) * game.CooldownMultiplier;
+    }
+
+    // Returns the base Fire Blades count for each skill level.
+    private static int GetFireBladeCount(int level)
+    {
+        switch (level)
+        {
+            case 1: return 3;
+            case 2: return 5;
+            case 3: return 8;
+            default: return 10;
+        }
+    }
+
+    // Gives each Fire Spirit a stable slot around the player instead of orbiting.
+    private static Vector2 GetFixedFireSpiritOffset(int index, int count)
+    {
+        count = Mathf.Max(1, count);
+        if (count == 1)
+        {
+            return new Vector2(0.92f, 0.58f);
+        }
+
+        if (count == 2)
+        {
+            return index == 0 ? new Vector2(-0.86f, 0.58f) : new Vector2(0.86f, 0.58f);
+        }
+
+        if (count == 3)
+        {
+            switch (index)
+            {
+                case 0: return new Vector2(-0.94f, 0.58f);
+                case 1: return new Vector2(0.94f, 0.58f);
+                default: return new Vector2(0f, 1.02f);
+            }
+        }
+
+        if (count == 4)
+        {
+            switch (index)
+            {
+                case 0: return new Vector2(-0.96f, 0.58f);
+                case 1: return new Vector2(0.96f, 0.58f);
+                case 2: return new Vector2(-0.42f, 1.06f);
+                default: return new Vector2(0.42f, 1.06f);
+            }
+        }
+
+        float angle = 90f + index * (360f / count);
+        return new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * 1.05f;
     }
 
     // Destroys all persistent helper objects owned by continuous skills.

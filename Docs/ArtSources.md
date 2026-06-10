@@ -20,27 +20,36 @@ The downloaded archive includes `License.txt`, which states that the assets may 
 
 ## Custom Zombie Storm Images
 
-- Source: AI-generated images supplied by the project owner.
+- Source: AI-generated images created with ChatGPT and supplied by the project owner.
 - Local paths: `Assets/ZombieStormArt/Enemies`, `Assets/ZombieStormArt/Maps`, `Assets/ZombieStormArt/Menu`, `Assets/cowboy_spritesheet_transparent_split (1)`, `Assets/screen_selected`
 - Used for: Q-style base zombie animation, graveyard arena background, main protagonist walk frames, and protagonist hurt frames.
 
-The graveyard arena background image (`Assets/ZombieStormArt/Maps/graveyard_arena.png`) and the main protagonist images in `Assets/cowboy_spritesheet_transparent_split (1)` / `Assets/screen_selected` were generated with AI tools and then supplied by the project owner for use in this project.
+The graveyard arena background image (`Assets/ZombieStormArt/Maps/graveyard_arena.png`) and the main protagonist images in `Assets/cowboy_spritesheet_transparent_split (1)` / `Assets/screen_selected` were generated with ChatGPT and then supplied by the project owner for use in this project.
 
 ## Main Menu Cover
 
-- Source: AI-generated image supplied by the project owner.
+- Source: AI-generated image created with ChatGPT and supplied by the project owner.
 - Local path: `Assets/ZombieStormArt/Menu/main_menu_cover.png`
 - Used for: Zombie Storm main menu cover art and embedded visual button labels.
 
-This cover image was generated with AI tools, then supplied by the project owner for use as the game's main menu cover. The runtime overlays transparent Unity buttons on top of the rendered `Start Game` and `Settings` areas.
+This cover image was generated with ChatGPT, then supplied by the project owner for use as the game's main menu cover. The runtime overlays transparent Unity buttons on top of the rendered `Start Game` and `Settings` areas.
+
+## Story Sequence Images
+
+- Source: storyline images supplied by the project owner from `C:\Users\ken\Desktop\story`.
+- Local path: `Assets/ZombieStormArt/Story`
+- Used for: pre-run story sequence shown after `Start Run` and advanced with Space.
+
+Generation tool, original public source, and license metadata are not recorded in the repository. Re-check ownership and redistribution terms before publishing raw asset files publicly.
 
 ## Dark VFX 01 - 02
 
-- Source: local download supplied by the project owner from `C:\Users\ken\Downloads\Dark VFX 01 - 02`.
+- Source: https://pixlab24.com/tilesets/effects/34816/
+- Local source folder supplied by the project owner: `C:\Users\ken\Downloads\Dark VFX 01 - 02`.
 - Local paths: `Assets/ZombieStormArt/Effects/DarkVFX1`, `Assets/ZombieStormArt/Effects/DarkVFX2`
 - Used for: `EmberTyrantBoss` (`Golem_3`) dash impact and falling magma impact attack effects.
 
-No license file was found in the supplied download folder during import. Review the original download source before redistributing the raw PNG files publicly.
+Review the specific Pixlab24 asset page and license terms before redistributing the raw PNG files publicly.
 
 ## Foozle Pixel Magic Effects
 
@@ -53,12 +62,20 @@ No license file was found in the supplied download folder during import. Review 
 
 ## Pixlab24 Fire Bomb Effect
 
-- Source: https://pixlab24.com/
+- Source: https://pixlab24.com/tilesets/effects/48436/
 - Local source folder supplied by the project owner: `C:\Users\ken\Downloads\5f06fc6b255498ab\Pixel Art VFX - Fire Mage - FREE Version\VFX2`
 - Local path: `Assets/ZombieStormArt/Effects/FireBomb`
 - Used for: Fire Zone's thrown fire bomb projectile animation.
 
 This fire bomb effect was imported from a Pixlab24 asset download supplied by the project owner. Review the specific asset page and license terms before redistributing the raw PNG files publicly.
+
+## Pixlab24 Fire Bomb Burn Circle Effect
+
+- Source: https://pixlab24.com/tilesets/effects/48436/
+- Local path: `Assets/ZombieStormArt/Effects/GroundFire/TekilaFire01`
+- Used for: Fire Zone's lingering burning circle / ground fire left after fire bombs land.
+
+The project owner identified this Pixlab24 page as the source website for the burning circle related to the fire bomb's lingering fire area. Review the specific asset page and license terms before redistributing the raw PNG files publicly.
 
 ## Tekila 2D Fire Pack
 
@@ -67,6 +84,30 @@ This fire bomb effect was imported from a Pixlab24 asset download supplied by th
 - Used for: Fire Zone's lingering ground fire left by fire bombs.
 
 No license file was found in the supplied folder during import. Review the original download source before redistributing the raw PNG files publicly.
+
+## Skill Card UI Templates
+
+- Source: AI-generated images created with ChatGPT and supplied by the project owner.
+- Local path: `Assets/ZombieStormArt/UI`
+- Used for: skill-card art templates for Fire Spirit/default cards, Magic Bolt, Fire Blades, Regeneration, Fire Zone, Storm / Ultimate cards, damage / critical upgrade cards, cooldown / recharge upgrade cards, and experience / pickup-range upgrade cards.
+
+All current skill-card UI template images were generated with ChatGPT and supplied by the project owner.
+
+## Health Potion Pickup Icon
+
+- Source: AI-generated image created with ChatGPT and supplied by the project owner.
+- Local path: `Assets/ZombieStormArt/UI/health_potion.png`
+- Used for: health potion pickup dropped by zombies.
+
+The health potion art was generated with ChatGPT and supplied by the project owner.
+
+## Player Status HUD Card
+
+- Source: AI-generated image created with ChatGPT and supplied by the project owner.
+- Local paths: `Assets/ZombieStormArt/UI/player_status_card.png`, `Assets/ZombieStormArt/UI/player_status_card_cropped.png`
+- Used for: top-left player HUD card with dynamic health and experience bars.
+
+The cropped file is a game-ready version derived from the supplied ChatGPT image.
 
 ## CraftPix Zombie Villager Chibi
 

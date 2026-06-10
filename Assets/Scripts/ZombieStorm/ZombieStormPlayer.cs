@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-// Controls player movement, health, experience, coins, and damage feedback.
+// Controls player movement, health, experience, and damage feedback.
 public sealed class ZombieStormPlayer : MonoBehaviour
 {
     private const float AnimatedPlayerVisualScale = 1.55f;
@@ -32,7 +32,6 @@ public sealed class ZombieStormPlayer : MonoBehaviour
     public float ExperienceToNext { get; private set; }
     public float Health { get; private set; }
     public float MaxHealth { get; private set; }
-    public int Coins { get; private set; }
     public int Kills { get; set; }
     public float PickupRange { get { return 1.35f + game.GetPassiveLevel(ZombieStormPassiveType.PickupRange) * 0.35f; } }
 
@@ -46,7 +45,6 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         ExperienceToNext = 12f;
         MaxHealth = 115f;
         Health = MaxHealth;
-        Coins = 0;
         Kills = 0;
         BuildHealthBar();
     }
@@ -232,13 +230,6 @@ public sealed class ZombieStormPlayer : MonoBehaviour
             game.RequestLevelUp();
             break;
         }
-    }
-
-    // Adds coins and updates the run statistics.
-    public void AddCoins(int amount)
-    {
-        Coins += Mathf.Max(0, amount);
-        game.PlaySfx("coin", 0.34f, 0.055f);
     }
 
     // Subtracts health, plays hit feedback, and triggers death at zero health.

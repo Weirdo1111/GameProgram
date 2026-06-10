@@ -48,8 +48,7 @@ public enum ZombieStormPassiveType
     MoveSpeed,
     PickupRange,
     Crit,
-    MaxHealth,
-    CoinGain
+    MaxHealth
 }
 
 // Lists oscillator wave shapes used when generating simple sound effects.

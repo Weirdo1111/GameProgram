@@ -265,7 +265,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         else if (Type == ZombieStormEnemyType.EmberTyrantBoss)
         {
             speed = 1.45f;
-            maxHealth = 1680f * Mathf.Max(1f, difficulty * 1.12f);
+            maxHealth = 1680f * 1.5f * Mathf.Max(1f, difficulty * 1.12f);
             damagePerSecond = 36f;
             Radius = 1.48f;
             transform.localScale = Vector3.one * 2.12f;
@@ -623,7 +623,8 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
         else if (Type == ZombieStormEnemyType.EmberTyrantBoss)
         {
-            bossQueuedAction = UnityEngine.Random.Range(0, 2);
+            float meteorChance = enraged ? 0.34f : 0.24f;
+            bossQueuedAction = UnityEngine.Random.value < meteorChance ? 1 : 0;
             PrepareEmberTyrantTelegraph(bossQueuedAction, bossQueuedDirection, enraged);
         }
         else
@@ -951,14 +952,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             return;
         }
 
-        int impacts = enraged ? 6 : 4;
-        Vector2 target = game.Player != null ? (Vector2)game.Player.transform.position : (Vector2)transform.position + direction * 3f;
-        for (int i = 0; i < impacts; i++)
-        {
-            Vector2 position = target + UnityEngine.Random.insideUnitCircle * (enraged ? 3.1f : 2.4f);
-            bossTelegraphPositions.Add(position);
-            game.SpawnAreaEffect(position, enraged ? 1.38f : 1.15f, 0f, 0.76f, 1f, new Color(1f, 0.32f, 0.05f, 0.38f), "meteor_warning");
-        }
+        game.SpawnAreaEffect(transform.position, enraged ? 3.1f : 2.55f, 0f, enraged ? 0.72f : 0.86f, 1f, new Color(1f, 0.32f, 0.05f, 0.34f), "meteor_warning");
     }
 
     // Places several warning markers along a dash direction.
@@ -1150,14 +1144,8 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         }
         else
         {
-            for (int i = 0; i < bossTelegraphPositions.Count; i++)
-            {
-                Vector2 impactPosition = bossTelegraphPositions[i];
-                game.SpawnEnemyAreaEffect(impactPosition, enraged ? 1.35f : 1.1f, enraged ? 24f : 18f, 0.48f, 99f, ember, "ember_meteor_blast");
-                game.SpawnEnemyAreaEffect(impactPosition, enraged ? 0.92f : 0.76f, enraged ? 7f : 5f, enraged ? 2.4f : 1.9f, 0.5f, new Color(1f, 0.22f, 0.04f, 0.44f), "fire_pool");
-            }
-
-            game.ShakeCamera(enraged ? 0.2f : 0.14f, 0.18f);
+            game.SpawnFullArenaEmberMeteorBarrage(enraged ? 32f : 24f, enraged ? 1.08f : 1f, enraged ? -0.34f : 0f);
+            game.ShakeCamera(enraged ? 0.24f : 0.18f, 0.22f);
         }
 
         game.PlaySfx("boom", action == 0 ? 0.76f : 0.66f, 0.08f);
@@ -1188,6 +1176,11 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 
         if (Type == ZombieStormEnemyType.EmberTyrantBoss)
         {
+            if (bossQueuedAction == 1)
+            {
+                return bossQueuedEnraged ? 0.82f : 1.05f;
+            }
+
             return bossQueuedEnraged ? 0.48f : 0.64f;
         }
 
@@ -1224,7 +1217,12 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 
         if (Type == ZombieStormEnemyType.EmberTyrantBoss)
         {
-            return enraged ? 1.28f : 1.9f;
+            if (bossQueuedAction == 1)
+            {
+                return enraged ? 4.7f : 6.2f;
+            }
+
+            return enraged ? 1.55f : 2.25f;
         }
 
         return enraged ? 2.15f : 3.1f;
