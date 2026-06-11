@@ -16,6 +16,7 @@ public sealed class ZombieStormProjectile : MonoBehaviour
     private SpriteRenderer spriteRenderer;
     private Sprite[] fireballFrames;
     private bool createsFireZoneOnKill;
+    private readonly HashSet<ZombieStormEnemy> hitEnemies = new HashSet<ZombieStormEnemy>();
 
     // Initializes the references and values this object needs at runtime.
     public void Initialize(ZombieStormGameController owner, Vector2 fireDirection, float hitDamage, float moveSpeed, float seconds, int pierceCount, bool fireZoneOnKill)
@@ -28,6 +29,7 @@ public sealed class ZombieStormProjectile : MonoBehaviour
         maxLife = Mathf.Max(0.01f, seconds);
         pierce = pierceCount;
         createsFireZoneOnKill = fireZoneOnKill;
+        hitEnemies.Clear();
         spriteRenderer = GetComponent<SpriteRenderer>();
         fireballFrames = game.GetProjectileEffectFrames();
         if (spriteRenderer != null && fireballFrames != null && fireballFrames.Length > 0)
@@ -55,9 +57,10 @@ public sealed class ZombieStormProjectile : MonoBehaviour
         for (int i = 0; i < activeEnemies.Count; i++)
         {
             ZombieStormEnemy enemy = activeEnemies[i];
-            if (enemy != null && !enemy.IsDead && Vector2.Distance(transform.position, enemy.transform.position) <= enemy.Radius + 0.16f)
+            if (enemy != null && !enemy.IsDead && !hitEnemies.Contains(enemy) && Vector2.Distance(transform.position, enemy.transform.position) <= enemy.Radius + 0.16f)
             {
                 Vector2 hitPosition = enemy.transform.position;
+                hitEnemies.Add(enemy);
                 enemy.TakeDamage(damage, direction);
                 game.SpawnAreaEffect(transform.position, 0.62f, 0f, 0.22f, 1f, new Color(1f, 0.56f, 0.14f, 0.78f), "foozle_explosion");
                 if (createsFireZoneOnKill && game.Skills != null)

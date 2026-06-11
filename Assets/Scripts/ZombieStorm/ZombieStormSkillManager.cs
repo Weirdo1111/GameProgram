@@ -78,7 +78,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
     public void LevelUpSkill(ZombieStormSkillType weapon)
     {
         int current = GetSkillLevel(weapon);
-        int maxLevel = weapon == ZombieStormSkillType.Regeneration ? 3 : weapon == ZombieStormSkillType.FireZone || weapon == ZombieStormSkillType.OrbitingKnife ? 4 : 5;
+        int maxLevel = weapon == ZombieStormSkillType.Regeneration ? 3 : weapon == ZombieStormSkillType.OrbitingKnife ? 4 : 5;
         int next = Mathf.Min(maxLevel, current + 1);
         if (next == current)
         {
@@ -241,7 +241,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         Vector2 direction = targetDistance > 0.01f ? toTarget / targetDistance : Vector2.up;
         Vector2 origin = (Vector2)transform.position + direction * Mathf.Min(0.42f, Mathf.Max(0.12f, targetDistance * 0.42f));
         int shots = (IsEvolved(ZombieStormSkillType.MagicBolt) ? 3 : level >= 4 ? 2 : 1) + Mod("magic_split");
-        float damage = (10f + level * 3.4f) * (1f + Mod("magic_force") * 0.16f);
+        float damage = GetMagicBoltBaseDamage(level);
         int pierce = (level >= 3 ? 1 : 0) + Mod("magic_pierce");
         float powerTint = Mathf.Clamp01(Mod("magic_force") * 0.18f + (IsEvolved(ZombieStormSkillType.MagicBolt) ? 0.32f : 0f));
         Color fireballColor = Color.Lerp(Color.white, new Color(1f, 0.42f, 0.12f, 1f), powerTint);
@@ -298,22 +298,56 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         fireBombAttackCounter = 0;
         Vector2 scatter = UnityEngine.Random.insideUnitCircle * 0.34f;
-        float impactRadius = (1.18f + level * 0.12f) * game.AreaMultiplier;
-        float impactDamage = RollDamage(10f + level * 3.2f);
-        float burnRadius = (1.05f + level * 0.12f) * game.AreaMultiplier * 0.5f;
-        float burnDamage = RollDamage(4.8f + level * 1.4f);
-        game.SpawnFireBombProjectile(origin, targetPosition + scatter, impactDamage, impactRadius, level >= 2, burnDamage, burnRadius, 5f, 0.42f);
+        float impactRadius = GetFireBombImpactRadius(level);
+        float impactDamage = RollDamage(GetFireBombImpactDamage());
+        float burnRadius = GetFireBombBurnRadius(level);
+        float burnDamage = RollDamage(GetFireBombBurnDamage(level));
+        game.SpawnFireBombProjectile(origin, targetPosition + scatter, impactDamage, impactRadius, level >= 2, burnDamage, burnRadius, GetFireBombBurnDuration(level), 0.42f);
     }
 
     // Applies the Fire Zone bomb impact immediately for compatibility with older projectile hooks.
     private void SpawnFireBombImpact(Vector2 position, int level)
     {
-        float impactRadius = (1.18f + level * 0.12f) * game.AreaMultiplier;
-        game.SpawnAreaEffect(position, impactRadius, RollDamage(10f + level * 3.2f), 0.18f, 99f, new Color(1f, 0.52f, 0.08f, 0.78f), "foozle_explosion");
+        float impactRadius = GetFireBombImpactRadius(level);
+        game.SpawnAreaEffect(position, impactRadius, RollDamage(GetFireBombImpactDamage()), 0.18f, 99f, new Color(1f, 0.52f, 0.08f, 0.78f), "foozle_explosion");
         if (level >= 2)
         {
-            game.SpawnAreaEffect(position, (1.05f + level * 0.12f) * game.AreaMultiplier * 0.5f, RollDamage(4.8f + level * 1.4f), 5f, 0.42f, new Color(1f, 0.42f, 0.08f, 0.72f), game.GetRandomGroundFireEffectKey());
+            game.SpawnAreaEffect(position, GetFireBombBurnRadius(level), RollDamage(GetFireBombBurnDamage(level)), GetFireBombBurnDuration(level), 0.42f, new Color(1f, 0.42f, 0.08f, 0.72f), game.GetRandomGroundFireEffectKey());
         }
+    }
+
+    // Returns the current Magic Bolt base damage before global damage and crit rolls.
+    private float GetMagicBoltBaseDamage(int level)
+    {
+        return (10f + level * 3.4f) * (1f + Mod("magic_force") * 0.16f);
+    }
+
+    // Fire bombs are stronger than a single Magic Bolt and scale with the current bolt build.
+    private float GetFireBombImpactDamage()
+    {
+        int magicBoltLevel = Mathf.Max(1, GetSkillLevel(ZombieStormSkillType.MagicBolt));
+        return GetMagicBoltBaseDamage(magicBoltLevel) * 1.8f;
+    }
+
+    private float GetFireBombImpactRadius(int level)
+    {
+        return (1.18f + level * 0.12f) * game.AreaMultiplier * 1.3f;
+    }
+
+    private float GetFireBombBurnRadius(int level)
+    {
+        return (1.05f + level * 0.12f) * game.AreaMultiplier * 0.5f;
+    }
+
+    private float GetFireBombBurnDamage(int level)
+    {
+        float levelFiveBonus = level >= 5 ? 1.5f : 1f;
+        return (4.8f + level * 1.4f) * 1.5f * levelFiveBonus;
+    }
+
+    private static float GetFireBombBurnDuration(int level)
+    {
+        return level >= 5 ? 6f : 5f;
     }
 
     // Returns how many attacks Fire Zone needs before throwing a bomb.
@@ -384,7 +418,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             ZombieStormEnemy enemy = activeEnemies[i];
             if (enemy != null && !enemy.IsDead && Vector2.Distance(enemy.transform.position, transform.position) <= radius + enemy.Radius)
             {
-                enemy.TakeDamage(RollDamage((6f + level * 1.8f) * (1f + Mod("knife_edge") * 0.18f)), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
+                enemy.TakeDamage(RollDamage((6f + level * 1.8f) * 2f * (1f + Mod("knife_edge") * 0.18f)), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
                 game.SpawnHitSpark(enemy.transform.position, new Color(1f, 0.32f, 0.16f, 0.86f), 0.28f);
                 game.SpawnAreaEffect(enemy.transform.position, 0.34f, 0f, 0.12f, 1f, new Color(1f, 0.16f, 0.06f, 0.42f), "hit_spark");
             }

@@ -1264,8 +1264,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private void StartRun()
     {
         runTime = 0f;
-        spawnTimer = 1.15f;
-        eliteTimer = 70f;
+        spawnTimer = 1.35f;
+        eliteTimer = 78f;
         feedbackTimer = 0f;
         bossCount = 0;
         leveling = false;
@@ -1626,8 +1626,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         if (spawnTimer <= 0f)
         {
-            spawnTimer = Mathf.Max(0.28f, 1.85f - runTime / 210f);
+            spawnTimer = Mathf.Max(0.28f, 1.85f - runTime / 210f) / GetEarlyGameReliefScale();
             float earlyCount = runTime < 35f ? 1f : runTime < 75f ? 1.65f : 2f + difficultyScore * 0.9f;
+            if (!firstBossDefeated)
+            {
+                earlyCount *= runTime < 75f ? 0.94f : 0.88f;
+            }
+
             int count = Mathf.Clamp(Mathf.RoundToInt(earlyCount), 1, 14);
             for (int i = 0; i < count; i++)
             {
@@ -1637,7 +1642,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         if (eliteTimer <= 0f)
         {
-            eliteTimer = Mathf.Max(34f, 58f - runTime / 14f);
+            eliteTimer = Mathf.Max(34f, 58f - runTime / 14f) / GetEarlyGameReliefScale();
             SpawnEnemy(firstBossDefeated ? ZombieStormEnemyType.Reaper : ZombieStormEnemyType.Gravedigger);
             ShowFeedback("Heavy zombie incoming. Keep your distance.", 2.5f);
         }
@@ -1664,6 +1669,12 @@ public sealed class ZombieStormGameController : MonoBehaviour
     {
         SpawnEnemy(bossType);
         ShowFeedback(BossWaveWarning(bossType), 3f);
+    }
+
+    // Gives the player a little room to build before the first boss is defeated.
+    private float GetEarlyGameReliefScale()
+    {
+        return firstBossDefeated ? 1f : 0.82f;
     }
 
     // Chooses the next enemy type using time-based random weights.
@@ -1712,7 +1723,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ZombieStormEnemy enemy = enemyObject.GetComponent<ZombieStormEnemy>();
         Sprite[] walkFrames = GetEnemyWalkFrames(enemyType);
         bool framesFaceRight = walkFrames != chibiEnemyWalkFrames;
-        enemy.Initialize(this, enemyType, key, GetEnemySprite(enemyType, walkFrames), walkFrames, GetEnemyAttackFrames(enemyType), GetEnemySpecialAttackFrames(enemyType), GetEnemyHurtFrames(enemyType), GetEnemyDeathFrames(enemyType), framesFaceRight, runTime, difficultyScore);
+        enemy.Initialize(this, enemyType, key, GetEnemySprite(enemyType, walkFrames), walkFrames, GetEnemyAttackFrames(enemyType), GetEnemySpecialAttackFrames(enemyType), GetEnemyHurtFrames(enemyType), GetEnemyDeathFrames(enemyType), framesFaceRight, runTime, difficultyScore, firstBossDefeated ? 1f : 0.9f);
     }
 
     // Maps removed base zombie types to enemy types that still exist in the project.
@@ -2394,7 +2405,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             ZombieStormSkillType weaponType = (ZombieStormSkillType)values.GetValue(UnityEngine.Random.Range(0, values.Length));
             if (CanOfferSkill(weaponType) && !IsSkillKnown(weaponType))
             {
-                return ZombieStormUpgradeOption.Custom("unlock_" + weaponType, SkillName(weaponType) + " Lv.1", SkillSummary(weaponType), "NEW ACTIVE SKILL", SkillAccent(weaponType), delegate { Skills.LearnSkill(weaponType); });
+                return ZombieStormUpgradeOption.Custom("unlock_" + weaponType, SkillName(weaponType) + " Lv.1", SkillSummary(weaponType), "NEW SKILL", SkillAccent(weaponType), delegate { Skills.LearnSkill(weaponType); });
             }
         }
 
@@ -2459,7 +2470,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     // Returns the highest level allowed for a skill.
     private static int SkillMaxLevel(ZombieStormSkillType weaponType)
     {
-        return weaponType == ZombieStormSkillType.Regeneration ? 3 : weaponType == ZombieStormSkillType.FireZone || weaponType == ZombieStormSkillType.OrbitingKnife ? 4 : 5;
+        return weaponType == ZombieStormSkillType.Regeneration ? 3 : weaponType == ZombieStormSkillType.OrbitingKnife ? 4 : 5;
     }
 
     // Creates an upgrade option for a passive stat.
@@ -2887,9 +2898,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         float gap = narrow ? 10f : 22f;
         float startX = narrow ? panel.x + 18f : panel.x + 30f;
         float startY = panel.y + (narrow ? 118f : 122f);
-        float footerHeight = narrow ? 44f : 52f;
         float cardWidth = narrow ? panel.width - 36f : (panel.width - 60f - gap * 2f) / 3f;
-        float availableCardHeight = panel.yMax - footerHeight - 18f - startY;
+        float availableCardHeight = panel.yMax - 24f - startY;
         float cardHeight = narrow ? Mathf.Clamp((availableCardHeight - gap * (choiceCount - 1)) / choiceCount, 84f, 102f) : availableCardHeight;
 
         for (int i = 0; i < currentChoices.Count; i++)
@@ -2899,8 +2909,6 @@ public sealed class ZombieStormGameController : MonoBehaviour
                 : new Rect(startX + i * (cardWidth + gap), startY, cardWidth, cardHeight);
             DrawUpgradeCard(rect, currentChoices[i], i, narrow);
         }
-
-        DrawUpgradeFooter(new Rect(panel.x + 20f, panel.yMax - footerHeight - 12f, panel.width - 40f, footerHeight), headerAccent, narrow);
 
         GUI.skin.label.fontSize = 18;
         GUI.skin.label.alignment = TextAnchor.UpperLeft;
@@ -3089,7 +3097,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return fireZoneCardTemplateTexture != null ? fireZoneCardTemplateTexture : upgradeCardTemplateTexture;
         }
 
-        if (key.Contains("Regeneration") || key.Contains("regen_"))
+        if (key.Contains("Regeneration") || key.Contains("regen_") || key.Contains("passive_MaxHealth"))
         {
             return regenerationCardTemplateTexture != null ? regenerationCardTemplateTexture : upgradeCardTemplateTexture;
         }
@@ -3111,7 +3119,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
             || key.Contains("shield_force")
             || key.Contains("ultimate_voltage")
             || key.Contains("passive_Damage")
-            || key.Contains("passive_Crit");
+            || key.Contains("passive_Crit")
+            || key.Contains("passive_Area");
     }
 
     // Checks whether an upgrade should use the cooldown / time card template.
@@ -3120,7 +3129,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return key.Contains("drone_overclock")
             || key.Contains("shield_recharge")
             || key.Contains("ultimate_recharge")
-            || key.Contains("passive_FireRate");
+            || key.Contains("passive_FireRate")
+            || key.Contains("passive_MoveSpeed");
     }
 
     // Checks whether an upgrade should use the experience card template.
@@ -3152,13 +3162,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
             layout.TitleInset = 0.16f;
             layout.KindInset = 0.16f;
             layout.DescriptionInset = 0.08f;
-            layout.TitleY = 0.45f;
+            layout.TitleY = 0.406f;
             layout.TitleHeight = 0.084f;
-            layout.KindY = 0.582f;
-            layout.DescriptionY = 0.666f;
-            layout.DescriptionTextOffset = -0.012f;
-            layout.ButtonY = 0.868f;
-            layout.ButtonTextOffset = 0.004f;
+            layout.KindY = 0.532f;
+            layout.DescriptionY = 0.612f;
+            layout.DescriptionTextOffset = 0f;
+            layout.ButtonY = 0.858f;
+            layout.ButtonTextOffset = 0f;
+            layout.ButtonHeight = 0.072f;
         }
         else if (cardTemplate == xpCardTemplateTexture)
         {
@@ -3198,16 +3209,20 @@ public sealed class ZombieStormGameController : MonoBehaviour
             layout.DescriptionY = 0.664f;
             layout.DescriptionTextOffset = -0.014f;
             layout.ButtonY = 0.87f;
-            layout.ButtonTextOffset = -0.014f;
+            layout.ButtonTextOffset = 0.018f;
         }
         else if (cardTemplate == fireZoneCardTemplateTexture)
         {
-            layout.TitleY = 0.422f;
-            layout.KindY = 0.545f;
-            layout.DescriptionY = 0.642f;
-            layout.DescriptionTextOffset = -0.012f;
-            layout.ButtonY = 0.872f;
-            layout.ButtonTextOffset = -0.014f;
+            layout.TitleY = 0.535f;
+            layout.TitleHeight = 0.088f;
+            layout.KindY = 0.666f;
+            layout.KindHeight = 0.056f;
+            layout.DescriptionY = 0.742f;
+            layout.DescriptionTextOffset = 0f;
+            layout.DescriptionHeight = 0.168f;
+            layout.ButtonY = 0.908f;
+            layout.ButtonTextOffset = 0f;
+            layout.ButtonHeight = 0.07f;
         }
         else if (cardTemplate == regenerationCardTemplateTexture)
         {
@@ -3233,7 +3248,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             layout.DescriptionTextOffset = -0.012f;
             layout.DescriptionHeight = 0.19f;
             layout.ButtonY = 0.862f;
-            layout.ButtonTextOffset = -0.013f;
+            layout.ButtonTextOffset = 0.016f;
             layout.ButtonHeight = 0.07f;
             layout.TitleFontSize = 15;
             layout.LongTitleFontSize = 13;
@@ -3346,25 +3361,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
 
         GUI.color = new Color(1f, 0.88f, 0.32f, 1f);
         GUI.skin.label.fontSize = compact ? 28 : 36;
-        bool showStatBlock = !compact || panel.width >= 560f;
-        float titleWidth = showStatBlock ? panel.width * 0.55f : panel.width - 56f;
-        GUI.Label(new Rect(panel.x + 28f, panel.y + 40f, titleWidth, 48f), "LEVEL UP");
+        GUI.Label(new Rect(panel.x + 28f, panel.y + 40f, panel.width - 56f, 48f), "LEVEL UP");
 
         GUI.color = new Color(0.76f, 0.86f, 0.94f, 1f);
         GUI.skin.label.fontSize = compact ? 12 : 14;
-        float promptWidth = showStatBlock ? panel.width * 0.62f : panel.width - 60f;
-        GUI.Label(new Rect(panel.x + 30f, panel.y + (compact ? 76f : 88f), promptWidth, 24f), "Choose one upgrade with 1 / 2 / 3 or click a card.");
-
-        if (showStatBlock)
-        {
-            string levelText = Player != null ? "RUN LV " + Player.Level : "RUN LV --";
-            Rect statRect = new Rect(panel.xMax - (compact ? 178f : 240f), panel.y + 34f, compact ? 150f : 210f, compact ? 54f : 62f);
-            DrawPanel(statRect, new Color(0.012f, 0.018f, 0.026f, 0.72f), WithAlpha(accent, 0.45f));
-            GUI.color = WithAlpha(accent, 0.95f);
-            GUI.skin.label.fontSize = compact ? 18 : 24;
-            GUI.skin.label.alignment = TextAnchor.MiddleCenter;
-            GUI.Label(new Rect(statRect.x, statRect.y + 9f, statRect.width, statRect.height - 18f), levelText);
-        }
+        GUI.Label(new Rect(panel.x + 30f, panel.y + (compact ? 76f : 88f), panel.width - 60f, 24f), "Choose one upgrade with 1 / 2 / 3 or click a card.");
 
         GUI.skin.label.alignment = TextAnchor.UpperLeft;
     }
@@ -3435,22 +3436,6 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // Draws the footer hint and decoration for the upgrade panel.
-    private void DrawUpgradeFooter(Rect rect, Color accent, bool compact)
-    {
-        DrawPanel(rect, new Color(0.012f, 0.017f, 0.024f, 0.86f), WithAlpha(accent, 0.28f));
-        GUI.color = WithAlpha(accent, 0.7f);
-        GUI.DrawTexture(new Rect(rect.x + 10f, rect.y + 9f, 3f, rect.height - 18f), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.xMax - 13f, rect.y + 9f, 3f, rect.height - 18f), Texture2D.whiteTexture);
-
-        GUI.skin.label.wordWrap = false;
-        GUI.skin.label.alignment = TextAnchor.MiddleCenter;
-        GUI.skin.label.fontSize = compact ? 11 : 13;
-        GUI.color = new Color(0.78f, 0.86f, 0.92f, 1f);
-        GUI.Label(rect, compact ? "1 / 2 / 3  SELECT" : "BUILD CHOICE LOCKS IN IMMEDIATELY    |    1 / 2 / 3 SELECT");
-        GUI.skin.label.alignment = TextAnchor.UpperLeft;
-    }
-
     // Returns the category label shown on an upgrade card.
     private static string GetUpgradeKindLabel(ZombieStormUpgradeOption option)
     {
@@ -3486,9 +3471,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return "FB";
         }
 
-        if (key.Contains("Regeneration") || key.Contains("regen_"))
+        if (key.Contains("Regeneration") || key.Contains("regen_") || key.Contains("MaxHealth"))
         {
-            return "RG";
+            return key.Contains("MaxHealth") ? "HP" : "RG";
         }
 
         if (key.Contains("FireZone") || key.Contains("fire_"))
@@ -4033,7 +4018,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case ZombieStormSkillType.FireZone: return "Fire Zone";
             case ZombieStormSkillType.SummonDrone: return "Fire Spirit";
             case ZombieStormSkillType.ShieldBurst: return "Shield Burst";
-            case ZombieStormSkillType.UltimateStorm: return "Ultimate: Full-Screen Thunder";
+            case ZombieStormSkillType.UltimateStorm: return "Full-Screen Thunder";
             default: return weapon.ToString();
         }
     }
@@ -4089,6 +4074,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             case 2: return "Lv.2: fire bombs leave burning flames on the ground.";
             case 3: return "Lv.3: fire bombs trigger every 3 attacks.";
             case 4: return "Lv.4: fire bombs trigger every 2 attacks.";
+            case 5: return "Lv.5: burning flames deal 50% more damage and last 1 second longer.";
             default: return "Lv." + nextLevel + ": throws fire bombs after repeated attacks.";
         }
     }

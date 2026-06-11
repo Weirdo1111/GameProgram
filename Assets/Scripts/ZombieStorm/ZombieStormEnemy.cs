@@ -63,7 +63,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     private bool UsesAnimatedBossArt { get { return Type == ZombieStormEnemyType.CrystalGolemBoss || Type == ZombieStormEnemyType.MossGolemBoss || Type == ZombieStormEnemyType.EmberTyrantBoss; } }
 
     // Initializes the references and values this object needs at runtime.
-    public void Initialize(ZombieStormGameController owner, ZombieStormEnemyType enemyType, string key, Sprite sprite, Sprite[] enemyWalkFrames, Sprite[] enemyAttackFrames, Sprite[] enemySpecialAttackFrames, Sprite[] enemyHurtFrames, Sprite[] enemyDeathFrames, bool framesFaceRight, float runTime, float difficulty)
+    public void Initialize(ZombieStormGameController owner, ZombieStormEnemyType enemyType, string key, Sprite sprite, Sprite[] enemyWalkFrames, Sprite[] enemyAttackFrames, Sprite[] enemySpecialAttackFrames, Sprite[] enemyHurtFrames, Sprite[] enemyDeathFrames, bool framesFaceRight, float runTime, float difficulty, float earlyGameRelief)
     {
         game = owner;
         Type = enemyType;
@@ -270,6 +270,18 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             Radius = 1.48f;
             transform.localScale = Vector3.one * 2.12f;
             bossActionTimer = 1.55f;
+        }
+
+        float relief = Mathf.Clamp(earlyGameRelief, 0.7f, 1f);
+        if (relief < 0.999f)
+        {
+            maxHealth *= relief;
+            damagePerSecond *= Mathf.Lerp(1f, relief, 0.85f);
+            speed *= Mathf.Lerp(1f, relief, 0.45f);
+            if (IsBoss)
+            {
+                bossActionTimer *= 1.12f;
+            }
         }
 
         if (useSideViewWalk)
