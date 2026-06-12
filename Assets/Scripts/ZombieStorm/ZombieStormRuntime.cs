@@ -131,6 +131,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Texture2D regenerationCardTemplateTexture;
     private Texture2D stormCardTemplateTexture;
     private Texture2D playerStatusCardTexture;
+    private Texture2D failedResultTexture;
+    private Texture2D victoryResultTexture;
     private Font upgradeCardTitleFont;
     private Font upgradeCardBodyFont;
     private Sprite kenneyZombieSprite;
@@ -196,7 +198,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    // Creates the game controller automatically when the scene loads.
+    // Ensures a controller exists even when the scene does not contain a pre-placed bootstrap object.
     private static void AutoBoot()
     {
         if (FindObjectOfType<ZombieStormGameController>() != null)
@@ -229,7 +231,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Time.timeScale = 0f;
     }
 
-    // Advances movement, combat, animation, timers, and state changes each frame.
+    // Runs the top-level flow state machine: menu/story input, pause/settings routing,
+    // gameplay timers, spawning, upgrade shortcuts, win/loss checks, and feedback countdowns.
     private void Update()
     {
         if (flowState == ZombieStormFlowState.MainMenu)
@@ -439,14 +442,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // Returns the passive level value for the current state.
+    // Reads a passive upgrade level; missing passives are treated as level zero.
     public int GetPassiveLevel(ZombieStormPassiveType passive)
     {
         int level;
         return passives.TryGetValue(passive, out level) ? level : 0;
     }
 
-    // Handles register enemy logic for ZombieStormGameController.
+    // Adds an enemy to the active list so skills, collision, rewards, and UI can find it.
     public void RegisterEnemy(ZombieStormEnemy enemy)
     {
         if (!enemies.Contains(enemy))
@@ -455,13 +458,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // Handles unregister enemy logic for ZombieStormGameController.
+    // Removes an enemy from the active list when it dies, despawns, or returns to the pool.
     public void UnregisterEnemy(ZombieStormEnemy enemy)
     {
         enemies.Remove(enemy);
     }
 
-    // Handles register obstacle logic for ZombieStormGameController.
+    // Adds a map obstacle to the manual collision list used by player and enemy movement.
     public void RegisterObstacle(ZombieStormObstacle obstacle)
     {
         if (obstacle != null && !obstacles.Contains(obstacle))
@@ -470,13 +473,13 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // Handles unregister obstacle logic for ZombieStormGameController.
+    // Removes a disabled or destroyed obstacle from the manual collision list.
     public void UnregisterObstacle(ZombieStormObstacle obstacle)
     {
         obstacles.Remove(obstacle);
     }
 
-    // Handles resolve obstacle collision logic for ZombieStormGameController.
+    // Pushes a circular actor out of every registered obstacle and clamps the result to the arena.
     public Vector2 ResolveObstacleCollision(Vector2 position, float moverRadius)
     {
         position = ClampToArena(position);
@@ -513,7 +516,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return ClampToArena(position);
     }
 
-    // Handles find nearest enemy logic for ZombieStormGameController.
+    // Finds the closest living enemy inside a maximum distance from the given world position.
     public ZombieStormEnemy FindNearestEnemy(Vector2 origin, float maxDistance)
     {
         ZombieStormEnemy best = null;
@@ -539,7 +542,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return best;
     }
 
-    // Handles find random enemy logic for ZombieStormGameController.
+    // Picks a random living enemy from the active list; returns null when none are alive.
     public ZombieStormEnemy FindRandomEnemy()
     {
         if (enemies.Count == 0)
@@ -578,7 +581,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return count;
     }
 
-    // Spawns pooled and initializes its starting values.
+    // Fetches an inactive pooled object or creates a new one, then activates it for reuse.
     public GameObject SpawnPooled(string key, Func<GameObject> factory)
     {
         Queue<GameObject> queue;
@@ -593,7 +596,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return item;
     }
 
-    // Handles return pooled logic for ZombieStormGameController.
+    // Deactivates an object, parents it under the pool root, and queues it for later reuse.
     public void ReturnPooled(string key, GameObject item)
     {
         if (item == null)
@@ -614,7 +617,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         queue.Enqueue(item);
     }
 
-    // Spawns player projectile and initializes its starting values.
+    // Spawns a player fireball and configures its damage, speed, lifetime, pierce count,
+    // visual color, size, and optional Fire Zone effect when it kills an enemy.
     public void SpawnPlayerProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life, int pierce, Color color, float size, bool createsFireZoneOnKill = false)
     {
         GameObject projectileObject = SpawnPooled("player_bullet", CreatePlayerProjectile);
@@ -629,7 +633,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         PlaySfx("shoot", 0.28f, 0.055f);
     }
 
-    // Spawns a thrown fire bomb projectile and initializes its starting values.
+    // Spawns the arcing Fire Zone bomb and passes the impact damage plus all lingering
+    // ground-fire settings that must be applied when the bomb reaches its target.
     public void SpawnFireBombProjectile(Vector2 position, Vector2 targetPosition, float impactDamage, float impactRadius, bool leavesFire, float burnDamage, float burnRadius, float burnDuration, float burnTickRate)
     {
         GameObject projectileObject = SpawnPooled("fire_bomb_projectile", CreateFireBombProjectile);
@@ -646,25 +651,26 @@ public sealed class ZombieStormGameController : MonoBehaviour
         PlaySfx("shoot", 0.22f, 0.045f);
     }
 
-    // Spawns enemy projectile and initializes its starting values.
+    // Spawns the standard enemy projectile used by ranged enemies and some boss attacks.
     public void SpawnEnemyProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life)
     {
         SpawnEnemyProjectile(position, direction, damage, speed, life, new Color(0.5f, 1f, 0.22f, 1f), 0.44f);
     }
 
-    // Spawns enemy projectile and initializes its starting values.
+    // Spawns an enemy projectile with caller-selected color and size.
     public void SpawnEnemyProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life, Color color, float size)
     {
         SpawnEnemyProjectile(position, direction, damage, speed, life, color, size, fireSprite);
     }
 
-    // Spawns enemy rock projectile and initializes its starting values.
+    // Spawns the Orc Thrower's rock projectile using the shared enemy projectile behavior.
     public void SpawnEnemyRockProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life)
     {
         SpawnEnemyProjectile(position, direction, damage, speed, life, new Color(0.62f, 0.54f, 0.43f, 1f), 0.48f, rockSprite);
     }
 
-    // Spawns enemy projectile and initializes its starting values.
+    // Internal enemy projectile factory that applies the chosen sprite, tint, scale,
+    // damage, travel speed, lifetime, and the global enemy damage multiplier.
     private void SpawnEnemyProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life, Color color, float size, Sprite sprite)
     {
         GameObject projectileObject = SpawnPooled("enemy_spit", CreateEnemyProjectile);
@@ -678,7 +684,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         projectile.Initialize(this, direction, damage * EnemyDamageMultiplier, speed, life, color, size);
     }
 
-    // Spawns ice boss projectile and initializes its starting values.
+    // Spawns an animated crystal orb for the ice boss and initializes its combat values.
     public void SpawnIceBossProjectile(Vector2 position, Vector2 direction, float damage, float speed, float life)
     {
         GameObject projectileObject = SpawnPooled("ice_boss_orb", CreateIceBossProjectile);
@@ -694,7 +700,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         SpawnHitSpark(position, new Color(0.45f, 0.9f, 1f, 0.92f), 0.58f);
     }
 
-    // Spawns ember boss meteor strike and initializes its starting values.
+    // Creates one Ember Tyrant meteor strike, including its warning, falling animation,
+    // impact radius, damage, and fall duration.
     public void SpawnEmberBossMeteorStrike(Vector2 position, float damage, float radius, float fallDuration)
     {
         GameObject strikeObject = SpawnPooled("ember_meteor_strike", CreateEmberBossMeteorStrike);
@@ -704,7 +711,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         strike.Initialize(this, position, damage * EnemyDamageMultiplier, radius, fallDuration);
     }
 
-    // Spawns area effect and initializes its starting values.
+    // Spawns a player-owned or neutral area effect that can repeatedly damage enemies
+    // while displaying either an imported animation or a configured static sprite.
     public void SpawnAreaEffect(Vector2 position, float radius, float damage, float duration, float tickRate, Color color, string poolKey)
     {
         GameObject effectObject = SpawnPooled(poolKey, CreateAreaEffect);
@@ -719,7 +727,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         effect.Initialize(this, poolKey, radius, damage, duration, tickRate);
     }
 
-    // Spawns enemy area effect and initializes its starting values.
+    // Spawns an enemy-owned area effect that damages the player and renders above
+    // ordinary world sprites so dangerous ground attacks remain visible.
     public void SpawnEnemyAreaEffect(Vector2 position, float radius, float damage, float duration, float tickRate, Color color, string poolKey)
     {
         GameObject effectObject = SpawnPooled(poolKey, CreateAreaEffect);
@@ -734,7 +743,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         effect.Initialize(this, poolKey, radius, damage * EnemyDamageMultiplier, duration, tickRate, true);
     }
 
-    // Spawns delayed enemy area effect and initializes its starting values.
+    // Creates a lightweight delayed attack timer. When the warning delay expires, it
+    // spawns the enemy area effect and optionally triggers camera shake and sound.
     public void SpawnDelayedEnemyAreaEffect(Vector2 position, float delay, float radius, float damage, float duration, float tickRate, Color color, string poolKey, float shakePower = 0f, float shakeDuration = 0f, float sfxVolume = 0f)
     {
         GameObject delayedObject = new GameObject("Delayed Enemy Area Effect");
@@ -743,7 +753,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         delayed.Initialize(this, position, delay, radius, damage, duration, tickRate, color, poolKey, shakePower, shakeDuration, sfxVolume);
     }
 
-    // Checks whether the current value matches the foreground effect condition.
+    // Returns true for impact and warning effects that must render in the foreground.
     private static bool IsForegroundEffect(string poolKey)
     {
         return poolKey == "hit_spark" || poolKey == "lightning_flash" || poolKey == "foozle_explosion" || poolKey == "meteor_warning" || poolKey == "poison_boss_blast" || poolKey == "ember_dash_blast" || poolKey == "ember_meteor_blast" || poolKey == "ember_boss_meteor";
@@ -764,14 +774,15 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // Spawns hit spark and initializes its starting values.
+    // Spawns a short, non-damaging spark or glow used for hits, pickups, heals, and impacts.
     public void SpawnHitSpark(Vector2 position, Color color, float radius = 0.36f)
     {
         SpawnAreaEffect(position, radius, 0f, 0.12f, 1f, color, "hit_spark");
         PlaySfx("hit", 0.2f + Mathf.Clamp01(radius) * 0.18f, 0.045f);
     }
 
-    // Spawns damage number and initializes its starting values.
+    // Adds a floating damage number to the HUD list and removes the oldest entry when
+    // the configured popup limit has been reached.
     public void SpawnDamageNumber(Vector2 position, float amount, bool critical)
     {
         if (damagePopups.Count > 80)
@@ -789,7 +800,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         damagePopups.Add(popup);
     }
 
-    // Spawns blood splat and initializes its starting values.
+    // Places a temporary blood decal with randomized rotation and scale at the hit position.
     public void SpawnBloodSplat(Vector2 position, float scale)
     {
         if (bloodSplatSprite == null)
@@ -808,28 +819,28 @@ public sealed class ZombieStormGameController : MonoBehaviour
         timed.Initialize(this, "blood_splat", UnityEngine.Random.Range(16f, 26f));
     }
 
-    // Handles flash screen logic for ZombieStormGameController.
+    // Starts the default red screen flash used when the player takes damage.
     public void FlashScreen(float amount)
     {
         screenFlashColor = new Color(1f, 0.08f, 0.04f);
         screenFlash = Mathf.Max(screenFlash, amount);
     }
 
-    // Handles flash screen logic for ZombieStormGameController.
+    // Starts a screen flash with a caller-selected color and intensity/duration value.
     public void FlashScreen(Color color, float amount)
     {
         screenFlashColor = color;
         screenFlash = Mathf.Max(screenFlash, amount);
     }
 
-    // Handles shake camera logic for ZombieStormGameController.
+    // Starts camera shake while preserving any stronger or longer shake already in progress.
     public void ShakeCamera(float power, float duration)
     {
         cameraShakePower = Mathf.Max(cameraShakePower, power);
         cameraShakeTime = Mathf.Max(cameraShakeTime, duration);
     }
 
-    // Spawns pickup and initializes its starting values.
+    // Spawns the normal XP pickup and, when requested, an additional bonus-XP pickup.
     public void SpawnPickup(Vector2 position, int xp, int bonusXp)
     {
         if (xp > 0)
@@ -858,7 +869,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         potionObject.GetComponent<ZombieStormPickup>().Initialize(this, "health_potion", 0, healAmount);
     }
 
-    // Handles on enemy killed logic for ZombieStormGameController.
+    // Processes every consequence of an enemy death: kill count, score feedback, blood,
+    // XP rewards, potion drops, boss rewards, healing, and temporary messages.
     public void OnEnemyKilled(ZombieStormEnemy enemy)
     {
         if (Player != null)
@@ -917,7 +929,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
     }
 
-    // Handles request level up logic for ZombieStormGameController.
+    // Pauses active gameplay and opens the upgrade-choice state after the player levels up.
     public void RequestLevelUp()
     {
         if (leveling || finished || flowState != ZombieStormFlowState.Running)
@@ -934,7 +946,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ShowFeedback("Level up. Pick a build direction.", 2f);
     }
 
-    // Handles end run logic for ZombieStormGameController.
+    // Ends the current run, records victory or defeat, freezes gameplay, and prepares
+    // the appropriate result screen and feedback.
     public void EndRun(bool victory, string message)
     {
         if (finished)
@@ -950,7 +963,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ShowFeedback(message, 999f);
     }
 
-    // Returns the skill sprite value for the current state.
+    // Returns the best available icon for a skill, preferring imported art and falling
+    // back to generated sprites when a project asset is unavailable.
     public Sprite GetSkillSprite(ZombieStormSkillType skillType)
     {
         if (skillType == ZombieStormSkillType.MagicBolt)
@@ -1001,7 +1015,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         get { return playerIdleFrames != null && playerIdleFrames.Length > 0; }
     }
 
-    // Returns the player walk frame value for the current state.
+    // Returns the walk-animation frame for the requested direction and frame index,
+    // wrapping the index so callers can advance animation time without checking bounds.
     public Sprite GetPlayerWalkFrame(string direction, int frameIndex)
     {
         Sprite[] frames;
@@ -1013,7 +1028,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return frames[Mathf.Abs(frameIndex) % frames.Length];
     }
 
-    // Returns the player idle frame value for the current state.
+    // Returns the idle-animation frame for the requested direction and frame index,
+    // falling back to the matching walk frame when no dedicated idle art is available.
     public Sprite GetPlayerIdleFrame(int frameIndex)
     {
         if (!HasPlayerIdleAnimation)
@@ -1034,7 +1050,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         get { return playerHurtFrames != null ? playerHurtFrames.Length : 0; }
     }
 
-    // Returns the player hurt frame value for the current state.
+    // Returns the hurt-animation frame for the requested direction and frame index,
+    // with directional and walk-frame fallbacks when hurt art is incomplete.
     public Sprite GetPlayerHurtFrame(int frameIndex)
     {
         if (!HasPlayerHurtAnimation)
@@ -1045,49 +1062,50 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return playerHurtFrames[Mathf.Clamp(frameIndex, 0, playerHurtFrames.Length - 1)];
     }
 
-    // Returns the soft shadow sprite value for the current state.
+    // Returns the reusable soft oval sprite used beneath characters and world objects.
     public Sprite GetSoftShadowSprite()
     {
         return softShadowSprite;
     }
 
-    // Returns the soft glow sprite value for the current state.
+    // Returns the reusable soft circular sprite used by lights, impacts, and aura effects.
     public Sprite GetSoftGlowSprite()
     {
         return softGlowSprite;
     }
 
-    // Returns the orbit ring sprite value for the current state.
+    // Returns the generated energy-ring sprite displayed around orbiting Fire Blades.
     public Sprite GetOrbitRingSprite()
     {
         return orbitRingSprite != null ? orbitRingSprite : softGlowSprite;
     }
 
-    // Returns the health bar sprite value for the current state.
+    // Returns the sprite used to draw simple world-space health bar fills.
     public Sprite GetHealthBarSprite()
     {
         return tileSprite;
     }
 
-    // Returns the projectile effect sprite value for the current state.
+    // Returns the first frame of a registered projectile effect, or null when that
+    // effect key has not been loaded.
     public Sprite GetProjectileEffectSprite()
     {
         return GetEffectPreviewSprite("foozle_fireball", 4, projectileFxSprite != null ? projectileFxSprite : bulletSprite);
     }
 
-    // Returns the projectile effect frames value for the current state.
+    // Returns all animation frames registered for a projectile effect key.
     public Sprite[] GetProjectileEffectFrames()
     {
         return GetEffectFrames("foozle_fireball");
     }
 
-    // Returns the fire bomb effect sprite value for the current state.
+    // Returns the first imported Fire Zone bomb frame for use as its initial sprite.
     public Sprite GetFireBombEffectSprite()
     {
         return GetEffectPreviewSprite("fire_bomb", 5, fireSprite);
     }
 
-    // Returns the fire bomb effect frames value for the current state.
+    // Returns the complete imported animation used by the thrown Fire Zone bomb.
     public Sprite[] GetFireBombEffectFrames()
     {
         return GetEffectFrames("fire_bomb");
@@ -1099,13 +1117,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return GroundFireEffectKeys[UnityEngine.Random.Range(0, GroundFireEffectKeys.Length)];
     }
 
-    // Returns the ice boss orb frames value for the current state.
+    // Returns the imported frame sequence used by the crystal boss's orb projectile.
     public Sprite[] GetIceBossOrbFrames()
     {
         return iceBossOrbFrames;
     }
 
-    // Returns the effect frames value for the current state.
+    // Looks up an effect animation by key and returns an empty array when it is missing,
+    // allowing callers to safely fall back to static visuals.
     public Sprite[] GetEffectFrames(string effectKey)
     {
         if (effectKey == "meteor_warning")
@@ -1150,7 +1169,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return null;
     }
 
-    // Handles rotate logic for ZombieStormGameController.
+    // Rotates a 2D vector by the supplied angle in degrees.
     public static Vector2 Rotate(Vector2 value, float degrees)
     {
         float radians = degrees * Mathf.Deg2Rad;
@@ -1159,13 +1178,14 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return new Vector2(value.x * cos - value.y * sin, value.x * sin + value.y * cos);
     }
 
-    // Handles with alpha logic for ZombieStormGameController.
+    // Returns a copy of a color with its alpha channel replaced by the supplied value.
     public static Color WithAlpha(Color color, float alpha)
     {
         return new Color(color.r, color.g, color.b, alpha);
     }
 
-    // Handles play sfx logic for ZombieStormGameController.
+    // Plays a one-shot sound effect through the shared audio source after applying
+    // the current master volume and the caller's per-effect volume.
     public void PlaySfx(string key, float volume = 1f, float minInterval = 0.02f)
     {
         if (audioSource == null)
@@ -1191,25 +1211,25 @@ public sealed class ZombieStormGameController : MonoBehaviour
         audioSource.PlayOneShot(clip, sfxMuted ? 0f : Mathf.Clamp01(volume * masterVolume * sfxVolume));
     }
 
-    // Handles request start run logic for ZombieStormGameController.
+    // Receives the main-menu Start command and begins the story or gameplay flow.
     public void RequestStartRun()
     {
         BeginStoryOrRun();
     }
 
-    // Handles request open main menu settings logic for ZombieStormGameController.
+    // Opens the settings modal from the main menu without changing the run state.
     public void RequestOpenMainMenuSettings()
     {
         OpenSettings(ZombieStormFlowState.MainMenu);
     }
 
-    // Handles request close settings logic for ZombieStormGameController.
+    // Closes the current settings modal and returns to the screen that opened it.
     public void RequestCloseSettings()
     {
         CloseSettings();
     }
 
-    // Handles request quit logic for ZombieStormGameController.
+    // Receives the menu Quit command and exits the build or stops Unity play mode.
     public void RequestQuit()
     {
         QuitGame();
@@ -1260,7 +1280,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         PlaySfx("pickup", 0.22f, 0.04f);
     }
 
-    // Handles start run logic for ZombieStormGameController.
+    // Resets all run-specific state, clears old pooled objects, creates the player and
+    // skill manager, restores normal time, and enters active gameplay.
     private void StartRun()
     {
         runTime = 0f;
@@ -1327,19 +1348,23 @@ public sealed class ZombieStormGameController : MonoBehaviour
             new Vector2(0.12f, -0.28f),
             new Vector2(0.62f, -0.48f),
             new Vector2(-0.68f, -0.82f),
-            new Vector2(0.82f, -0.78f)
+            new Vector2(0.82f, -0.78f),
+            new Vector2(-0.12f, 0.02f),
+            new Vector2(0.9f, -0.08f),
+            new Vector2(-0.28f, -0.9f),
+            new Vector2(0.36f, 0.62f)
         };
 
         for (int i = 0; i < normalizedPositions.Length; i++)
         {
             float radius = (i % 4 == 0 ? 1.32f : i % 4 == 1 ? 1.12f : i % 4 == 2 ? 0.98f : 0.86f) * radiusMultiplier;
-            float fallDuration = 3.55f + fallDurationOffset + (i % 5) * 0.18f;
+            float fallDuration = 3.25f + fallDurationOffset + (i % 5) * 0.16f;
             Vector2 position = new Vector2(normalizedPositions[i].x * halfExtents.x, normalizedPositions[i].y * halfExtents.y);
             SpawnEmberBossMeteorStrike(ClampToArena(position), damage, radius, fallDuration);
         }
     }
 
-    // Handles pause run logic for ZombieStormGameController.
+    // Pauses an active run by changing the flow state and setting the game time scale to zero.
     private void PauseRun()
     {
         if (flowState != ZombieStormFlowState.Running)
@@ -1352,7 +1377,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ShowFeedback("Run paused.", 1.6f);
     }
 
-    // Handles resume run logic for ZombieStormGameController.
+    // Leaves the pause screen, restores active gameplay, and resumes normal game time.
     private void ResumeRun()
     {
         if (finished)
@@ -1365,7 +1390,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         ShowFeedback("Back to the street.", 1.6f);
     }
 
-    // Handles open settings logic for ZombieStormGameController.
+    // Opens settings from the pause screen while remembering that gameplay is already paused.
     private void OpenSettings(ZombieStormFlowState returnState)
     {
         settingsReturnState = returnState;
@@ -1373,14 +1398,15 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Time.timeScale = 0f;
     }
 
-    // Handles close settings logic for ZombieStormGameController.
+    // Closes settings and returns either to the pause screen or the main menu.
     private void CloseSettings()
     {
         flowState = settingsReturnState;
         Time.timeScale = flowState == ZombieStormFlowState.Running ? 1f : 0f;
     }
 
-    // Handles return to main menu logic for ZombieStormGameController.
+    // Abandons the current run, clears temporary objects, restores normal time, and
+    // returns to the main-menu state.
     private void ReturnToMainMenu()
     {
         ClearActiveObjects();
@@ -1397,7 +1423,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
         Time.timeScale = 0f;
     }
 
-    // Builds the scene objects by combining their child elements.
+    // Creates the runtime-owned camera, roots, map, pooled object containers, menu UI,
+    // event system, resources, and other scene objects required by the game.
     private void BuildScene()
     {
         worldRoot = new GameObject("Zombie Storm Runtime").transform;
@@ -1497,6 +1524,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         LoadUpgradeCardTemplate();
         LoadUpgradeCardFonts();
         LoadPlayerStatusCardTexture();
+        LoadResultScreenTextures();
         LoadHealthPotionSprite();
         LoadFireSpiritSprite();
         LoadKenneyTopdownArt();
@@ -1693,7 +1721,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return ZombieStormEnemyType.Reaper;
         }
 
-        if (runTime > 45f && roll < (lowHealth ? 0.18f : 0.34f))
+        if (runTime > 45f && roll < (lowHealth ? 0.15f : 0.3f))
         {
             return ZombieStormEnemyType.OrcThrower;
         }
@@ -2782,6 +2810,18 @@ public sealed class ZombieStormGameController : MonoBehaviour
     // Draws the end-of-run summary panel.
     private void DrawResultsPanel()
     {
+        if (won && victoryResultTexture != null)
+        {
+            DrawImageResultPanel(victoryResultTexture);
+            return;
+        }
+
+        if (!won && failedResultTexture != null)
+        {
+            DrawImageResultPanel(failedResultTexture);
+            return;
+        }
+
         DrawOverlayBackdrop(0.74f);
         Rect panel = new Rect(Screen.width * 0.5f - 260f, Screen.height * 0.5f - 178f, 520f, 340f);
         DrawPanel(panel, new Color(0.025f, 0.032f, 0.044f, 0.97f), won ? new Color(0.2f, 0.9f, 0.72f, 0.58f) : new Color(1f, 0.18f, 0.12f, 0.58f));
@@ -2791,13 +2831,9 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.Label(new Rect(panel.x + 52f, panel.y + 26f, panel.width - 90f, 46f), won ? "SURVIVAL VICTORY" : "RUN FAILED");
         GUI.color = Color.white;
 
-        int kills = Player != null ? Player.Kills : 0;
-        int level = Player != null ? Player.Level : 1;
-        GUI.skin.label.fontSize = 20;
-        GUI.Label(new Rect(panel.x + 74f, panel.y + 96f, 390f, 34f), "Kills " + kills + "     Level " + level);
         GUI.skin.label.fontSize = 16;
         GUI.color = new Color(0.78f, 0.86f, 0.92f, 1f);
-        GUI.Label(new Rect(panel.x + 74f, panel.y + 136f, 390f, 46f), feedbackText);
+        GUI.Label(new Rect(panel.x + 74f, panel.y + 104f, 390f, 64f), feedbackText);
         GUI.color = Color.white;
 
         if (GUI.Button(new Rect(panel.x + 110f, panel.y + 204f, 300f, 36f), "Restart Run"))
@@ -2813,6 +2849,28 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.skin.label.fontSize = 13;
         GUI.color = new Color(0.68f, 0.76f, 0.84f, 1f);
         GUI.Label(new Rect(panel.x + 142f, panel.y + 296f, 260f, 24f), "Enter restarts | Esc returns");
+        GUI.skin.label.fontSize = 18;
+        GUI.color = Color.white;
+    }
+
+    // Draws an AI-generated result screen and keeps its buttons interactive.
+    private void DrawImageResultPanel(Texture2D resultTexture)
+    {
+        DrawOverlayBackdrop(0.82f);
+        Rect imageRect = GetCenteredTextureRect(resultTexture);
+        GUI.color = Color.white;
+        GUI.DrawTexture(imageRect, resultTexture, ScaleMode.ScaleToFit);
+
+        if (GUI.Button(RelativeRect(imageRect, 0.21f, 0.605f, 0.58f, 0.105f), GUIContent.none, GUIStyle.none))
+        {
+            StartRun();
+        }
+
+        if (GUI.Button(RelativeRect(imageRect, 0.21f, 0.75f, 0.58f, 0.1f), GUIContent.none, GUIStyle.none))
+        {
+            ReturnToMainMenu();
+        }
+
         GUI.skin.label.fontSize = 18;
         GUI.color = Color.white;
     }
@@ -5038,6 +5096,42 @@ public sealed class ZombieStormGameController : MonoBehaviour
         playerStatusCardTexture = LoadTextureFromPng(Path.Combine(Application.dataPath, "ZombieStormArt", "UI", "player_status_card_cropped.png"));
     }
 
+    // Loads AI-generated result screen backgrounds.
+    private void LoadResultScreenTextures()
+    {
+        failedResultTexture = LoadTextureFromPng(Path.Combine(Application.dataPath, "ZombieStormArt", "UI", "result_failed.png"));
+        victoryResultTexture = LoadTextureFromPng(Path.Combine(Application.dataPath, "ZombieStormArt", "UI", "result_victory.png"));
+
+        string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+        if (!Directory.Exists(downloads))
+        {
+            return;
+        }
+
+        if (failedResultTexture == null)
+        {
+            failedResultTexture = LoadLatestTextureFromPattern(downloads, "ChatGPT Image 2026*10_49_19.png");
+        }
+
+        if (victoryResultTexture == null)
+        {
+            victoryResultTexture = LoadLatestTextureFromPattern(downloads, "ChatGPT Image 2026*10_52_30.png");
+        }
+    }
+
+    // Loads the last filename match from a folder, useful for generated local UI mockups.
+    private Texture2D LoadLatestTextureFromPattern(string folder, string pattern)
+    {
+        string[] generatedFiles = Directory.GetFiles(folder, pattern);
+        if (generatedFiles.Length <= 0)
+        {
+            return null;
+        }
+
+        Array.Sort(generatedFiles, StringComparer.Ordinal);
+        return LoadTextureFromPng(generatedFiles[generatedFiles.Length - 1]);
+    }
+
     // Loads the health potion pickup art.
     private void LoadHealthPotionSprite()
     {
@@ -5455,6 +5549,36 @@ public sealed class ZombieStormGameController : MonoBehaviour
             Debug.LogWarning("Failed to load UI texture: " + path + "\n" + exception.Message);
             return null;
         }
+    }
+
+    // Returns the largest centered rect that preserves a texture's aspect ratio.
+    private static Rect GetCenteredTextureRect(Texture2D texture)
+    {
+        if (texture == null || texture.height <= 0)
+        {
+            return new Rect(0f, 0f, Screen.width, Screen.height);
+        }
+
+        float textureAspect = texture.width / (float)texture.height;
+        float screenAspect = Screen.width / (float)Mathf.Max(1, Screen.height);
+        float width = Screen.width;
+        float height = Screen.height;
+        if (screenAspect > textureAspect)
+        {
+            width = height * textureAspect;
+        }
+        else
+        {
+            height = width / textureAspect;
+        }
+
+        return new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+    }
+
+    // Converts normalized coordinates inside a parent rect to an absolute GUI rect.
+    private static Rect RelativeRect(Rect parent, float x, float y, float width, float height)
+    {
+        return new Rect(parent.x + parent.width * x, parent.y + parent.height * y, parent.width * width, parent.height * height);
     }
 
     // Loads a PNG as a sprite with optional background cleanup.

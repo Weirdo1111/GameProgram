@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-// Lists the active skills the player can unlock and upgrade.
+// Skill identifiers used by the upgrade system, HUD, sprite lookup, and auto-cast manager.
 public enum ZombieStormSkillType
 {
     MagicBolt,
@@ -15,7 +15,7 @@ public enum ZombieStormSkillType
     UltimateStorm
 }
 
-// Lists normal enemies, elites, and boss enemy types.
+// Enemy identifiers used for spawn selection, stats, animation lookup, rewards, and boss UI.
 public enum ZombieStormEnemyType
 {
     Grunt,
@@ -39,7 +39,7 @@ public enum ZombieStormEnemyType
     EmberTyrantBoss
 }
 
-// Lists passive upgrades such as health, speed, pickup range, and damage.
+// Passive upgrade identifiers that modify global player stats or skill formulas.
 public enum ZombieStormPassiveType
 {
     Damage,
@@ -51,7 +51,7 @@ public enum ZombieStormPassiveType
     MaxHealth
 }
 
-// Lists oscillator wave shapes used when generating simple sound effects.
+// Oscillator wave shapes used by the runtime synth that creates lightweight sound effects.
 public enum ZombieStormWave
 {
     Sine,
@@ -61,7 +61,8 @@ public enum ZombieStormWave
     Noise
 }
 
-// Stores one upgrade card, including title, description, color, and action.
+// Data object for one level-up card: unique key, display text, category label,
+// accent color, and the callback that applies the upgrade.
 public sealed class ZombieStormUpgradeOption
 {
     public string Key;
@@ -71,26 +72,26 @@ public sealed class ZombieStormUpgradeOption
     public Color Accent;
     public Action Apply;
 
-    // Creates an upgrade option for unlocking or leveling an active skill.
+    // Creates a standard active-skill card for unlocking a skill or raising its level.
     public static ZombieStormUpgradeOption Skill(string key, string title, string description, Color accent, Action apply)
     {
         return new ZombieStormUpgradeOption { Key = key, Title = title, Description = description, Category = "ACTIVE SKILL", Accent = accent, Apply = apply };
     }
 
-    // Creates an upgrade option for a passive stat.
+    // Creates a passive-stat card such as damage, cooldown, movement, pickup range, or health.
     public static ZombieStormUpgradeOption Passive(string key, string title, string description, Color accent, Action apply)
     {
         return new ZombieStormUpgradeOption { Key = key, Title = title, Description = description, Category = "PASSIVE STAT", Accent = accent, Apply = apply };
     }
 
-    // Creates a custom upgrade option with an explicit category label.
+    // Creates a card with a caller-supplied category, used for skill specializations.
     public static ZombieStormUpgradeOption Custom(string key, string title, string description, string category, Color accent, Action apply)
     {
         return new ZombieStormUpgradeOption { Key = key, Title = title, Description = description, Category = category, Accent = accent, Apply = apply };
     }
 }
 
-// Stores floating damage text data, including position, color, and remaining lifetime.
+// Runtime state for one floating damage number drawn in OnGUI and advanced each frame.
 public struct ZombieStormDamagePopup
 {
     public string Text;

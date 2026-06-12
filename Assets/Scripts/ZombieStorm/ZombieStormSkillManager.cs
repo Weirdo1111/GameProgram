@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-// Stores skill levels and automatically casts each active combat skill.
+// Owns the player's active skill loadout. It tracks learned skill levels, specialization
+// upgrades, evolved skills, persistent helpers, cooldowns, and all automatic casts.
 public sealed class ZombieStormSkillManager : MonoBehaviour
 {
     private readonly Dictionary<ZombieStormSkillType, int> levels = new Dictionary<ZombieStormSkillType, int>();
@@ -24,20 +25,21 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         get { return levels.Count; }
     }
 
-    // Initializes the references and values this object needs at runtime.
+    // Stores controller and player references used by every skill formula and spawn call.
     public void Initialize(ZombieStormGameController owner, ZombieStormPlayer survivor)
     {
         game = owner;
         player = survivor;
     }
 
-    // Cleans up childless helper objects when the player or skill manager is destroyed.
+    // Cleans up persistent skill helper objects so blades/spirits do not survive after the player.
     private void OnDestroy()
     {
         CleanupPersistentSkillObjects();
     }
 
-    // Advances movement, combat, animation, timers, and state changes each frame.
+    // Ticks all learned automatic skills, updates persistent blade/spirit objects, processes
+    // delayed blasts, and listens for the manual ultimate key.
     private void Update()
     {
         if (game == null || player == null)
@@ -54,7 +56,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         UpdateUltimateInput();
     }
 
-    // Learns a new skill and creates persistent skill objects when needed.
+    // Adds a new skill at level 1, seeds its first cooldown, and builds persistent visuals for
+    // skills that stay around the player.
     public void LearnSkill(ZombieStormSkillType weapon)
     {
         if (GetSkillLevel(weapon) > 0)
@@ -74,7 +77,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
     }
 
-    // Raises a skill level and rebuilds level-dependent skill objects.
+    // Increases a learned skill up to its cap and rebuilds helpers whose count/radius changes.
+    // Regeneration level 2 also grants the max-health bonus defined by its design.
     public void LevelUpSkill(ZombieStormSkillType weapon)
     {
         int current = GetSkillLevel(weapon);
@@ -101,21 +105,21 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
     }
 
-    // Returns the current level of a skill, or zero if it has not been learned.
+    // Returns the learned level for a skill; zero means the player does not know it yet.
     public int GetSkillLevel(ZombieStormSkillType weapon)
     {
         int level;
         return levels.TryGetValue(weapon, out level) ? level : 0;
     }
 
-    // Returns the level of a skill specialization upgrade.
+    // Returns how many times a named specialization has been chosen.
     public int GetSkillUpgradeLevel(string key)
     {
         int level;
         return skillUpgrades.TryGetValue(key, out level) ? level : 0;
     }
 
-    // Raises a skill specialization level and refreshes related skill visuals.
+    // Increments a specialization up to level 3 and rebuilds any persistent helpers affected by it.
     public void AddSkillUpgrade(string key)
     {
         int next = Mathf.Min(3, GetSkillUpgradeLevel(key) + 1);
@@ -130,13 +134,13 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
     }
 
-    // Checks whether a skill has evolved.
+    // Reports whether the skill has reached its passive-gated evolution state.
     public bool IsEvolved(ZombieStormSkillType weapon)
     {
         return evolved.Contains(weapon);
     }
 
-    // Marks a skill as evolved and rebuilds any related skill objects.
+    // Marks a skill as evolved and refreshes helpers so evolved counts/radii appear immediately.
     public void Evolve(ZombieStormSkillType weapon)
     {
         evolved.Add(weapon);
@@ -150,7 +154,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
     }
 
-    // Builds the HUD text that summarizes the current skill loadout.
+    // Builds the compact HUD loadout text, including ultimate cooldown and evolved markers.
     public string GetLoadoutText()
     {
         string text = "Skills";
@@ -180,7 +184,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         return text;
     }
 
-    // Converts a skill type into a short loadout label.
+    // Converts internal skill enum values into short labels that fit the HUD.
     private static string SkillLabel(ZombieStormSkillType weapon)
     {
         switch (weapon)
@@ -198,7 +202,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
     private delegate void SkillAction(int level);
 
-    // Counts down a skill cooldown and casts it when ready.
+    // Shared cooldown gate for auto-cast skills: unknown skills do nothing, ready skills cast,
+    // and unready skills write their reduced cooldown back to the dictionary.
     private void TickSkill(ZombieStormSkillType weapon, SkillAction action)
     {
         int level = GetSkillLevel(weapon);
@@ -220,13 +225,14 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
     }
 
-    // Reads a specialization level used by skill formulas.
+    // Shorthand for reading specialization levels inside formulas.
     private int Mod(string key)
     {
         return GetSkillUpgradeLevel(key);
     }
 
-    // Fires magic fireballs with level-based count, damage, and pierce.
+    // Finds the nearest target and fires one or more Magic Bolt projectiles with level/upgrades
+    // controlling spread, pierce, damage, projectile size, and Fire Zone attack counting.
     private void CastMagicBolt(int level)
     {
         ZombieStormEnemy target = game.FindNearestEnemy(transform.position, IsEvolved(ZombieStormSkillType.MagicBolt) ? 18f : 14f);
@@ -259,7 +265,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         cooldowns[ZombieStormSkillType.MagicBolt] = baseCooldown * game.CooldownMultiplier;
     }
 
-    // Restores one health on a fixed timer.
+    // Applies the passive regeneration tick and refreshes its cooldown from the current level.
     private void CastRegeneration(int level)
     {
         player.Heal(1f);
@@ -267,7 +273,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         cooldowns[ZombieStormSkillType.Regeneration] = level >= 3 ? 2f : 3f;
     }
 
-    // Creates the Fire Zone bomb impact at a target point.
+    // Called by older projectile hooks when a fireball should immediately create Fire Zone impact.
     public void SpawnFireZoneOnFireballHit(Vector2 position)
     {
         int level = GetSkillLevel(ZombieStormSkillType.FireZone);
@@ -279,7 +285,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         SpawnFireBombImpact(position, level);
     }
 
-    // Counts Magic Bolt attacks and throws a Fire Zone bomb when the level threshold is met.
+    // Counts Magic Bolt attacks toward Fire Zone's throw threshold and launches a bomb at the
+    // current target once enough attacks have happened.
     private void CountFireZoneAttack(Vector2 origin, Vector2 targetPosition)
     {
         int level = GetSkillLevel(ZombieStormSkillType.FireZone);
@@ -305,7 +312,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         game.SpawnFireBombProjectile(origin, targetPosition + scatter, impactDamage, impactRadius, level >= 2, burnDamage, burnRadius, GetFireBombBurnDuration(level), 0.42f);
     }
 
-    // Applies the Fire Zone bomb impact immediately for compatibility with older projectile hooks.
+    // Creates the immediate Fire Zone impact and optional burn patch without using the arcing bomb.
     private void SpawnFireBombImpact(Vector2 position, int level)
     {
         float impactRadius = GetFireBombImpactRadius(level);
@@ -316,41 +323,45 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
     }
 
-    // Returns the current Magic Bolt base damage before global damage and crit rolls.
+    // Calculates Magic Bolt's pre-multiplier base damage from level and force upgrades.
     private float GetMagicBoltBaseDamage(int level)
     {
         return (10f + level * 3.4f) * (1f + Mod("magic_force") * 0.16f);
     }
 
-    // Fire bombs are stronger than a single Magic Bolt and scale with the current bolt build.
+    // Scales Fire Zone's impact damage from the current Magic Bolt build so both skills stay linked.
     private float GetFireBombImpactDamage()
     {
         int magicBoltLevel = Mathf.Max(1, GetSkillLevel(ZombieStormSkillType.MagicBolt));
         return GetMagicBoltBaseDamage(magicBoltLevel) * 1.8f;
     }
 
+    // Calculates Fire Zone's impact radius, including global area passive scaling.
     private float GetFireBombImpactRadius(int level)
     {
         return (1.18f + level * 0.12f) * game.AreaMultiplier * 1.3f;
     }
 
+    // Calculates the lingering burn patch radius after the impact explosion.
     private float GetFireBombBurnRadius(int level)
     {
         return (1.05f + level * 0.12f) * game.AreaMultiplier * 0.5f;
     }
 
+    // Calculates each burn tick before global damage/crit rolls; level 5 adds a burn bonus.
     private float GetFireBombBurnDamage(int level)
     {
         float levelFiveBonus = level >= 5 ? 1.5f : 1f;
         return (4.8f + level * 1.4f) * 1.5f * levelFiveBonus;
     }
 
+    // Returns how long the Fire Zone burn patch stays active.
     private static float GetFireBombBurnDuration(int level)
     {
         return level >= 5 ? 6f : 5f;
     }
 
-    // Returns how many attacks Fire Zone needs before throwing a bomb.
+    // Returns how many Magic Bolt attacks are required before Fire Zone throws another bomb.
     private static int GetFireBombAttackThreshold(int level)
     {
         if (level >= 4)
@@ -361,7 +372,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         return level >= 3 ? 3 : 4;
     }
 
-    // Casts a shield burst that damages and knocks back nearby enemies.
+    // Fires Shield Burst only when enemies are close enough, then damages the area and starts
+    // its recharge cooldown from level and recharge upgrades.
     private void CastShieldBurst(int level)
     {
         float radius = (1.35f + level * 0.24f + Mod("shield_radius") * 0.22f) * game.AreaMultiplier;
@@ -377,7 +389,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         cooldowns[ZombieStormSkillType.ShieldBurst] = Mathf.Max(0.65f, 2.4f - level * 0.16f - Mod("shield_recharge") * 0.18f) * game.CooldownMultiplier;
     }
 
-    // Updates orbiting blade position, rotation, collision damage, and visual effects.
+    // Keeps Fire Blades arranged around the player, checks enemies inside the orbit radius on a
+    // shared tick cooldown, and applies blade damage plus spark feedback.
     private void UpdateOrbitingKnives()
     {
         int level = GetSkillLevel(ZombieStormSkillType.OrbitingKnife);
@@ -418,7 +431,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
             ZombieStormEnemy enemy = activeEnemies[i];
             if (enemy != null && !enemy.IsDead && Vector2.Distance(enemy.transform.position, transform.position) <= radius + enemy.Radius)
             {
-                enemy.TakeDamage(RollDamage((6f + level * 1.8f) * 2f * (1f + Mod("knife_edge") * 0.18f)), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
+                enemy.TakeDamage(RollDamage((6f + level * 1.8f) * 4f * (1f + Mod("knife_edge") * 0.18f)), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
                 game.SpawnHitSpark(enemy.transform.position, new Color(1f, 0.32f, 0.16f, 0.86f), 0.28f);
                 game.SpawnAreaEffect(enemy.transform.position, 0.34f, 0f, 0.12f, 1f, new Color(1f, 0.16f, 0.06f, 0.42f), "hit_spark");
             }
@@ -427,7 +440,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         cooldowns[ZombieStormSkillType.OrbitingKnife] = 0.24f * game.CooldownMultiplier;
     }
 
-    // Rebuilds the orbiting blade count and glow objects from current upgrades.
+    // Destroys and recreates Fire Blade helper objects whenever level, reach, count, or evolution changes.
     private void RebuildOrbitingKnives()
     {
         CleanupOrbitingKnives();
@@ -452,7 +465,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
     }
 
-    // Rebuilds the Fire Spirit count from skill level and upgrades.
+    // Destroys and recreates Fire Spirit helper sprites from level, swarm upgrades, and evolution.
     private void RebuildDrones()
     {
         CleanupDrones();
@@ -472,7 +485,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
     }
 
-    // Updates Fire Spirit orbit positions and auto-fires at nearby enemies.
+    // Positions Fire Spirits in stable slots around the player and lets each one shoot at its
+    // nearest enemy when the shared spirit cooldown is ready.
     private void UpdateSummonDrones()
     {
         int level = GetSkillLevel(ZombieStormSkillType.SummonDrone);
@@ -519,7 +533,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         cooldowns[ZombieStormSkillType.SummonDrone] = Mathf.Max(0.22f, 0.92f - levelCooldownBonus - Mod("drone_overclock") * 0.08f) * game.CooldownMultiplier;
     }
 
-    // Returns the base Fire Blades count for each skill level.
+    // Returns the base number of Fire Blades granted by the skill level before upgrades/evolution.
     private static int GetFireBladeCount(int level)
     {
         switch (level)
@@ -531,53 +545,62 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
     }
 
-    // Gives each Fire Spirit a stable slot around the player instead of orbiting.
+    // Gives each Fire Spirit a readable fixed slot around the player; small counts use hand-tuned
+    // formations, larger counts fall back to an evenly spaced ring.
     private static Vector2 GetFixedFireSpiritOffset(int index, int count)
     {
+        const float distanceMultiplier = 1.45f;
         count = Mathf.Max(1, count);
+        Vector2 offset;
         if (count == 1)
         {
-            return new Vector2(0.92f, 0.58f);
+            offset = new Vector2(0.92f, 0.58f);
+            return offset * distanceMultiplier;
         }
 
         if (count == 2)
         {
-            return index == 0 ? new Vector2(-0.86f, 0.58f) : new Vector2(0.86f, 0.58f);
+            offset = index == 0 ? new Vector2(-0.86f, 0.58f) : new Vector2(0.86f, 0.58f);
+            return offset * distanceMultiplier;
         }
 
         if (count == 3)
         {
             switch (index)
             {
-                case 0: return new Vector2(-0.94f, 0.58f);
-                case 1: return new Vector2(0.94f, 0.58f);
-                default: return new Vector2(0f, 1.02f);
+                case 0: offset = new Vector2(-0.94f, 0.58f); break;
+                case 1: offset = new Vector2(0.94f, 0.58f); break;
+                default: offset = new Vector2(0f, 1.02f); break;
             }
+
+            return offset * distanceMultiplier;
         }
 
         if (count == 4)
         {
             switch (index)
             {
-                case 0: return new Vector2(-0.96f, 0.58f);
-                case 1: return new Vector2(0.96f, 0.58f);
-                case 2: return new Vector2(-0.42f, 1.06f);
-                default: return new Vector2(0.42f, 1.06f);
+                case 0: offset = new Vector2(-0.96f, 0.58f); break;
+                case 1: offset = new Vector2(0.96f, 0.58f); break;
+                case 2: offset = new Vector2(-0.42f, 1.06f); break;
+                default: offset = new Vector2(0.42f, 1.06f); break;
             }
+
+            return offset * distanceMultiplier;
         }
 
         float angle = 90f + index * (360f / count);
-        return new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * 1.05f;
+        return new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * 1.52f;
     }
 
-    // Destroys all persistent helper objects owned by continuous skills.
+    // Destroys every persistent helper owned by continuous skills.
     private void CleanupPersistentSkillObjects()
     {
         CleanupOrbitingKnives();
         CleanupDrones();
     }
 
-    // Destroys orbiting blade objects and their halo ring.
+    // Destroys all Fire Blade helper objects and clears their tracking list.
     private void CleanupOrbitingKnives()
     {
         for (int i = 0; i < orbitingObjects.Count; i++)
@@ -591,7 +614,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         orbitingObjects.Clear();
     }
 
-    // Destroys Fire Spirit helper objects.
+    // Destroys all Fire Spirit helper objects and clears their tracking list.
     private void CleanupDrones()
     {
         for (int i = 0; i < drones.Count; i++)
@@ -605,7 +628,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         drones.Clear();
     }
 
-    // Checks the ultimate key and casts the storm when energy is full.
+    // Counts down ultimate cooldown, listens for F, then damages every enemy on screen and starts
+    // the next ultimate recharge when the skill is learned and ready.
     private void UpdateUltimateInput()
     {
         if (ultimateCooldown > 0f)
@@ -640,7 +664,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         ultimateCooldown = Mathf.Max(12f, 42f - level * 4f - Mod("ultimate_recharge") * 3.5f);
     }
 
-    // Finds the nearest enemy that this chain effect has not already hit.
+    // Finds the closest living enemy within range that is not already present in a supplied hit set.
     private ZombieStormEnemy FindNearestUnhitEnemy(Vector2 origin, float maxDistance, HashSet<ZombieStormEnemy> hit)
     {
         ZombieStormEnemy best = null;
@@ -665,7 +689,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         return best;
     }
 
-    // Counts enemies inside a radius to evaluate skill target value.
+    // Counts living enemies overlapping a radius; used to avoid wasting Shield Burst on empty space.
     private int CountEnemiesNear(Vector2 origin, float radius)
     {
         int count = 0;
@@ -683,7 +707,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         return count;
     }
 
-    // Updates delayed blasts and creates area damage when their timers finish.
+    // Advances queued delayed blasts, spawns their area damage on expiry, and plays matching
+    // impact feedback for meteor-style blasts.
     private void UpdatePendingBlasts()
     {
         for (int i = pendingBlasts.Count - 1; i >= 0; i--)
@@ -710,7 +735,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
     }
 
-    // Calculates final damage from base damage and global damage multipliers.
+    // Applies global skill damage and critical chance to a base damage value.
     private float RollDamage(float baseDamage)
     {
         float damage = baseDamage * game.DamageMultiplier;
@@ -723,7 +748,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
     }
 }
 
-// Stores delayed blast data such as warning position, timer, and damage settings.
+// Stores one pending player-skill blast that will become an area effect after a short delay.
 public struct ZombieStormPendingSkillBlast
 {
     public Vector2 Position;

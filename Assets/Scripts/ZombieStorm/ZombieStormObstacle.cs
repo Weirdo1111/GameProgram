@@ -1,7 +1,8 @@
 using UnityEngine;
 
 [DisallowMultipleComponent]
-// Registers map obstacles so the controller can use them for collision limits.
+// Represents one circular map obstacle. The game controller queries registered obstacles to keep
+// players and enemies from walking through graves, props, and other arena blockers.
 public sealed class ZombieStormObstacle : MonoBehaviour
 {
     [Min(0.05f)]
@@ -35,7 +36,8 @@ public sealed class ZombieStormObstacle : MonoBehaviour
         }
     }
 
-    // Initializes references, singleton state, settings, resources, and scene objects.
+    // Caches the optional CircleCollider2D and makes it a trigger because collision resolution is
+    // handled manually by ZombieStormGameController.
     private void Awake()
     {
         circleCollider = GetComponent<CircleCollider2D>();
@@ -45,19 +47,19 @@ public sealed class ZombieStormObstacle : MonoBehaviour
         }
     }
 
-    // Registers this object when Unity enables it.
+    // Registers the obstacle when Unity enables it so newly activated map props block movement.
     private void OnEnable()
     {
         Register();
     }
 
-    // Runs first-frame setup such as registration after the object is enabled.
+    // Registers again on Start to cover creation order where the controller was not ready during OnEnable.
     private void Start()
     {
         Register();
     }
 
-    // Unregisters this object so disabled references are not used later.
+    // Removes the obstacle from the controller so disabled or destroyed props are ignored.
     private void OnDisable()
     {
         if (ZombieStormGameController.Instance != null)
@@ -66,20 +68,20 @@ public sealed class ZombieStormObstacle : MonoBehaviour
         }
     }
 
-    // Keeps inspector values valid while editing in Unity.
+    // Keeps the editable fallback radius positive when values change in the Inspector.
     private void OnValidate()
     {
         radius = Mathf.Max(0.05f, radius);
     }
 
-    // Draws editor gizmos that show the obstacle radius while selected.
+    // Shows the effective world-space blocking radius in the Scene view for tuning.
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = new Color(0.15f, 0.95f, 0.35f, 0.75f);
         Gizmos.DrawWireSphere(WorldCenter, WorldRadius);
     }
 
-    // Registers this object with the game controller.
+    // Adds this obstacle to the active controller if one exists.
     private void Register()
     {
         if (ZombieStormGameController.Instance != null)

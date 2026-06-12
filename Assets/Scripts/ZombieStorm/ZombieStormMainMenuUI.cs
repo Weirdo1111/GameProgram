@@ -5,7 +5,8 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 [DisallowMultipleComponent]
-// Builds and controls the main menu, settings modal, and credits modal.
+// Builds the standalone main menu UI using Unity UI/TextMeshPro. It owns the cover art,
+// visible buttons, invisible cover hotspots, settings modal, credits modal, and hover styling.
 public sealed class ZombieStormMainMenuUI : MonoBehaviour
 {
     private const float FadeSpeed = 10f;
@@ -38,7 +39,8 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
     private Image coverImage;
     private AspectRatioFitter coverAspectFitter;
 
-    // Initializes the references and values this object needs at runtime.
+    // Builds the menu the first time it is called, binds it to the game controller,
+    // and refreshes the displayed background when a new cover sprite is supplied.
     public void Initialize(ZombieStormGameController owner, Sprite backgroundSprite)
     {
         controller = owner;
@@ -85,7 +87,8 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         get { return initialized && !failed && canvas != null && menuRoot != null; }
     }
 
-    // Advances movement, combat, animation, timers, and state changes each frame.
+    // Keeps the menu visible only while the controller is in main-menu flow, closes the top modal
+    // on Escape, and smoothly fades the canvas group in/out.
     private void Update()
     {
         if (!IsReady || controller == null)
@@ -112,7 +115,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         }
     }
 
-    // Closes the top menu modal and returns whether one was closed.
+    // Closes Credits before Settings so Escape behaves like a simple modal stack.
     public bool CloseTopModal()
     {
         if (creditsRoot != null && creditsRoot.activeSelf)
@@ -124,7 +127,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return false;
     }
 
-    // Creates the main menu canvas with scaling, sorting, and input components.
+    // Creates the root screen-space canvas, scaler, raycaster, and canvas group used by the menu.
     private void BuildCanvas()
     {
         GameObject canvasObject = new GameObject("MainMenuCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(CanvasGroup));
@@ -142,7 +145,8 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         canvasGroup.alpha = 1f;
     }
 
-    // Builds menu background, buttons, cover hotspots, and bottom info.
+    // Assembles the full menu screen: background art, left button panel, cover-art hotspots,
+    // bottom hints, settings modal, and credits modal.
     private void BuildMenu(Sprite backgroundSprite)
     {
         menuRoot = CreateRect("CommercialMainMenu", canvas.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.one);
@@ -156,7 +160,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         creditsRoot.SetActive(false);
     }
 
-    // Sets the menu background image and overlay layers.
+    // Applies the supplied cover art or fallback art, then adds gradient/vignette overlays for readability.
     private void SetBackground(Sprite backgroundSprite)
     {
         if (menuRoot == null)
@@ -176,7 +180,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         }
     }
 
-    // Creates a full-screen cover image object.
+    // Creates the cover image object and its aspect fitter so generated art scales without distortion.
     private Image CreateCoverImage(Transform parent, Sprite sprite)
     {
         GameObject imageObject = CreateRect("Background", parent, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, CoverArtYOffset));
@@ -197,7 +201,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return image;
     }
 
-    // Resizes the cover image so it keeps its aspect ratio without distortion.
+    // Chooses the cover aspect ratio from the sprite when available, otherwise uses the expected art ratio.
     private void ApplyCoverAspect(Sprite sprite)
     {
         if (coverAspectFitter == null)
@@ -214,7 +218,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         coverAspectFitter.aspectRatio = CoverArtAspectRatio;
     }
 
-    // Creates the left-side menu button panel.
+    // Creates the left-side translucent panel that holds the title and visible menu buttons.
     private RectTransform CreatePanel(Transform parent)
     {
         GameObject panelObject = CreateRect("MenuPanel", parent, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(116f, 22f));
@@ -240,7 +244,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return rect;
     }
 
-    // Creates the main menu title and subtitle text.
+    // Adds the title, English subtitle, and short pitch text to the menu panel.
     private void CreateTitle(RectTransform panel)
     {
         TextMeshProUGUI title = CreateText("ChineseTitle", panel, "\u50f5\u5c38\u5272\u8349\u5927\u4f5c\u6218", 56f, new Color(1f, 0.86f, 0.48f, 1f), TextAlignmentOptions.Left);
@@ -273,7 +277,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         pitch.enableWordWrapping = true;
     }
 
-    // Creates the start, settings, credits, and quit buttons.
+    // Adds the visible menu buttons and wires them to controller requests or local modal toggles.
     private void CreateButtons(RectTransform panel)
     {
         RectTransform buttonGroup = CreateRect("ButtonGroup", panel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(52f, -294f)).GetComponent<RectTransform>();
@@ -292,14 +296,14 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         hint.rectTransform.sizeDelta = new Vector2(-108f, 24f);
     }
 
-    // Creates invisible clickable areas on the cover image.
+    // Adds transparent button hitboxes over the AI-rendered Start Game and Settings areas in the cover art.
     private void CreateCoverHotspots(Transform parent)
     {
         CreateTransparentCoverButton(parent, "StartGameHotspot", new Vector2(570f, -228f), new Vector2(500f, 128f), delegate { controller.RequestStartRun(); });
         CreateTransparentCoverButton(parent, "SettingsHotspot", new Vector2(570f, -356f), new Vector2(500f, 128f), delegate { controller.RequestOpenMainMenuSettings(); });
     }
 
-    // Creates an invisible button that only receives clicks.
+    // Creates a transparent UI Button whose only job is to receive clicks over rendered cover text.
     private Button CreateTransparentCoverButton(Transform parent, string name, Vector2 anchoredPosition, Vector2 size, UnityEngine.Events.UnityAction onClick)
     {
         GameObject buttonObject = CreateRect(name, parent, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), anchoredPosition);
@@ -318,7 +322,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return button;
     }
 
-    // Creates a styled menu button with outline and hover feedback.
+    // Creates a visible menu button with background image, outline, label, click handler, and hover visual component.
     private Button CreateStyledButton(Transform parent, string label, int index, UnityEngine.Events.UnityAction onClick)
     {
         GameObject buttonObject = CreateRect(label.Replace(" ", "") + "Button", parent, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -index * 82f));
@@ -358,7 +362,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return button;
     }
 
-    // Creates the bottom menu text for version and help information.
+    // Adds small footer text for version, controls, and basic menu instructions.
     private void CreateBottomInfo(Transform parent)
     {
         TextMeshProUGUI version = CreateText("Version", parent, "v0.1 Prototype", 15f, new Color(0.72f, 0.76f, 0.78f, 0.68f), TextAlignmentOptions.BottomLeft);
@@ -376,7 +380,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         controls.rectTransform.sizeDelta = new Vector2(520f, 30f);
     }
 
-    // Creates the settings modal with volume, frame rate, and fullscreen controls.
+    // Builds the Settings modal and wires sliders/toggle so every change immediately applies to the controller.
     private GameObject CreateSettingsPanel(Transform parent)
     {
         GameObject root = CreateModalRoot("SettingsModal", parent);
@@ -410,7 +414,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return root;
     }
 
-    // Creates the credits modal with project and asset information.
+    // Builds the Credits modal that summarizes project authorship and major asset sources.
     private GameObject CreateCreditsPanel(Transform parent)
     {
         GameObject root = CreateModalRoot("CreditsModal", parent);
@@ -441,7 +445,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return root;
     }
 
-    // Creates a labeled settings slider with value text.
+    // Creates one settings row with label, slider, and numeric percent label.
     private Slider CreateSlider(RectTransform parent, string label, int index, out TextMeshProUGUI valueText)
     {
         float y = -126f - index * 86f;
@@ -495,7 +499,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return slider;
     }
 
-    // Creates a settings toggle control.
+    // Creates a settings row toggle, currently used for fullscreen.
     private Toggle CreateToggle(RectTransform parent, string label, int index)
     {
         float y = -126f - index * 86f;
@@ -532,7 +536,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return toggle;
     }
 
-    // Creates a modal root object and its dimmed background.
+    // Creates a full-screen modal root with a dimmed click-blocking background.
     private GameObject CreateModalRoot(string name, Transform parent)
     {
         GameObject root = CreateRect(name, parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.one);
@@ -541,7 +545,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return root;
     }
 
-    // Creates the content panel inside a modal.
+    // Creates the centered modal content panel and gives it a visible border.
     private RectTransform CreateModalPanel(Transform parent, Vector2 size)
     {
         GameObject panelObject = CreateRect("Panel", parent, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero);
@@ -556,7 +560,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return rect;
     }
 
-    // Copies current settings into the UI controls.
+    // Copies current controller settings into sliders/toggle without saving them again.
     private void RefreshSettingsControls()
     {
         if (controller == null || masterSlider == null)
@@ -571,7 +575,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         UpdateSettingValueLabels();
     }
 
-    // Saves settings from UI controls and applies them to the game.
+    // Reads the current settings controls and applies/saves them through the controller.
     private void SaveSettingsFromControls()
     {
         if (controller == null || masterSlider == null)
@@ -588,7 +592,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         controller.ApplyMenuSettings(masterSlider.value, musicSlider.value, sfxSlider.value, fullscreenToggle.isOn);
     }
 
-    // Refreshes numeric value labels in the settings modal.
+    // Updates the percent labels beside volume sliders after values change.
     private void UpdateSettingValueLabels()
     {
         masterValue.text = Mathf.RoundToInt(masterSlider.value * 100f).ToString() + "%";
@@ -596,7 +600,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         sfxValue.text = Mathf.RoundToInt(sfxSlider.value * 100f).ToString() + "%";
     }
 
-    // Creates a TextMeshPro text object with base styling.
+    // Creates a TextMeshProUGUI object with shared menu font, color, alignment, and raycast disabled.
     private TextMeshProUGUI CreateText(string name, Transform parent, string text, float size, Color color, TextAlignmentOptions alignment)
     {
         GameObject textObject = CreateRect(name, parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
@@ -614,7 +618,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return tmp;
     }
 
-    // Creates a UI image object with the requested color.
+    // Creates a plain UI Image used for panels, borders, overlays, and button backgrounds.
     private Image CreateImage(string name, Transform parent, Color color)
     {
         GameObject imageObject = CreateRect(name, parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
@@ -624,7 +628,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return image;
     }
 
-    // Creates a RectTransform and applies anchor, pivot, and position settings.
+    // Creates a GameObject with RectTransform and applies anchors, pivot, and anchored position.
     private static GameObject CreateRect(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition)
     {
         GameObject gameObject = new GameObject(name, typeof(RectTransform));
@@ -638,7 +642,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return gameObject;
     }
 
-    // Stretches a RectTransform to fill its parent.
+    // Resets anchors and offsets so the RectTransform fills its parent exactly.
     private static void Stretch(RectTransform rect)
     {
         rect.anchorMin = Vector2.zero;
@@ -648,7 +652,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         rect.offsetMax = Vector2.zero;
     }
 
-    // Creates the font asset used by the main menu.
+    // Uses the TMP default font if available, otherwise falls back to the bundled Liberation SDF font.
     private TMP_FontAsset CreateMenuFont()
     {
         if (TMP_Settings.defaultFontAsset != null)
@@ -659,7 +663,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
     }
 
-    // Ensures an EventSystem exists so UI clicks work.
+    // Creates an EventSystem/InputModule if the scene does not already have one, allowing buttons to click.
     private void EnsureEventSystem()
     {
         if (FindObjectOfType<EventSystem>() != null)
@@ -671,7 +675,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         eventSystem.transform.SetParent(transform, false);
     }
 
-    // Returns a fallback background sprite when cover art is missing.
+    // Creates and caches a simple generated fallback cover when the AI menu art is missing.
     private Sprite GetBackgroundFallbackSprite()
     {
         if (backgroundFallbackSprite != null)
@@ -694,7 +698,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return backgroundFallbackSprite;
     }
 
-    // Creates a solid-color UI sprite.
+    // Creates a one-pixel solid sprite for UI images that only need flat color.
     private Sprite CreateSolidSprite(string name)
     {
         Texture2D texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
@@ -706,7 +710,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
     }
 
-    // Creates a vertical gradient overlay sprite.
+    // Creates the top/bottom gradient overlay used to darken the cover art behind text.
     private Sprite CreateVerticalGradientSprite()
     {
         const int width = 2;
@@ -731,7 +735,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
     }
 
-    // Creates a vignette overlay that focuses the menu image.
+    // Creates a radial vignette overlay that frames the menu art and improves foreground contrast.
     private Sprite CreateVignetteSprite()
     {
         const int size = 256;
@@ -756,7 +760,8 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
     }
 }
 
-// Applies hover and pressed visual states to main menu buttons.
+// Pointer-state component for menu buttons. It changes background, outline, and label colors
+// for normal, hover, and pressed states without requiring Animator assets.
 public sealed class ZombieStormMenuButtonVisual : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
 {
     private Image background;
@@ -764,7 +769,7 @@ public sealed class ZombieStormMenuButtonVisual : MonoBehaviour, IPointerEnterHa
     private TextMeshProUGUI label;
     private bool hovering;
 
-    // Initializes the references and values this object needs at runtime.
+    // Stores the UI parts this visual controller will recolor and applies the normal state.
     public void Initialize(Image targetBackground, Outline targetOutline, TextMeshProUGUI targetLabel)
     {
         background = targetBackground;
@@ -799,7 +804,7 @@ public sealed class ZombieStormMenuButtonVisual : MonoBehaviour, IPointerEnterHa
         ApplyVisual(hovering, false);
     }
 
-    // Applies button background, outline, and label colors for the current state.
+    // Applies the color palette for normal, hover, or pressed button state.
     private void ApplyVisual(bool hover, bool pressed)
     {
         if (background != null)

@@ -36,20 +36,20 @@ This cover image was generated with ChatGPT, then supplied by the project owner 
 
 ## Story Sequence Images
 
-- Source: storyline images supplied by the project owner from `C:\Users\ken\Desktop\story`.
+- Source: AI-generated images created with ChatGPT and supplied by the project owner.
 - Local path: `Assets/ZombieStormArt/Story`
 - Used for: pre-run story sequence shown after `Start Run` and advanced with Space.
 
-Generation tool, original public source, and license metadata are not recorded in the repository. Re-check ownership and redistribution terms before publishing raw asset files publicly.
+The story sequence images were generated with ChatGPT and supplied by the project owner for this project.
 
 ## Dark VFX 01 - 02
 
-- Source: https://pixlab24.com/tilesets/effects/34816/
+- Source: local download supplied by the project owner. Original public source page is not recorded in this repository.
 - Local source folder supplied by the project owner: `C:\Users\ken\Downloads\Dark VFX 01 - 02`.
 - Local paths: `Assets/ZombieStormArt/Effects/DarkVFX1`, `Assets/ZombieStormArt/Effects/DarkVFX2`
 - Used for: `EmberTyrantBoss` (`Golem_3`) dash impact and falling magma impact attack effects.
 
-Review the specific Pixlab24 asset page and license terms before redistributing the raw PNG files publicly.
+No license file was found in the supplied folder during import. Review the original download source before redistributing the raw PNG files publicly.
 
 ## Foozle Pixel Magic Effects
 
@@ -79,11 +79,12 @@ The project owner identified this Pixlab24 page as the source website for the bu
 
 ## Tekila 2D Fire Pack
 
-- Source: local download supplied by the project owner from `C:\Users\ken\Downloads\2a2476b47d8dbb21\2D Fire Pack 2 by Tekila\Sheets\Fire01`
+- Source: https://pixlab24.com/tilesets/effects/34816/
+- Local source folder supplied by the project owner: `C:\Users\ken\Downloads\2a2476b47d8dbb21\2D Fire Pack 2 by Tekila\Sheets\Fire01`
 - Local path: `Assets/ZombieStormArt/Effects/GroundFire/TekilaFire01`
 - Used for: Fire Zone's lingering ground fire left by fire bombs.
 
-No license file was found in the supplied folder during import. Review the original download source before redistributing the raw PNG files publicly.
+The Pixlab24 source page states that the asset can be used for personal and commercial projects. Re-check the page license before redistributing the raw PNG files publicly.
 
 ## Skill Card UI Templates
 
@@ -108,6 +109,14 @@ The health potion art was generated with ChatGPT and supplied by the project own
 - Used for: top-left player HUD card with dynamic health and experience bars.
 
 The cropped file is a game-ready version derived from the supplied ChatGPT image.
+
+## Result Screen Images
+
+- Source: AI-generated images created with ChatGPT and supplied by the project owner.
+- Local paths: `Assets/ZombieStormArt/UI/result_failed.png`, `Assets/ZombieStormArt/UI/result_victory.png`
+- Used for: AI-rendered failure and victory result screens.
+
+The failure and victory result screen images were generated with ChatGPT and supplied by the project owner. The runtime overlays transparent Unity button hit areas on top of the rendered `Restart Run` and `Main Menu` areas. During development, the runtime can also load the supplied ChatGPT images from the project owner's Downloads folder if the project-local PNG files are missing.
 
 ## CraftPix Zombie Villager Chibi
 

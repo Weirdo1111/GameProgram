@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-// Moves XP or health pickups toward the player and applies the reward.
+// Controls one pooled pickup item. XP orbs and health potions idle in the world,
+// magnetize toward the player inside pickup range, apply their reward, then return to the pool.
 public sealed class ZombieStormPickup : MonoBehaviour
 {
     private ZombieStormGameController game;
@@ -13,7 +14,8 @@ public sealed class ZombieStormPickup : MonoBehaviour
     private float baseScale;
     private float bobOffset;
 
-    // Initializes the references and values this object needs at runtime.
+    // Resets this pooled pickup with its reward payload and visual bobbing offset.
+    // A positive heal amount marks the pickup as a potion; otherwise it behaves as XP.
     public void Initialize(ZombieStormGameController owner, string key, int xpAmount, float healAmount = 0f)
     {
         game = owner;
@@ -24,7 +26,8 @@ public sealed class ZombieStormPickup : MonoBehaviour
         bobOffset = UnityEngine.Random.value * 10f;
     }
 
-    // Advances movement, combat, animation, timers, and state changes each frame.
+    // Pulls the pickup toward the player once inside pickup range, applies XP/healing on contact,
+    // plays potion feedback when relevant, and recycles the object after collection.
     private void Update()
     {
         if (game == null || game.Player == null)
