@@ -557,7 +557,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         UpdateWalkVisual(direction);
     }
 
-    // Runs shared boss AI: chase faster while enraged, pause during telegraphs, animate casts,
+    // Runs shared boss behavior: chase faster while enraged, pause during telegraphs, animate casts,
     // execute queued skills when warnings finish, and restart the boss action cooldown.
     private void UpdateBoss(Vector2 direction)
     {

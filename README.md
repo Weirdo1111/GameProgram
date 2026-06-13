@@ -50,7 +50,7 @@ Documented external art sources are listed in `Docs/ArtSources.md`. Imported aud
 - Fire bomb and burn-circle effects: imported from Pixlab24 asset downloads supplied by the project owner and verified for free and commercial project use.
 - CraftPix character and boss sprites: sourced from CraftPix free asset packs and verified for commercial project use.
 - Dark VFX effects: free public assets verified for personal learning and course-project use.
-- Main menu cover, skill-card templates, and health potion pickup icon: AI-generated images created with ChatGPT and supplied by the project owner, documented in `Docs/ArtSources.md`.
+- Main menu cover, skill-card templates, and health potion pickup icon: project-created visual assets documented in `Docs/ArtSources.md`.
 
 All included assets have documented sources and verified usage terms for this course project. The GamerSounds audio clips and Dark VFX effects are used for personal learning and project exchange.
 

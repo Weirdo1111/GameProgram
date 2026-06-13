@@ -2837,7 +2837,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GUI.color = Color.white;
     }
 
-    // Draws an AI-generated result screen and keeps its buttons interactive.
+    // Draws an illustrated result screen and keeps its buttons interactive.
     private void DrawImageResultPanel(Texture2D resultTexture)
     {
         DrawOverlayBackdrop(0.82f);
@@ -3303,7 +3303,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         return layout;
     }
 
-    // Stores normalized card text slots so different AI templates can align independently.
+    // Stores normalized card text slots so different card art templates can align independently.
     private struct UpgradeCardTextLayout
     {
         public float TextInset;
@@ -5024,40 +5024,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
         playerStatusCardTexture = LoadTextureFromPng(Path.Combine(Application.dataPath, "ZombieStormArt", "UI", "player_status_card_cropped.png"));
     }
 
-    // Loads AI-generated result screen backgrounds.
+    // Loads result screen backgrounds.
     private void LoadResultScreenTextures()
     {
         failedResultTexture = LoadTextureFromPng(Path.Combine(Application.dataPath, "ZombieStormArt", "UI", "result_failed.png"));
         victoryResultTexture = LoadTextureFromPng(Path.Combine(Application.dataPath, "ZombieStormArt", "UI", "result_victory.png"));
-
-        string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-        if (!Directory.Exists(downloads))
-        {
-            return;
-        }
-
-        if (failedResultTexture == null)
-        {
-            failedResultTexture = LoadLatestTextureFromPattern(downloads, "ChatGPT Image 2026*10_49_19.png");
-        }
-
-        if (victoryResultTexture == null)
-        {
-            victoryResultTexture = LoadLatestTextureFromPattern(downloads, "ChatGPT Image 2026*10_52_30.png");
-        }
-    }
-
-    // Loads the last filename match from a folder, useful for generated local UI mockups.
-    private Texture2D LoadLatestTextureFromPattern(string folder, string pattern)
-    {
-        string[] generatedFiles = Directory.GetFiles(folder, pattern);
-        if (generatedFiles.Length <= 0)
-        {
-            return null;
-        }
-
-        Array.Sort(generatedFiles, StringComparer.Ordinal);
-        return LoadTextureFromPng(generatedFiles[generatedFiles.Length - 1]);
     }
 
     // Loads the health potion pickup art.

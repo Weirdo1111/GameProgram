@@ -198,7 +198,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         coverAspectFitter.aspectRatio = CoverArtAspectRatio;
     }
 
-    // Adds transparent button hitboxes over the AI-rendered Start Game and Settings areas in the cover art.
+    // Adds transparent button hitboxes over the rendered Start Game and Settings areas in the cover art.
     private void CreateCoverHotspots(Transform parent)
     {
         CreateTransparentCoverButton(parent, "StartGameHotspot", new Vector2(570f, -228f), new Vector2(500f, 128f), delegate { controller.RequestStartRun(); });
@@ -528,7 +528,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         eventSystem.transform.SetParent(transform, false);
     }
 
-    // Creates and caches a simple generated fallback cover when the AI menu art is missing.
+    // Creates and caches a simple fallback cover when the menu art is missing.
     private Sprite GetBackgroundFallbackSprite()
     {
         if (backgroundFallbackSprite != null)

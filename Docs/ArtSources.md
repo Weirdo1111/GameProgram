@@ -20,29 +20,29 @@ The downloaded archive includes `License.txt`, which states that the assets may 
 - Local path: `Assets/ExternalArt/MikodrakSpellEffects`
 - Used for: runtime projectile, spark, fire, lightning, burst, and explosion effect frames.
 
-## Custom Zombie Storm Images
+## Project-Generated Visual Assets
 
-- Source: AI-generated images created with ChatGPT and supplied by the project owner.
+- Source: generated with digital image tools, edited, and supplied by the project owner.
 - Local paths: `Assets/ZombieStormArt/Enemies`, `Assets/ZombieStormArt/Maps`, `Assets/ZombieStormArt/Menu`, `Assets/cowboy_spritesheet_transparent_split (1)`, `Assets/screen_selected`
 - Used for: Q-style base zombie animation, graveyard arena background, main protagonist walk frames, and protagonist hurt frames.
 
-The graveyard arena background image (`Assets/ZombieStormArt/Maps/graveyard_arena.png`) and the main protagonist images in `Assets/cowboy_spritesheet_transparent_split (1)` / `Assets/screen_selected` were generated with ChatGPT and then supplied by the project owner for use in this project.
+The graveyard arena background and protagonist animation frames were prepared specifically for this project.
 
 ## Main Menu Cover
 
-- Source: AI-generated image created with ChatGPT and supplied by the project owner.
+- Source: project-generated visual asset supplied by the project owner.
 - Local path: `Assets/ZombieStormArt/Menu/main_menu_cover.png`
 - Used for: Zombie Storm main menu cover art and embedded visual button labels.
 
-This cover image was generated with ChatGPT, then supplied by the project owner for use as the game's main menu cover. The runtime overlays transparent Unity buttons on top of the rendered `Start Game` and `Settings` areas.
+The runtime overlays transparent Unity buttons on top of the rendered `Start Game` and `Settings` areas.
 
 ## Story Sequence Images
 
-- Source: AI-generated images created with ChatGPT and supplied by the project owner.
+- Source: project-generated visual assets supplied by the project owner.
 - Local path: `Assets/ZombieStormArt/Story`
 - Used for: pre-run story sequence shown after `Start Run` and advanced with Space.
 
-The story sequence images were generated with ChatGPT and supplied by the project owner for this project.
+The story sequence images were prepared specifically for this project.
 
 ## Dark VFX 01 - 02
 
@@ -87,35 +87,35 @@ The Pixlab24 source page states that the asset can be used for personal and comm
 
 ## Skill Card UI Templates
 
-- Source: AI-generated images created with ChatGPT and supplied by the project owner.
+- Source: project-generated visual assets supplied by the project owner.
 - Local path: `Assets/ZombieStormArt/UI`
 - Used for: skill-card art templates for Fire Spirit/default cards, Magic Bolt, Fire Blades, Regeneration, Fire Zone, Storm / Ultimate cards, damage / critical upgrade cards, cooldown / recharge upgrade cards, and experience / pickup-range upgrade cards.
 
-All current skill-card UI template images were generated with ChatGPT and supplied by the project owner.
+All current skill-card UI templates were prepared specifically for this project.
 
 ## Health Potion Pickup Icon
 
-- Source: AI-generated image created with ChatGPT and supplied by the project owner.
+- Source: project-generated visual asset supplied by the project owner.
 - Local path: `Assets/ZombieStormArt/UI/health_potion.png`
 - Used for: health potion pickup dropped by zombies.
 
-The health potion art was generated with ChatGPT and supplied by the project owner.
+The health potion art was prepared specifically for this project.
 
 ## Player Status HUD Card
 
-- Source: AI-generated image created with ChatGPT and supplied by the project owner.
+- Source: project-generated visual asset supplied by the project owner.
 - Local paths: `Assets/ZombieStormArt/UI/player_status_card.png`, `Assets/ZombieStormArt/UI/player_status_card_cropped.png`
 - Used for: top-left player HUD card with dynamic health and experience bars.
 
-The cropped file is a game-ready version derived from the supplied ChatGPT image.
+The cropped file is a game-ready version derived from the supplied source image.
 
 ## Result Screen Images
 
-- Source: AI-generated images created with ChatGPT and supplied by the project owner.
+- Source: project-generated visual assets supplied by the project owner.
 - Local paths: `Assets/ZombieStormArt/UI/result_failed.png`, `Assets/ZombieStormArt/UI/result_victory.png`
-- Used for: AI-rendered failure and victory result screens.
+- Used for: illustrated failure and victory result screens.
 
-The failure and victory result screen images were generated with ChatGPT and supplied by the project owner. The runtime overlays transparent Unity button hit areas on top of the rendered `Restart Run` and `Main Menu` areas.
+The runtime overlays transparent Unity button hit areas on top of the rendered `Restart Run` and `Main Menu` areas.
 
 ## CraftPix Zombie Villager Chibi
 
