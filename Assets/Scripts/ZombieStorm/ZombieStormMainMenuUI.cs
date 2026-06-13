@@ -6,7 +6,7 @@ using UnityEngine.UI;
 
 [DisallowMultipleComponent]
 // Builds the standalone main menu UI using Unity UI/TextMeshPro. It owns the cover art,
-// visible buttons, invisible cover hotspots, settings modal, credits modal, and hover styling.
+// invisible cover hotspots, settings modal, and button hover styling.
 public sealed class ZombieStormMainMenuUI : MonoBehaviour
 {
     private const float FadeSpeed = 10f;
@@ -22,7 +22,6 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
     private CanvasGroup canvasGroup;
     private GameObject menuRoot;
     private GameObject settingsRoot;
-    private GameObject creditsRoot;
     private TMP_FontAsset menuFont;
     private Sprite solidSprite;
     private Sprite backgroundFallbackSprite;
@@ -68,7 +67,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
             BuildCanvas();
             BuildMenu(backgroundSprite);
             RefreshSettingsControls();
-            initialized = canvas != null && menuRoot != null && settingsRoot != null && creditsRoot != null;
+            initialized = canvas != null && menuRoot != null && settingsRoot != null;
         }
         catch (System.Exception exception)
         {
@@ -109,22 +108,6 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
 
         canvasGroup.alpha = Mathf.MoveTowards(canvasGroup.alpha, 1f, Time.unscaledDeltaTime * FadeSpeed);
         settingsRoot.SetActive(controller.IsMainMenuSettingsActive);
-        if (controller.IsMainMenuSettingsActive)
-        {
-            creditsRoot.SetActive(false);
-        }
-    }
-
-    // Closes Credits before Settings so Escape behaves like a simple modal stack.
-    public bool CloseTopModal()
-    {
-        if (creditsRoot != null && creditsRoot.activeSelf)
-        {
-            creditsRoot.SetActive(false);
-            return true;
-        }
-
-        return false;
     }
 
     // Creates the root screen-space canvas, scaler, raycaster, and canvas group used by the menu.
@@ -145,8 +128,7 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         canvasGroup.alpha = 1f;
     }
 
-    // Assembles the full menu screen: background art, left button panel, cover-art hotspots,
-    // bottom hints, settings modal, and credits modal.
+    // Assembles the menu screen from background art, cover-art hotspots, and the settings modal.
     private void BuildMenu(Sprite backgroundSprite)
     {
         menuRoot = CreateRect("CommercialMainMenu", canvas.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.one);
@@ -155,12 +137,10 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
 
         CreateCoverHotspots(menuRoot.transform);
         settingsRoot = CreateSettingsPanel(menuRoot.transform);
-        creditsRoot = CreateRect("CreditsPlaceholder", menuRoot.transform, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
         settingsRoot.SetActive(false);
-        creditsRoot.SetActive(false);
     }
 
-    // Applies the supplied cover art or fallback art, then adds gradient/vignette overlays for readability.
+    // Applies the supplied cover art or generated fallback art.
     private void SetBackground(Sprite backgroundSprite)
     {
         if (menuRoot == null)
@@ -216,84 +196,6 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         }
 
         coverAspectFitter.aspectRatio = CoverArtAspectRatio;
-    }
-
-    // Creates the left-side translucent panel that holds the title and visible menu buttons.
-    private RectTransform CreatePanel(Transform parent)
-    {
-        GameObject panelObject = CreateRect("MenuPanel", parent, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(116f, 22f));
-        RectTransform rect = panelObject.GetComponent<RectTransform>();
-        rect.sizeDelta = new Vector2(560f, 720f);
-
-        Image image = panelObject.AddComponent<Image>();
-        image.sprite = solidSprite;
-        image.color = new Color(0.018f, 0.023f, 0.028f, 0.86f);
-
-        Outline outline = panelObject.AddComponent<Outline>();
-        outline.effectColor = new Color(0.95f, 0.22f, 0.12f, 0.45f);
-        outline.effectDistance = new Vector2(2f, -2f);
-
-        Image accent = CreateImage("AccentBar", panelObject.transform, new Color(1f, 0.24f, 0.12f, 0.9f));
-        RectTransform accentRect = accent.rectTransform;
-        accentRect.anchorMin = new Vector2(0f, 1f);
-        accentRect.anchorMax = new Vector2(1f, 1f);
-        accentRect.pivot = new Vector2(0.5f, 1f);
-        accentRect.anchoredPosition = Vector2.zero;
-        accentRect.sizeDelta = new Vector2(0f, 4f);
-
-        return rect;
-    }
-
-    // Adds the title, English subtitle, and short pitch text to the menu panel.
-    private void CreateTitle(RectTransform panel)
-    {
-        TextMeshProUGUI title = CreateText("ChineseTitle", panel, "\u50f5\u5c38\u5272\u8349\u5927\u4f5c\u6218", 56f, new Color(1f, 0.86f, 0.48f, 1f), TextAlignmentOptions.Left);
-        title.rectTransform.anchorMin = new Vector2(0f, 1f);
-        title.rectTransform.anchorMax = new Vector2(1f, 1f);
-        title.rectTransform.pivot = new Vector2(0f, 1f);
-        title.rectTransform.anchoredPosition = new Vector2(48f, -52f);
-        title.rectTransform.sizeDelta = new Vector2(-96f, 76f);
-        title.fontStyle = FontStyles.Bold;
-        title.outlineColor = new Color(0.12f, 0.02f, 0.01f, 0.95f);
-        title.outlineWidth = 0.18f;
-        Shadow titleShadow = title.gameObject.AddComponent<Shadow>();
-        titleShadow.effectColor = new Color(0f, 0f, 0f, 0.7f);
-        titleShadow.effectDistance = new Vector2(4f, -4f);
-
-        TextMeshProUGUI subtitle = CreateText("EnglishTitle", panel, "Zombie Storm", 26f, new Color(0.92f, 0.96f, 1f, 0.86f), TextAlignmentOptions.Left);
-        subtitle.rectTransform.anchorMin = new Vector2(0f, 1f);
-        subtitle.rectTransform.anchorMax = new Vector2(1f, 1f);
-        subtitle.rectTransform.pivot = new Vector2(0f, 1f);
-        subtitle.rectTransform.anchoredPosition = new Vector2(52f, -126f);
-        subtitle.rectTransform.sizeDelta = new Vector2(-104f, 34f);
-        subtitle.characterSpacing = 8f;
-
-        TextMeshProUGUI pitch = CreateText("Pitch", panel, "Survive the horde, stack wild skills, and burn a path through the dead city.", 18f, new Color(0.74f, 0.8f, 0.84f, 0.9f), TextAlignmentOptions.Left);
-        pitch.rectTransform.anchorMin = new Vector2(0f, 1f);
-        pitch.rectTransform.anchorMax = new Vector2(1f, 1f);
-        pitch.rectTransform.pivot = new Vector2(0f, 1f);
-        pitch.rectTransform.anchoredPosition = new Vector2(52f, -180f);
-        pitch.rectTransform.sizeDelta = new Vector2(-108f, 64f);
-        pitch.enableWordWrapping = true;
-    }
-
-    // Adds the visible menu buttons and wires them to controller requests or local modal toggles.
-    private void CreateButtons(RectTransform panel)
-    {
-        RectTransform buttonGroup = CreateRect("ButtonGroup", panel, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(52f, -294f)).GetComponent<RectTransform>();
-        buttonGroup.sizeDelta = new Vector2(430f, 330f);
-
-        CreateStyledButton(buttonGroup, "Start Run", 0, delegate { controller.RequestStartRun(); });
-        CreateStyledButton(buttonGroup, "Settings", 1, delegate { controller.RequestOpenMainMenuSettings(); });
-        CreateStyledButton(buttonGroup, "Credits", 2, delegate { creditsRoot.SetActive(true); });
-        CreateStyledButton(buttonGroup, "Quit", 3, delegate { controller.RequestQuit(); });
-
-        TextMeshProUGUI hint = CreateText("EnterHint", panel, "Press Enter to start", 15f, new Color(0.7f, 0.76f, 0.8f, 0.72f), TextAlignmentOptions.Left);
-        hint.rectTransform.anchorMin = new Vector2(0f, 0f);
-        hint.rectTransform.anchorMax = new Vector2(1f, 0f);
-        hint.rectTransform.pivot = new Vector2(0f, 0f);
-        hint.rectTransform.anchoredPosition = new Vector2(54f, 44f);
-        hint.rectTransform.sizeDelta = new Vector2(-108f, 24f);
     }
 
     // Adds transparent button hitboxes over the AI-rendered Start Game and Settings areas in the cover art.
@@ -362,24 +264,6 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return button;
     }
 
-    // Adds small footer text for version, controls, and basic menu instructions.
-    private void CreateBottomInfo(Transform parent)
-    {
-        TextMeshProUGUI version = CreateText("Version", parent, "v0.1 Prototype", 15f, new Color(0.72f, 0.76f, 0.78f, 0.68f), TextAlignmentOptions.BottomLeft);
-        version.rectTransform.anchorMin = Vector2.zero;
-        version.rectTransform.anchorMax = Vector2.zero;
-        version.rectTransform.pivot = Vector2.zero;
-        version.rectTransform.anchoredPosition = new Vector2(32f, 24f);
-        version.rectTransform.sizeDelta = new Vector2(280f, 30f);
-
-        TextMeshProUGUI controls = CreateText("Controls", parent, "WASD Move | Auto Skills | F Ultimate", 15f, new Color(0.72f, 0.76f, 0.78f, 0.68f), TextAlignmentOptions.BottomRight);
-        controls.rectTransform.anchorMin = Vector2.one;
-        controls.rectTransform.anchorMax = Vector2.one;
-        controls.rectTransform.pivot = Vector2.one;
-        controls.rectTransform.anchoredPosition = new Vector2(-32f, 24f);
-        controls.rectTransform.sizeDelta = new Vector2(520f, 30f);
-    }
-
     // Builds the Settings modal and wires sliders/toggle so every change immediately applies to the controller.
     private GameObject CreateSettingsPanel(Transform parent)
     {
@@ -411,37 +295,6 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         backRect.pivot = new Vector2(0.5f, 0f);
         backRect.anchoredPosition = new Vector2(0f, 38f);
         backRect.sizeDelta = new Vector2(360f, 62f);
-        return root;
-    }
-
-    // Builds the Credits modal that summarizes project authorship and major asset sources.
-    private GameObject CreateCreditsPanel(Transform parent)
-    {
-        GameObject root = CreateModalRoot("CreditsModal", parent);
-        RectTransform panel = CreateModalPanel(root.transform, new Vector2(560f, 420f));
-
-        TextMeshProUGUI title = CreateText("Title", panel, "Credits", 38f, new Color(0.95f, 0.98f, 1f, 1f), TextAlignmentOptions.Center);
-        title.rectTransform.anchorMin = new Vector2(0f, 1f);
-        title.rectTransform.anchorMax = new Vector2(1f, 1f);
-        title.rectTransform.pivot = new Vector2(0.5f, 1f);
-        title.rectTransform.anchoredPosition = new Vector2(0f, -42f);
-        title.rectTransform.sizeDelta = new Vector2(-80f, 54f);
-        title.fontStyle = FontStyles.Bold;
-
-        TextMeshProUGUI body = CreateText("Body", panel, "Zombie Storm Prototype\nDesign, code, and tuning by the project team.\nExternal art is used according to its source license.", 19f, new Color(0.78f, 0.84f, 0.88f, 0.92f), TextAlignmentOptions.Center);
-        body.rectTransform.anchorMin = new Vector2(0f, 0f);
-        body.rectTransform.anchorMax = new Vector2(1f, 1f);
-        body.rectTransform.offsetMin = new Vector2(52f, 112f);
-        body.rectTransform.offsetMax = new Vector2(-52f, -122f);
-        body.enableWordWrapping = true;
-
-        Button back = CreateStyledButton(panel, "Back", 0, delegate { creditsRoot.SetActive(false); });
-        RectTransform backRect = back.GetComponent<RectTransform>();
-        backRect.anchorMin = new Vector2(0.5f, 0f);
-        backRect.anchorMax = new Vector2(0.5f, 0f);
-        backRect.pivot = new Vector2(0.5f, 0f);
-        backRect.anchoredPosition = new Vector2(0f, 34f);
-        backRect.sizeDelta = new Vector2(320f, 60f);
         return root;
     }
 
@@ -710,54 +563,6 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
         return Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
     }
 
-    // Creates the top/bottom gradient overlay used to darken the cover art behind text.
-    private Sprite CreateVerticalGradientSprite()
-    {
-        const int width = 2;
-        const int height = 256;
-        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
-        texture.name = "menu_top_bottom_gradient";
-        texture.filterMode = FilterMode.Bilinear;
-        texture.wrapMode = TextureWrapMode.Clamp;
-        for (int y = 0; y < height; y++)
-        {
-            float t = y / (height - 1f);
-            float edge = Mathf.Max(1f - t, t);
-            float alpha = Mathf.Lerp(0.08f, 0.46f, Mathf.InverseLerp(0.52f, 1f, edge));
-            Color color = new Color(0f, 0f, 0f, alpha);
-            for (int x = 0; x < width; x++)
-            {
-                texture.SetPixel(x, y, color);
-            }
-        }
-
-        texture.Apply(false, false);
-        return Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
-    }
-
-    // Creates a radial vignette overlay that frames the menu art and improves foreground contrast.
-    private Sprite CreateVignetteSprite()
-    {
-        const int size = 256;
-        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
-        texture.name = "menu_vignette";
-        texture.filterMode = FilterMode.Bilinear;
-        texture.wrapMode = TextureWrapMode.Clamp;
-        Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
-        float maxDistance = center.magnitude;
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                float distance = Vector2.Distance(new Vector2(x, y), center) / maxDistance;
-                float alpha = Mathf.SmoothStep(0f, 0.62f, Mathf.InverseLerp(0.42f, 1f, distance));
-                texture.SetPixel(x, y, new Color(0f, 0f, 0f, alpha));
-            }
-        }
-
-        texture.Apply(false, false);
-        return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
-    }
 }
 
 // Pointer-state component for menu buttons. It changes background, outline, and label colors

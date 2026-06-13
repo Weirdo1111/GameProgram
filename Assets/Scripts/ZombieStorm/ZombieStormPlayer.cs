@@ -52,7 +52,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
     }
 
     // Reads WASD/arrow input, applies move-speed and slow modifiers, clamps the player
-    // against the arena/obstacles, advances hurt timers, and refreshes animation/health UI.
+    // inside the arena, advances hurt timers, and refreshes animation/health UI.
     private void Update()
     {
         if (game == null)
@@ -76,7 +76,7 @@ public sealed class ZombieStormPlayer : MonoBehaviour
         }
 
         transform.position += (Vector3)(input * speed * Time.deltaTime);
-        transform.position = game.ResolveObstacleCollision(transform.position, 0.34f);
+        transform.position = game.ClampToArena(transform.position);
 
         if (input.sqrMagnitude > 0.01f)
         {

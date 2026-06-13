@@ -301,7 +301,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
     }
 
     // Runs the active enemy state: skip dead/null cases, choose type-specific movement/attack
-    // behavior, resolve separation/collisions, apply contact damage, and update render depth.
+    // behavior, keep enemies in bounds, apply contact damage, and update render depth.
     private void Update()
     {
         if (game == null)
@@ -374,7 +374,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
             transform.position += (Vector3)(direction * finalSpeed * Time.deltaTime);
         }
 
-        transform.position = game.ResolveObstacleCollision(transform.position, Radius);
+        transform.position = game.ClampToArena(transform.position);
         transform.position = ResolvePlayerSeparation(transform.position);
 
         Vector2 currentToPlayer = (Vector2)game.Player.transform.position - (Vector2)transform.position;

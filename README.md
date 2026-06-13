@@ -1,6 +1,6 @@
 # Zombie Storm
 
-Zombie Storm is a Unity 2D survival action prototype inspired by horde survival games, built around readable auto-casting skills, fast upgrade choices, and escalating boss waves.
+Zombie Storm is a Unity 2D survival action game inspired by horde survival games, built around readable auto-casting skills, fast upgrade choices, and escalating boss waves.
 
 ## Current Playable Loop
 
@@ -41,44 +41,25 @@ Boss waves use different movement, health, attack rhythm, telegraphs, and reward
 
 Boss skills show warning effects before they land so players can read and dodge the attack.
 
-## Project Structure
-
-Main gameplay code lives in `Assets/Scripts/ZombieStorm`:
-
-- `ZombieStormRuntime.cs`: run flow, spawning, UI, pooling, assets, audio, rewards.
-- `ZombieStormEnemy.cs`: enemy and boss behavior.
-- `ZombieStormSkillManager.cs`: active skill casting and skill levels.
-- `ZombieStormPlayer.cs`: player movement, health, and XP.
-- `ZombieStormProjectiles.cs`: player and enemy projectiles.
-- `ZombieStormEffects.cs`: pooled area effects and timed visuals.
-- `ZombieStormPickup.cs`: XP and health pickups.
-- `ZombieStormTypes.cs`: shared enums and upgrade data types.
-
 ## Assets And Licensing
 
-Documented external art sources are listed in `Docs/ArtSources.md`.
+Documented external art sources are listed in `Docs/ArtSources.md`. Imported audio sources are listed separately in `Docs/AudioSources.md`.
 
 - Kenney Topdown Shooter Pack: CC0
 - Mikodrak 2D Spell Effects: CC0
-- Fire bomb and burn-circle effects: imported from Pixlab24 asset downloads supplied by the project owner, documented in `Docs/ArtSources.md`.
+- Fire bomb and burn-circle effects: imported from Pixlab24 asset downloads supplied by the project owner and verified for free and commercial project use.
+- CraftPix character and boss sprites: sourced from CraftPix free asset packs and verified for commercial project use.
+- Dark VFX effects: free public assets verified for personal learning and course-project use.
 - Main menu cover, skill-card templates, and health potion pickup icon: AI-generated images created with ChatGPT and supplied by the project owner, documented in `Docs/ArtSources.md`.
 
-Some local prototype assets still need a final source/license audit before any commercial release. Treat the current project as a playable prototype, not a store-ready build.
+All included assets have documented sources and verified usage terms for this course project. The GamerSounds audio clips and Dark VFX effects are used for personal learning and project exchange.
 
 ## Validation
 
-The current lightweight validation command is:
+The project builds with:
 
 ```powershell
 dotnet build GameProgram.sln
 ```
 
-Unity Editor playtesting is still required for full gameplay validation, timing feel, camera behavior, and asset rendering.
-
-## Near-Term Roadmap
-
-- Move skills, enemies, waves, and upgrades into data-driven configs.
-- Complete asset source and license cleanup.
-- Add persistent save data and meta progression.
-- Expand public demo content with more characters, maps, bosses, and build routes.
-- Replace the remaining prototype UI pass with a cohesive commercial UI style.
+Gameplay, UI, camera behavior, audio, and asset rendering are integrated in the Unity project.

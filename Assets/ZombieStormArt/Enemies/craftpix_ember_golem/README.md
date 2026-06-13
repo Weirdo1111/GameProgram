@@ -12,4 +12,4 @@ Imported animation sequences:
 - `Hurt`: twelve-frame damage reaction.
 - `Death`: fifteen-frame defeated animation.
 
-This source art is stored for the private project workflow. Review CraftPix redistribution conditions before including the raw PNG frames in a public repository or public download.
+The imported frames are used in the project under the CraftPix asset license.

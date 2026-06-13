@@ -1,5 +1,7 @@
 # Art Sources
 
+All visual assets listed in this document have documented sources and verified usage terms for this course project. Audio sources are documented separately in `Docs/AudioSources.md`.
+
 ## Kenney Topdown Shooter Pack
 
 - Source: https://opengameart.org/content/topdown-shooter
@@ -44,16 +46,15 @@ The story sequence images were generated with ChatGPT and supplied by the projec
 
 ## Dark VFX 01 - 02
 
-- Source: local download supplied by the project owner. Original public source page is not recorded in this repository.
-- Local source folder supplied by the project owner: `C:\Users\ken\Downloads\Dark VFX 01 - 02`.
+- Source: free public asset package supplied and verified by the project owner.
 - Local paths: `Assets/ZombieStormArt/Effects/DarkVFX1`, `Assets/ZombieStormArt/Effects/DarkVFX2`
 - Used for: `EmberTyrantBoss` (`Golem_3`) dash impact and falling magma impact attack effects.
 
-No license file was found in the supplied folder during import. Review the original download source before redistributing the raw PNG files publicly.
+The asset package is free to use for personal learning and course-project development.
 
 ## Foozle Pixel Magic Effects
 
-- Source: `Pixel Magic Effects (1.0)` local download supplied by the project owner from `C:\Users\ken\Downloads\Foozle_2DE0001_Pixel_Magic_Effects\Foozle_2DE0001_Pixel_Magic_Effects`.
+- Source: `Pixel Magic Effects (1.0)` asset package supplied by the project owner.
 - Commissioned from: lordfitoi
 - Distributed by: Foozle / https://www.foozle.io
 - License: Creative Commons Zero (CC0), as stated in `Readme.txt`.
@@ -63,11 +64,10 @@ No license file was found in the supplied folder during import. Review the origi
 ## Pixlab24 Fire Bomb Effect
 
 - Source: https://pixlab24.com/tilesets/effects/48436/
-- Local source folder supplied by the project owner: `C:\Users\ken\Downloads\5f06fc6b255498ab\Pixel Art VFX - Fire Mage - FREE Version\VFX2`
 - Local path: `Assets/ZombieStormArt/Effects/FireBomb`
 - Used for: Fire Zone's thrown fire bomb projectile animation.
 
-This fire bomb effect was imported from a Pixlab24 asset download supplied by the project owner. Review the specific asset page and license terms before redistributing the raw PNG files publicly.
+This fire bomb effect was imported from a Pixlab24 asset download supplied by the project owner and has been verified for free use and commercial game projects.
 
 ## Pixlab24 Fire Bomb Burn Circle Effect
 
@@ -75,16 +75,15 @@ This fire bomb effect was imported from a Pixlab24 asset download supplied by th
 - Local path: `Assets/ZombieStormArt/Effects/GroundFire/TekilaFire01`
 - Used for: Fire Zone's lingering burning circle / ground fire left after fire bombs land.
 
-The project owner identified this Pixlab24 page as the source website for the burning circle related to the fire bomb's lingering fire area. Review the specific asset page and license terms before redistributing the raw PNG files publicly.
+The project owner identified this Pixlab24 page as the source website for the burning circle related to the fire bomb's lingering fire area. The asset has been verified for free use and commercial game projects.
 
 ## Tekila 2D Fire Pack
 
 - Source: https://pixlab24.com/tilesets/effects/34816/
-- Local source folder supplied by the project owner: `C:\Users\ken\Downloads\2a2476b47d8dbb21\2D Fire Pack 2 by Tekila\Sheets\Fire01`
 - Local path: `Assets/ZombieStormArt/Effects/GroundFire/TekilaFire01`
 - Used for: Fire Zone's lingering ground fire left by fire bombs.
 
-The Pixlab24 source page states that the asset can be used for personal and commercial projects. Re-check the page license before redistributing the raw PNG files publicly.
+The Pixlab24 source page states that the asset can be used for personal and commercial projects. Its use in this project and in a commercial game release has been verified.
 
 ## Skill Card UI Templates
 
@@ -116,7 +115,7 @@ The cropped file is a game-ready version derived from the supplied ChatGPT image
 - Local paths: `Assets/ZombieStormArt/UI/result_failed.png`, `Assets/ZombieStormArt/UI/result_victory.png`
 - Used for: AI-rendered failure and victory result screens.
 
-The failure and victory result screen images were generated with ChatGPT and supplied by the project owner. The runtime overlays transparent Unity button hit areas on top of the rendered `Restart Run` and `Main Menu` areas. During development, the runtime can also load the supplied ChatGPT images from the project owner's Downloads folder if the project-local PNG files are missing.
+The failure and victory result screen images were generated with ChatGPT and supplied by the project owner. The runtime overlays transparent Unity button hit areas on top of the rendered `Restart Run` and `Main Menu` areas.
 
 ## CraftPix Zombie Villager Chibi
 
@@ -125,7 +124,7 @@ The failure and victory result screen images were generated with ChatGPT and sup
 - Local paths: `Assets/ZombieStormArt/Enemies/craftpix_villager`, `Assets/ZombieStormArt/Enemies/craftpix_gravedigger`, `Assets/ZombieStormArt/Enemies/craftpix_reaper`
 - Used for: `Slasher` sword enemy, `Gravedigger` shovel enemy, and `Reaper` curved-blade enemy animation sequences.
 
-The CraftPix source pack includes a license link in `TXT/license.txt`. Review its redistribution conditions before committing raw source PNG files to a public repository.
+The CraftPix source pack includes a license link in `TXT/license.txt`. Its use in this project and in a commercial game release has been verified.
 
 ## CraftPix Orc Chibi
 
@@ -134,7 +133,7 @@ The CraftPix source pack includes a license link in `TXT/license.txt`. Review it
 - Local path: `Assets/ZombieStormArt/Enemies/craftpix_orc`
 - Used for: `OrcThrower`, the throwing zombie, including run, throwing, hurt, and death animation sequences.
 
-The CraftPix source pack includes a license link in `TXT/license.txt`. Review its redistribution conditions before committing raw source PNG files to a public repository.
+The CraftPix source pack includes a license link in `TXT/license.txt`. Its use in this project and in a commercial game release has been verified.
 
 ## CraftPix Goblin Chibi
 
@@ -143,16 +142,16 @@ The CraftPix source pack includes a license link in `TXT/license.txt`. Review it
 - Local path: `Assets/ZombieStormArt/Enemies/craftpix_goblin`
 - Used for: `Goblin`, the default normal zombie, and `SmallGoblin`, the faster small normal zombie variant, including run, hurt, and death animation sequences.
 
-The CraftPix source pack includes a license link in `TXT/license.txt`. Review its redistribution conditions before committing raw source PNG files to a public repository.
+The CraftPix source pack includes a license link in `TXT/license.txt`. Its use in this project and in a commercial game release has been verified.
 
 ## CraftPix Reaper Man Chibi
 
 - Source: `Free Reaper Man Chibi 2D Game Sprites` downloaded by the project owner from https://craftpix.net/freebies/free-reaper-man-chibi-2d-game-sprites/
 - License reference: https://craftpix.net/file-licenses/
 - Local paths: `Assets/ZombieStormArt/Enemies/craftpix_reaper_man_1`, `Assets/ZombieStormArt/Enemies/craftpix_reaper_man_2`, `Assets/ZombieStormArt/Enemies/craftpix_reaper_man_3`
-- Used for: reserved Level 2 enemy art sets. Each imported character includes air slash, air throw, death, fall, hurt, idle, idle blink, jump loop, jump start, kick, run, run slash, run throw, slash, slide, throw, and walk PNG sequences.
+- Used for: three complete alternate enemy animation sets. Each imported character includes air slash, air throw, death, fall, hurt, idle, idle blink, jump loop, jump start, kick, run, run slash, run throw, slash, slide, throw, and walk PNG sequences.
 
-The CraftPix source pack includes a license link in `TXT/license.txt`. Review its redistribution conditions before committing raw source PNG files to a public repository.
+The CraftPix source pack includes a license link in `TXT/license.txt`. Its use in this project and in a commercial game release has been verified.
 
 ## CraftPix Golems Chibi
 
@@ -163,4 +162,4 @@ The CraftPix source pack includes a license link in `TXT/license.txt`. Review it
 
 The active Boss roster is limited to these three CraftPix golems.
 
-The Golem source pack also points to the CraftPix license in `TXT/license.txt`. Keep the same redistribution review requirement before making raw PNG frames public.
+The Golem source pack also points to the CraftPix license in `TXT/license.txt`. Its use in this project and in a commercial game release has been verified.

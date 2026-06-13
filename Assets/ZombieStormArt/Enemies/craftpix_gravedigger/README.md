@@ -3,7 +3,7 @@
 - Source pack: `Free Zombie Villager Chibi Character Sprites`, `Zombie_Villager_2`
 - Source site: https://craftpix.net/freebies/free-zombie-villager-chibi-character-sprites/
 - License reference: https://craftpix.net/file-licenses/
-- Imported prototype role: `Gravedigger`, a heavy shovel-wielding melee zombie.
+- Runtime role: `Gravedigger`, a heavy shovel-wielding melee zombie.
 
 Imported animation folders:
 
@@ -12,4 +12,4 @@ Imported animation folders:
 - `Hurt`: hit reaction, 12 frames.
 - `Death`: death animation, 15 frames.
 
-The throwing sequence was deliberately not used in this prototype because the shovel swing communicates this character's combat role more clearly.
+The shovel swing is used because it clearly communicates this character's combat role.

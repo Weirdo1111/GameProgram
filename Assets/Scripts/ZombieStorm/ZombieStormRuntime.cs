@@ -35,7 +35,6 @@ public sealed class ZombieStormGameController : MonoBehaviour
     public IReadOnlyList<ZombieStormEnemy> Enemies { get { return enemies; } }
 
     private readonly List<ZombieStormEnemy> enemies = new List<ZombieStormEnemy>(256);
-    private readonly List<ZombieStormObstacle> obstacles = new List<ZombieStormObstacle>(32);
     private readonly Dictionary<string, Queue<GameObject>> pools = new Dictionary<string, Queue<GameObject>>();
     private readonly Dictionary<ZombieStormPassiveType, int> passives = new Dictionary<ZombieStormPassiveType, int>();
     private readonly Dictionary<string, AudioClip> sfx = new Dictionary<string, AudioClip>();
@@ -92,6 +91,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
     private Transform poolRoot;
     private Camera mainCamera;
     private AudioSource audioSource;
+    private AudioSource musicSource;
     private Sprite playerSprite;
     private Sprite zombieSprite;
     private Sprite fastZombieSprite;
@@ -243,10 +243,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             }
             else if (Input.GetKeyDown(KeyCode.Escape))
             {
-                if (mainMenuUI == null || !mainMenuUI.CloseTopModal())
-                {
-                    QuitGame();
-                }
+                QuitGame();
             }
 
             return;
@@ -464,58 +461,6 @@ public sealed class ZombieStormGameController : MonoBehaviour
         enemies.Remove(enemy);
     }
 
-    // Adds a map obstacle to the manual collision list used by player and enemy movement.
-    public void RegisterObstacle(ZombieStormObstacle obstacle)
-    {
-        if (obstacle != null && !obstacles.Contains(obstacle))
-        {
-            obstacles.Add(obstacle);
-        }
-    }
-
-    // Removes a disabled or destroyed obstacle from the manual collision list.
-    public void UnregisterObstacle(ZombieStormObstacle obstacle)
-    {
-        obstacles.Remove(obstacle);
-    }
-
-    // Pushes a circular actor out of every registered obstacle and clamps the result to the arena.
-    public Vector2 ResolveObstacleCollision(Vector2 position, float moverRadius)
-    {
-        position = ClampToArena(position);
-        for (int pass = 0; pass < 2; pass++)
-        {
-            for (int i = obstacles.Count - 1; i >= 0; i--)
-            {
-                ZombieStormObstacle obstacle = obstacles[i];
-                if (obstacle == null)
-                {
-                    obstacles.RemoveAt(i);
-                    continue;
-                }
-
-                if (!obstacle.isActiveAndEnabled || !obstacle.gameObject.activeInHierarchy)
-                {
-                    continue;
-                }
-
-                Vector2 center = obstacle.WorldCenter;
-                float minDistance = obstacle.WorldRadius + moverRadius;
-                Vector2 offset = position - center;
-                float sqrDistance = offset.sqrMagnitude;
-                if (sqrDistance >= minDistance * minDistance)
-                {
-                    continue;
-                }
-
-                Vector2 pushDirection = sqrDistance > 0.0001f ? offset.normalized : Vector2.right;
-                position = center + pushDirection * minDistance;
-            }
-        }
-
-        return ClampToArena(position);
-    }
-
     // Finds the closest living enemy inside a maximum distance from the given world position.
     public ZombieStormEnemy FindNearestEnemy(Vector2 origin, float maxDistance)
     {
@@ -540,26 +485,6 @@ public sealed class ZombieStormGameController : MonoBehaviour
         }
 
         return best;
-    }
-
-    // Picks a random living enemy from the active list; returns null when none are alive.
-    public ZombieStormEnemy FindRandomEnemy()
-    {
-        if (enemies.Count == 0)
-        {
-            return null;
-        }
-
-        for (int i = 0; i < 10; i++)
-        {
-            ZombieStormEnemy enemy = enemies[UnityEngine.Random.Range(0, enemies.Count)];
-            if (enemy != null && enemy.gameObject.activeInHierarchy && !enemy.IsDead)
-            {
-                return enemy;
-            }
-        }
-
-        return FindNearestEnemy(Player != null ? Player.transform.position : Vector3.zero, 999f);
     }
 
     // Counts active enemies, pruning stale references so clear-stage victory cannot hang.
@@ -630,7 +555,6 @@ public sealed class ZombieStormGameController : MonoBehaviour
         spriteRenderer.color = color;
         ZombieStormProjectile projectile = projectileObject.GetComponent<ZombieStormProjectile>();
         projectile.Initialize(this, direction, damage, speed, life, pierce, createsFireZoneOnKill);
-        PlaySfx("shoot", 0.28f, 0.055f);
     }
 
     // Spawns the arcing Fire Zone bomb and passes the impact damage plus all lingering
@@ -648,7 +572,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         spriteRenderer.sortingOrder = 44;
         ZombieStormFireBombProjectile projectile = projectileObject.GetComponent<ZombieStormFireBombProjectile>();
         projectile.Initialize(this, position, targetPosition, impactDamage, impactRadius, leavesFire, burnDamage, burnRadius, burnDuration, burnTickRate);
-        PlaySfx("shoot", 0.22f, 0.045f);
+        PlaySfx("fire_bomb", 0.7f, 0.08f);
     }
 
     // Spawns the standard enemy projectile used by ranged enemies and some boss attacks.
@@ -878,6 +802,8 @@ public sealed class ZombieStormGameController : MonoBehaviour
             Player.Kills++;
         }
 
+        string deathSfx = UnityEngine.Random.value < 0.5f ? "enemy_death" : "enemy_death_alt";
+        PlaySfx(deathSfx, enemy.IsBoss ? 0.84f : 0.58f, 0.045f);
         if (enemy.Type == ZombieStormEnemyType.Elite || enemy.IsBoss)
         {
             PlaySfx(enemy.IsBoss ? "boss_down" : "elite_down", 0.75f, 0.1f);
@@ -1229,12 +1155,6 @@ public sealed class ZombieStormGameController : MonoBehaviour
         CloseSettings();
     }
 
-    // Receives the menu Quit command and exits the build or stops Unity play mode.
-    public void RequestQuit()
-    {
-        QuitGame();
-    }
-
     // Applies menu settings effects to the current game state.
     public void ApplyMenuSettings(float master, float music, float sfx, bool fullscreen)
     {
@@ -1249,6 +1169,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         PlayerPrefs.SetFloat("ZombieStorm.SfxVolume", sfxVolume);
         PlayerPrefs.SetInt("ZombieStorm.Fullscreen", fullscreen ? 1 : 0);
         PlayerPrefs.Save();
+        UpdateMusicVolume();
     }
 
     // Starts the story sequence when available, otherwise starts gameplay immediately.
@@ -1260,7 +1181,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             flowState = ZombieStormFlowState.Story;
             settingsReturnState = ZombieStormFlowState.MainMenu;
             Time.timeScale = 0f;
-            PlaySfx("level_up", 0.28f, 0.1f);
+            PlaySfx("story_transition", 0.62f, 0.08f);
             return;
         }
 
@@ -1277,7 +1198,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
             return;
         }
 
-        PlaySfx("pickup", 0.22f, 0.04f);
+        PlaySfx("story_transition", 0.62f, 0.08f);
     }
 
     // Resets all run-specific state, clears old pooled objects, creates the player and
@@ -1455,9 +1376,15 @@ public sealed class ZombieStormGameController : MonoBehaviour
         audioSource.playOnAwake = false;
         audioSource.spatialBlend = 0f;
         audioSource.volume = 1f;
+
+        musicSource = gameObject.AddComponent<AudioSource>();
+        musicSource.playOnAwake = false;
+        musicSource.loop = true;
+        musicSource.spatialBlend = 0f;
+        musicSource.pitch = 1f;
     }
 
-    // Builds the floor, roads, obstacles, and decorative scene objects.
+    // Builds the floor, roads, and decorative scene objects.
     private void BuildEnvironment()
     {
         usingCustomArenaMap = false;
@@ -1537,6 +1464,11 @@ public sealed class ZombieStormGameController : MonoBehaviour
     {
         sfx.Clear();
         sfx["shoot"] = CreateSynthClip("zs_shoot", 0.075f, 820f, 1180f, 0.45f, 0.08f, ZombieStormWave.Square);
+        sfx["normal_attack"] = sfx["shoot"];
+        sfx["fire_bomb"] = CreateSynthClip("zs_fire_bomb", 0.18f, 420f, 110f, 0.62f, 0.28f, ZombieStormWave.Saw);
+        sfx["enemy_death"] = CreateSynthClip("zs_enemy_death", 0.16f, 180f, 52f, 0.66f, 0.38f, ZombieStormWave.Noise);
+        sfx["enemy_death_alt"] = sfx["enemy_death"];
+        sfx["story_transition"] = CreateSynthClip("zs_story_transition", 0.12f, 460f, 1260f, 0.44f, 0.12f, ZombieStormWave.Saw);
         sfx["hit"] = CreateSynthClip("zs_hit", 0.07f, 190f, 82f, 0.55f, 0.42f, ZombieStormWave.Noise);
         sfx["pickup"] = CreateSynthClip("zs_pickup", 0.105f, 620f, 1240f, 0.35f, 0.02f, ZombieStormWave.Triangle);
         sfx["hurt"] = CreateSynthClip("zs_hurt", 0.16f, 190f, 74f, 0.62f, 0.24f, ZombieStormWave.Saw);
@@ -1545,11 +1477,63 @@ public sealed class ZombieStormGameController : MonoBehaviour
         sfx["boom"] = CreateSynthClip("zs_boom", 0.28f, 110f, 38f, 0.8f, 0.58f, ZombieStormWave.Noise);
         sfx["lightning"] = CreateSynthClip("zs_lightning", 0.16f, 1380f, 420f, 0.46f, 0.22f, ZombieStormWave.Saw);
         sfx["ultimate"] = CreateSynthClip("zs_ultimate", 0.46f, 180f, 58f, 0.74f, 0.32f, ZombieStormWave.Saw);
+        sfx["fire_tornado"] = sfx["ultimate"];
         sfx["elite_down"] = CreateArpeggioClip("zs_elite_down", new[] { 760f, 570f, 380f }, 0.2f, 0.48f);
         sfx["boss_down"] = CreateArpeggioClip("zs_boss_down", new[] { 360f, 540f, 720f, 1080f }, 0.42f, 0.56f);
         sfx["victory"] = CreateArpeggioClip("zs_victory", new[] { 520f, 660f, 780f, 1040f, 1320f }, 0.62f, 0.58f);
         sfx["fail"] = CreateArpeggioClip("zs_fail", new[] { 330f, 247f, 196f }, 0.42f, 0.62f);
         sfx["start"] = CreateArpeggioClip("zs_start", new[] { 330f, 495f, 660f }, 0.26f, 0.34f);
+
+        OverrideSfxFromResources("normal_attack", "Audio/normal_attack");
+        OverrideSfxFromResources("fire_tornado", "Audio/fire_tornado");
+        OverrideSfxFromResources("fire_bomb", "Audio/fire_bomb");
+        OverrideSfxFromResources("enemy_death", "Audio/enemy_death");
+        OverrideSfxFromResources("enemy_death_alt", "Audio/enemy_death_alt");
+        OverrideSfxFromResources("hurt", "Audio/player_hurt");
+        OverrideSfxFromResources("level_up", "Audio/level_up");
+        OverrideSfxFromResources("upgrade", "Audio/level_up");
+        OverrideSfxFromResources("story_transition", "Audio/story_transition");
+        OverrideSfxFromResources("victory", "Audio/victory");
+        OverrideSfxFromResources("fail", "Audio/defeat");
+        StartBackgroundMusic();
+    }
+
+    // Replaces a synthesized fallback with an imported Resources audio clip when available.
+    private void OverrideSfxFromResources(string key, string resourcePath)
+    {
+        AudioClip clip = Resources.Load<AudioClip>(resourcePath);
+        if (clip != null)
+        {
+            sfx[key] = clip;
+        }
+    }
+
+    // Starts the imported background track once and keeps it looping from the main menu onward.
+    private void StartBackgroundMusic()
+    {
+        if (musicSource == null)
+        {
+            return;
+        }
+
+        AudioClip clip = Resources.Load<AudioClip>("Audio/background_music");
+        if (clip == null)
+        {
+            return;
+        }
+
+        musicSource.clip = clip;
+        UpdateMusicVolume();
+        musicSource.Play();
+    }
+
+    // Applies the saved master and music sliders to the dedicated looping music source.
+    private void UpdateMusicVolume()
+    {
+        if (musicSource != null)
+        {
+            musicSource.volume = Mathf.Clamp01(masterVolume * musicVolume);
+        }
     }
 
     // Generates a short synthetic sound clip from frequency and wave settings.
@@ -4482,63 +4466,7 @@ public sealed class ZombieStormGameController : MonoBehaviour
         GameObject map = CreateSpriteObject("Custom Graveyard Arena", customArenaMapSprite, Color.white, new Vector3(0f, 0f, 5f), Vector3.one * scale, -10);
         map.transform.SetParent(worldRoot, false);
         mainCamera.backgroundColor = new Color(0.015f, 0.018f, 0.014f);
-        BuildGraveyardArenaObstacles();
         return true;
-    }
-
-    // Creates graveyard-style obstacles from the map layout.
-    private void BuildGraveyardArenaObstacles()
-    {
-        Vector3[] circles =
-        {
-            new Vector3(-27.2f, 13.5f, 1.45f),
-            new Vector3(-21.8f, 13.1f, 1.18f),
-            new Vector3(-15.6f, 12.8f, 1.05f),
-            new Vector3(-6.2f, 14.2f, 1.12f),
-            new Vector3(5.6f, 14.1f, 1.1f),
-            new Vector3(15.6f, 12.9f, 1.12f),
-            new Vector3(21.6f, 13.1f, 1.28f),
-            new Vector3(27.1f, 13.3f, 1.45f),
-            new Vector3(-27.3f, 6.6f, 1.22f),
-            new Vector3(-20.6f, 6.2f, 1.05f),
-            new Vector3(-13.7f, 5.4f, 0.95f),
-            new Vector3(13.4f, 5.5f, 0.95f),
-            new Vector3(19.6f, 6.3f, 1.18f),
-            new Vector3(26.5f, 6.1f, 1.34f),
-            new Vector3(-27.6f, -1.4f, 1.18f),
-            new Vector3(-20.8f, -1.8f, 1.02f),
-            new Vector3(20.4f, -1.7f, 1.08f),
-            new Vector3(27.0f, -2.0f, 1.28f),
-            new Vector3(-27.1f, -8.8f, 1.28f),
-            new Vector3(-21.4f, -9.5f, 1.12f),
-            new Vector3(-14.2f, -10.5f, 0.98f),
-            new Vector3(13.8f, -10.1f, 1.02f),
-            new Vector3(20.8f, -9.4f, 1.16f),
-            new Vector3(26.8f, -8.9f, 1.36f),
-            new Vector3(-27.7f, -14.1f, 1.38f),
-            new Vector3(-8.2f, -14.5f, 1.02f),
-            new Vector3(7.6f, -14.4f, 1.02f),
-            new Vector3(27.8f, -14.0f, 1.38f)
-        };
-
-        for (int i = 0; i < circles.Length; i++)
-        {
-            CreateMapObstacle("Graveyard Map Obstacle " + (i + 1), new Vector2(circles[i].x, circles[i].y), circles[i].z);
-        }
-    }
-
-    // Creates one map obstacle and assigns its collision radius.
-    private void CreateMapObstacle(string name, Vector2 position, float radius)
-    {
-        GameObject obstacleObject = new GameObject(name);
-        obstacleObject.transform.SetParent(worldRoot, false);
-        obstacleObject.transform.position = new Vector3(position.x, position.y, 0f);
-        CircleCollider2D circle = obstacleObject.AddComponent<CircleCollider2D>();
-        circle.radius = radius;
-        circle.isTrigger = true;
-        ZombieStormObstacle obstacle = obstacleObject.AddComponent<ZombieStormObstacle>();
-        obstacle.radius = radius;
-        obstacle.extraPadding = 0.08f;
     }
 
     // Adds a crosswalk decoration at the requested position.

@@ -202,8 +202,8 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
     private delegate void SkillAction(int level);
 
-    // Shared cooldown gate for auto-cast skills: unknown skills do nothing, ready skills cast,
-    // and unready skills write their reduced cooldown back to the dictionary.
+    // Handles automatic skill cooldowns: ignores unlearned skills, casts ready skills,
+    // and counts down the remaining cooldown for skills that are not ready yet.
     private void TickSkill(ZombieStormSkillType weapon, SkillAction action)
     {
         int level = GetSkillLevel(weapon);
@@ -225,7 +225,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
     }
 
-    // Shorthand for reading specialization levels inside formulas.
+    // Returns the current level of a named skill upgrade for use in damage, range, and cooldown formulas.
     private int Mod(string key)
     {
         return GetSkillUpgradeLevel(key);
@@ -253,6 +253,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         Color fireballColor = Color.Lerp(Color.white, new Color(1f, 0.42f, 0.12f, 1f), powerTint);
         float fireballSize = 0.78f + level * 0.055f + Mod("magic_force") * 0.06f + Mod("magic_pierce") * 0.035f + (IsEvolved(ZombieStormSkillType.MagicBolt) ? 0.12f : 0f);
         game.SpawnAreaEffect(origin, 0.52f + level * 0.035f, 0f, 0.22f, 1f, new Color(1f, 0.5f, 0.12f, 0.72f), "foozle_explosion");
+        game.PlaySfx("normal_attack", 0.62f, 0.045f);
         for (int i = 0; i < shots; i++)
         {
             float spreadStep = shots <= 3 ? 9f : 7f;
@@ -658,35 +659,10 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
 
         float stormRadius = (7.5f + Mod("ultimate_radius") * 0.85f) * game.AreaMultiplier;
         game.SpawnAreaEffect(transform.position, stormRadius, RollDamage((25f + level * 8f) * (1f + Mod("ultimate_voltage") * 0.18f)), 0.35f, 99f, new Color(0.7f, 0.92f, 1f, 0.42f), "ultimate_storm");
-        game.PlaySfx("ultimate", 0.92f, 0.2f);
+        game.PlaySfx("fire_tornado", 0.92f, 0.2f);
         game.ShakeCamera(0.34f, 0.48f);
         game.FlashScreen(0.9f);
         ultimateCooldown = Mathf.Max(12f, 42f - level * 4f - Mod("ultimate_recharge") * 3.5f);
-    }
-
-    // Finds the closest living enemy within range that is not already present in a supplied hit set.
-    private ZombieStormEnemy FindNearestUnhitEnemy(Vector2 origin, float maxDistance, HashSet<ZombieStormEnemy> hit)
-    {
-        ZombieStormEnemy best = null;
-        float bestDistance = maxDistance * maxDistance;
-        IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
-        for (int i = 0; i < activeEnemies.Count; i++)
-        {
-            ZombieStormEnemy enemy = activeEnemies[i];
-            if (enemy == null || enemy.IsDead || hit.Contains(enemy))
-            {
-                continue;
-            }
-
-            float distance = ((Vector2)enemy.transform.position - origin).sqrMagnitude;
-            if (distance < bestDistance)
-            {
-                bestDistance = distance;
-                best = enemy;
-            }
-        }
-
-        return best;
     }
 
     // Counts living enemies overlapping a radius; used to avoid wasting Shield Burst on empty space.
