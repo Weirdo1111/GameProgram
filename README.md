@@ -41,19 +41,6 @@ Boss waves use different movement, health, attack rhythm, telegraphs, and reward
 
 Boss skills show warning effects before they land so players can read and dodge the attack.
 
-## Assets And Licensing
-
-Documented external art sources are listed in `Docs/ArtSources.md`. Imported audio sources are listed separately in `Docs/AudioSources.md`.
-
-- Kenney Topdown Shooter Pack: CC0
-- Mikodrak 2D Spell Effects: CC0
-- Fire bomb and burn-circle effects: imported from Pixlab24 asset downloads supplied by the project owner and verified for free and commercial project use.
-- CraftPix character and boss sprites: sourced from CraftPix free asset packs and verified for commercial project use.
-- Dark VFX effects: free public assets verified for personal learning and course-project use.
-- Main menu cover, skill-card templates, and health potion pickup icon: project-created visual assets documented in `Docs/ArtSources.md`.
-
-All included assets have documented sources and verified usage terms for this course project. The GamerSounds audio clips and Dark VFX effects are used for personal learning and project exchange.
-
 ## Validation
 
 The project builds with:

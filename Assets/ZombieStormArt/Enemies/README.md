@@ -14,7 +14,6 @@ The current chibi variant contains 19 numbered left-facing video frames sampled 
 
 `craftpix_orc/` supplies the `OrcThrower` enemy: a mid-run ranged enemy that uses its throwing animation to launch straight, non-homing rocks at the player.
 
-`craftpix_reaper_man_1/`, `craftpix_reaper_man_2/`, and `craftpix_reaper_man_3/` supply three complete alternate Reaper Man animation sets. Each set imports 17 PNG sequences: air slash, air throw, death, fall, hurt, idle, idle blink, jump loop, jump start, kick, run, run slash, run throw, slash, slide, throw, and walk.
 
 `craftpix_crystal_golem/` supplies the `Crystal Colossus` Boss: a large crystal-studded golem with dedicated run, blade-sweep, projectile-throw, hurt, and death animations. Its two attacks use cyan telegraphs and crystal-colored projectile impact feedback.
 
