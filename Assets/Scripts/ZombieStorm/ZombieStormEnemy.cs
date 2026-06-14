@@ -542,7 +542,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
         {
             attackAnimDuration = attackFrames.Length / 15f;
             attackAnimTime = attackAnimDuration;
-            shootTimer = attackAnimDuration + UnityEngine.Random.Range(1.7f, 2.45f);
+            shootTimer = attackAnimDuration + UnityEngine.Random.Range(2.7f, 3.45f);
             slasherStrikeApplied = false;
             SetActionFrame(attackFrames, 0f, attackAnimDuration);
             return;
@@ -550,7 +550,7 @@ public sealed class ZombieStormEnemy : MonoBehaviour
 
         if (shootTimer <= 0f)
         {
-            shootTimer = UnityEngine.Random.Range(1.7f, 2.45f);
+            shootTimer = UnityEngine.Random.Range(2.7f, 3.45f);
             game.SpawnEnemyRockProjectile((Vector2)transform.position + direction * 0.54f, direction, 13f, 5.8f, 3.4f);
         }
 

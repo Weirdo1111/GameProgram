@@ -4,7 +4,10 @@ using UnityEngine;
 // Legacy immediate-mode menus, HUD, upgrade cards, and combat overlays.
 public sealed partial class ZombieStormGameController
 {
-    // Draws immediate-mode UI such as HUD, upgrade cards, pause, and result panels.
+    // Legacy/fallback runtime UI.
+    // The main menu uses Canvas and TextMeshPro, so this method skips main-menu drawing
+    // when that UI is ready. OnGUI remains for lightweight runtime overlays such as the
+    // HUD, upgrade choices, pause and result panels, plus fallback drawing when needed.
     private void OnGUI()
     {
         if (mainMenuUI != null && mainMenuUI.IsReady && (flowState == ZombieStormFlowState.MainMenu || IsMainMenuSettingsActive))

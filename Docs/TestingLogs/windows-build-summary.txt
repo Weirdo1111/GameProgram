@@ -1,0 +1,31 @@
+Zombie Storm - Windows Build Evidence
+Date: 2026-06-13
+Engine: Unity 2022.3.62f3c1 (1623fc0bbb97)
+Target: Windows 64-bit standalone
+Source: Curated from zombiestorm-windows-build.log
+
+Key result:
+  Build Finished, Result: Success.
+  Total pipeline duration: approximately 36.3 seconds
+  Complete Unity build size: 75.1 MB
+  Output executable: ZombieStorm.exe
+
+Runtime content callback:
+  888 PNG files copied
+  129.4 MB copied
+  Destination: <Build>/ZombieStorm_Data/StreamingAssets/ZombieStormContent
+
+Build report categories for user-generated Unity assets:
+  Textures: 4.0 MB (62.1%)
+  Sounds: 1.9 MB (29.0%)
+  Scripts: 149.7 KB (2.3%)
+  Other assets: 386.8 KB (5.9%)
+  Total user assets: 6.4 MB
+
+Important distinction:
+  The 75.1 MB Unity build-size figure does not include the separately copied 129.4 MB
+  runtime PNG directory in its user-asset category report.
+
+Privacy note:
+  Absolute user paths, licensing output, package internals, and repetitive shader
+  compiler progress were omitted from this repository summary.

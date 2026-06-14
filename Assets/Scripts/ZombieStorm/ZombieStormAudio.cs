@@ -4,11 +4,14 @@ using UnityEngine;
 // Audio responsibilities for ZombieStormGameController.
 public sealed partial class ZombieStormGameController
 {
+    private const float GameplayMusicVolumeMultiplier = 0.7f;
+
     private readonly Dictionary<string, AudioClip> sfx = new Dictionary<string, AudioClip>();
     private readonly Dictionary<string, float> sfxLastPlayed = new Dictionary<string, float>();
 
     private AudioSource audioSource;
     private AudioSource musicSource;
+    private bool useGameplayMusicVolume;
 
     // Plays a one-shot sound effect through the shared audio source after applying
     // the current master volume and the caller's per-effect volume.
@@ -105,12 +108,13 @@ public sealed partial class ZombieStormGameController
         musicSource.Play();
     }
 
-    // Applies the saved master and music sliders to the dedicated looping music source.
+    // Applies the saved sliders and lowers the music during a run so combat sounds stay clear.
     private void UpdateMusicVolume()
     {
         if (musicSource != null)
         {
-            musicSource.volume = Mathf.Clamp01(masterVolume * musicVolume);
+            float stateMultiplier = useGameplayMusicVolume ? GameplayMusicVolumeMultiplier : 1f;
+            musicSource.volume = Mathf.Clamp01(masterVolume * musicVolume * stateMultiplier);
         }
     }
 

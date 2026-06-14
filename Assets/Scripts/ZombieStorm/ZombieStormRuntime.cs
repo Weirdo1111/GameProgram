@@ -1105,6 +1105,8 @@ public sealed partial class ZombieStormGameController : MonoBehaviour
         difficultyScore = 1f;
         flowState = ZombieStormFlowState.Running;
         Time.timeScale = 1f;
+        useGameplayMusicVolume = true;
+        UpdateMusicVolume();
 
         ClearActiveObjects();
         BuildEnvironment();
@@ -1226,6 +1228,8 @@ public sealed partial class ZombieStormGameController : MonoBehaviour
         flowState = ZombieStormFlowState.MainMenu;
         settingsReturnState = ZombieStormFlowState.MainMenu;
         Time.timeScale = 0f;
+        useGameplayMusicVolume = false;
+        UpdateMusicVolume();
     }
 
     // Creates the runtime-owned camera, roots, map, pooled object containers, menu UI,

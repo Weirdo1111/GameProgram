@@ -1,0 +1,25 @@
+Zombie Storm - Standalone Startup Smoke Evidence
+Date: 2026-06-13
+Build: Windows standalone player
+Mode: Headless startup using Unity Null graphics device
+Source: Curated from zombiestorm-player-smoke.log
+
+Observed initialization:
+  Unity engine version 2022.3.62f3c1 initialized
+  Input System initialized
+  Physics worker threads initialized
+  Managed assemblies loaded successfully
+  Runtime reached normal asset unloading
+  No managed C# exception or missing assembly was logged
+
+Expected headless warnings:
+  Sprites/Default unsupported on Null graphics device
+  Sprites/Mask unsupported on Null graphics device
+  Hardware video decoding disabled without Direct3D
+
+Interpretation:
+  The smoke run verifies startup and managed assembly loading. It does not verify visual
+  output because a Null graphics device cannot render the game's sprite shaders.
+
+Follow-up:
+  A normal GPU launch remains the appropriate visual and audio acceptance test.
