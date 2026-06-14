@@ -288,7 +288,7 @@ The following matrix is designed for repeatable manual regression. Items marked 
 
 | ID | Test | Expected result | State |
 | --- | --- | --- | --- |
-| BOS-001 | First boss timing | Crystal Colossus appears near 90 seconds | Code reviewed |
+| BOS-001 | First boss timing | Crystal Colossus appears near 75 seconds | Code reviewed |
 | BOS-002 | Second boss timing | Mossbound Colossus appears near 185 seconds | Code reviewed |
 | BOS-003 | Third boss timing | Ember Tyrant appears near 270 seconds | Code reviewed |
 | BOS-004 | Telegraph readability | Warning effect appears before damaging action | Code reviewed |

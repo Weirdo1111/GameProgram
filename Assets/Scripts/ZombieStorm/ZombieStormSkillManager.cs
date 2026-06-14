@@ -427,14 +427,15 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
 
         IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
-        for (int i = 0; i < activeEnemies.Count; i++)
+        for (int i = activeEnemies.Count - 1; i >= 0; i--)
         {
             ZombieStormEnemy enemy = activeEnemies[i];
             if (enemy != null && !enemy.IsDead && Vector2.Distance(enemy.transform.position, transform.position) <= radius + enemy.Radius)
             {
-                enemy.TakeDamage(RollDamage((6f + level * 1.8f) * 4f * (1f + Mod("knife_edge") * 0.18f)), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
-                game.SpawnHitSpark(enemy.transform.position, new Color(1f, 0.32f, 0.16f, 0.86f), 0.28f);
-                game.SpawnAreaEffect(enemy.transform.position, 0.34f, 0f, 0.12f, 1f, new Color(1f, 0.16f, 0.06f, 0.42f), "hit_spark");
+                Vector2 enemyPosition = enemy.transform.position;
+                enemy.TakeDamage(RollDamage((6f + level * 1.8f) * 4f * (1f + Mod("knife_edge") * 0.18f)), (enemyPosition - (Vector2)transform.position).normalized);
+                game.SpawnHitSpark(enemyPosition, new Color(1f, 0.32f, 0.16f, 0.86f), 0.28f);
+                game.SpawnAreaEffect(enemyPosition, 0.34f, 0f, 0.12f, 1f, new Color(1f, 0.16f, 0.06f, 0.42f), "hit_spark");
             }
         }
 
@@ -645,7 +646,7 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
         }
 
         IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
-        for (int i = 0; i < activeEnemies.Count; i++)
+        for (int i = activeEnemies.Count - 1; i >= 0; i--)
         {
             ZombieStormEnemy enemy = activeEnemies[i];
             if (enemy == null || enemy.IsDead)
@@ -653,8 +654,9 @@ public sealed class ZombieStormSkillManager : MonoBehaviour
                 continue;
             }
 
-            enemy.TakeDamage(RollDamage((42f + level * 18f) * (1f + Mod("ultimate_voltage") * 0.18f)), ((Vector2)enemy.transform.position - (Vector2)transform.position).normalized);
-            game.SpawnAreaEffect(enemy.transform.position, 0.62f, 0f, 0.22f, 1f, new Color(0.45f, 0.85f, 1f, 0.78f), "ultimate_spark");
+            Vector2 enemyPosition = enemy.transform.position;
+            enemy.TakeDamage(RollDamage((42f + level * 18f) * (1f + Mod("ultimate_voltage") * 0.18f)), (enemyPosition - (Vector2)transform.position).normalized);
+            game.SpawnAreaEffect(enemyPosition, 0.62f, 0f, 0.22f, 1f, new Color(0.45f, 0.85f, 1f, 0.78f), "ultimate_spark");
         }
 
         float stormRadius = (7.5f + Mod("ultimate_radius") * 0.85f) * game.AreaMultiplier;

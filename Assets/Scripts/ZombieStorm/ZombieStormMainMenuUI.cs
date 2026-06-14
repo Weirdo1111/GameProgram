@@ -7,7 +7,7 @@ using UnityEngine.UI;
 [DisallowMultipleComponent]
 // Builds the standalone main menu UI using Unity UI/TextMeshPro. It owns the cover art,
 // invisible cover hotspots, settings modal, and button hover styling.
-public sealed class ZombieStormMainMenuUI : MonoBehaviour
+public sealed partial class ZombieStormMainMenuUI : MonoBehaviour
 {
     private const float FadeSpeed = 10f;
     private const float CoverArtAspectRatio = 1792f / 1024f;
@@ -526,41 +526,6 @@ public sealed class ZombieStormMainMenuUI : MonoBehaviour
 
         GameObject eventSystem = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
         eventSystem.transform.SetParent(transform, false);
-    }
-
-    // Creates and caches a simple fallback cover when the menu art is missing.
-    private Sprite GetBackgroundFallbackSprite()
-    {
-        if (backgroundFallbackSprite != null)
-        {
-            return backgroundFallbackSprite;
-        }
-
-        Texture2D texture = new Texture2D(4, 4, TextureFormat.RGBA32, false);
-        texture.filterMode = FilterMode.Bilinear;
-        texture.wrapMode = TextureWrapMode.Clamp;
-        Color32[] pixels = new Color32[16];
-        for (int i = 0; i < pixels.Length; i++)
-        {
-            pixels[i] = new Color32(40, 45, 38, 255);
-        }
-
-        texture.SetPixels32(pixels);
-        texture.Apply(false, false);
-        backgroundFallbackSprite = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f), 4f);
-        return backgroundFallbackSprite;
-    }
-
-    // Creates a one-pixel solid sprite for UI images that only need flat color.
-    private Sprite CreateSolidSprite(string name)
-    {
-        Texture2D texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-        texture.name = name;
-        texture.filterMode = FilterMode.Point;
-        texture.wrapMode = TextureWrapMode.Clamp;
-        texture.SetPixel(0, 0, Color.white);
-        texture.Apply(false, false);
-        return Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
     }
 
 }

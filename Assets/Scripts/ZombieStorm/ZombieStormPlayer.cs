@@ -268,7 +268,8 @@ public sealed class ZombieStormPlayer : MonoBehaviour
     // Applies the strongest active slow multiplier and keeps the longer remaining slow duration.
     public void ApplySlow(float multiplier, float duration)
     {
-        slowMultiplier = Mathf.Clamp(multiplier, 0.1f, 1f);
+        float incomingMultiplier = Mathf.Clamp(multiplier, 0.1f, 1f);
+        slowMultiplier = slowTimer > 0f ? Mathf.Min(slowMultiplier, incomingMultiplier) : incomingMultiplier;
         slowTimer = Mathf.Max(slowTimer, duration);
         if (spriteRenderer != null)
         {

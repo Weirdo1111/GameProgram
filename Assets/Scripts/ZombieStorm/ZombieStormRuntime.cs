@@ -1385,7 +1385,7 @@ public sealed partial class ZombieStormGameController : MonoBehaviour
             ShowFeedback("Heavy zombie incoming. Keep your distance.", 2.5f);
         }
 
-        if (bossCount == 0 && runTime >= 90f)
+        if (bossCount == 0 && runTime >= 75f)
         {
             bossCount++;
             SpawnBossWave(ZombieStormEnemyType.CrystalGolemBoss);
@@ -2445,21 +2445,6 @@ public sealed partial class ZombieStormGameController : MonoBehaviour
             Vector3 scale = horizontal ? new Vector3(0.28f, 3.6f, 1f) : new Vector3(3.6f, 0.28f, 1f);
             GameObject stripe = CreateSpriteObject("Faded Crosswalk", tileSprite, new Color(0.86f, 0.9f, 0.88f, 0.2f), position, scale, -5);
             stripe.transform.SetParent(worldRoot, false);
-        }
-    }
-
-    // Builds a fallback neon floor when map art is unavailable.
-    private void BuildFallbackNeonFloor()
-    {
-        GameObject floor = CreateSpriteObject("Neon Asphalt", tileSprite, new Color(0.06f, 0.072f, 0.075f), Vector3.forward * 4f, new Vector3(110f, 110f, 1f), -8);
-        floor.transform.SetParent(worldRoot, false);
-
-        for (int i = -14; i <= 14; i++)
-        {
-            GameObject lineX = CreateSpriteObject("Road Line X", tileSprite, new Color(0.05f, 0.75f, 1f, 0.16f), new Vector3(i * 4f, 0f, 2f), new Vector3(0.06f, 110f, 1f), -6);
-            lineX.transform.SetParent(worldRoot, false);
-            GameObject lineY = CreateSpriteObject("Road Line Y", tileSprite, new Color(1f, 0.18f, 0.45f, 0.12f), new Vector3(0f, i * 4f, 2f), new Vector3(110f, 0.06f, 1f), -6);
-            lineY.transform.SetParent(worldRoot, false);
         }
     }
 

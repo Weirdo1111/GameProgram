@@ -43,24 +43,25 @@ public sealed class ZombieStormProjectile : MonoBehaviour
         transform.rotation = Quaternion.Euler(0f, 0f, angle);
     }
 
-    // Moves the fireball, expires it after its lifetime, checks enemy overlap, applies damage,
-    // and returns to the projectile pool after pierce is exhausted.
+    // Moves the fireball, checks its swept path for enemy hits, applies damage, and returns
+    // to the projectile pool after its lifetime or pierce count is exhausted.
     private void Update()
     {
         UpdateFireballAnimation();
-        transform.position += (Vector3)(direction * speed * Time.deltaTime);
+        float travelTime = Mathf.Min(Time.deltaTime, Mathf.Max(0f, life));
+        Vector2 startPosition = transform.position;
+        Vector2 endPosition = startPosition + direction * speed * travelTime;
+        transform.position = endPosition;
         life -= Time.deltaTime;
-        if (life <= 0f)
-        {
-            game.ReturnPooled("player_bullet", gameObject);
-            return;
-        }
 
         IReadOnlyList<ZombieStormEnemy> activeEnemies = game.Enemies;
         for (int i = 0; i < activeEnemies.Count; i++)
         {
             ZombieStormEnemy enemy = activeEnemies[i];
-            if (enemy != null && !enemy.IsDead && !hitEnemies.Contains(enemy) && Vector2.Distance(transform.position, enemy.transform.position) <= enemy.Radius + 0.16f)
+            if (enemy != null &&
+                !enemy.IsDead &&
+                !hitEnemies.Contains(enemy) &&
+                DistanceToSegment(enemy.transform.position, startPosition, endPosition) <= enemy.Radius + 0.16f)
             {
                 Vector2 hitPosition = enemy.transform.position;
                 hitEnemies.Add(enemy);
@@ -80,6 +81,11 @@ public sealed class ZombieStormProjectile : MonoBehaviour
                 return;
             }
         }
+
+        if (life <= 0f)
+        {
+            game.ReturnPooled("player_bullet", gameObject);
+        }
     }
 
     // Loops the projectile's fireball frames based on elapsed lifetime while it is in flight.
@@ -93,6 +99,20 @@ public sealed class ZombieStormProjectile : MonoBehaviour
         float elapsed = maxLife - life;
         int frameIndex = Mathf.Abs(Mathf.FloorToInt(elapsed / 0.045f)) % fireballFrames.Length;
         spriteRenderer.sprite = fireballFrames[frameIndex];
+    }
+
+    // Returns the shortest distance from a point to this frame's projectile movement segment.
+    private static float DistanceToSegment(Vector2 point, Vector2 start, Vector2 end)
+    {
+        Vector2 segment = end - start;
+        float lengthSquared = segment.sqrMagnitude;
+        if (lengthSquared <= 0.0001f)
+        {
+            return Vector2.Distance(point, start);
+        }
+
+        float t = Mathf.Clamp01(Vector2.Dot(point - start, segment) / lengthSquared);
+        return Vector2.Distance(point, start + segment * t);
     }
 }
 
