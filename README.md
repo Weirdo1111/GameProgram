@@ -87,3 +87,5 @@ Gameplay, UI, camera behavior, audio, and asset rendering are integrated in the 
 ## Asset Credits
 
 Art packs, project-specific images, animation frames, effects, audio, fonts, screenshots, source archives, and generated fallback visuals are listed in the centralized [Asset Credits and References](Docs/AssetReferences.md).
+
+Early hand-drawn visual planning is preserved in [Art and UI Drafts](Docs/ArtDrafts/README.md).
