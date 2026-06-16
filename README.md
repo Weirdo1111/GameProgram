@@ -82,6 +82,8 @@ The project uses Unity `2022.3.62f3c1`. Verified checks include Unity script com
 
 See [Testing and Debugging Report](Docs/TestingAndDebugging.md) for the test matrix, defect log, build evidence, known limitations, and release checklist.
 
+See [Design and Evaluation Evidence](Docs/DesignAndEvaluation.md) for the design decisions, improvement evidence, and awareness of legal, ethical, social, accessibility, and security considerations.
+
 Gameplay, UI, camera behavior, audio, and asset rendering are integrated in the Unity project.
 
 ## Asset Credits

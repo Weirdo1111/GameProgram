@@ -4,7 +4,7 @@ using UnityEngine;
 // Audio responsibilities for ZombieStormGameController.
 public sealed partial class ZombieStormGameController
 {
-    private const float GameplayMusicVolumeMultiplier = 0.7f;
+    private const float GameplayMusicVolumeMultiplier = 0.6f;
 
     private readonly Dictionary<string, AudioClip> sfx = new Dictionary<string, AudioClip>();
     private readonly Dictionary<string, float> sfxLastPlayed = new Dictionary<string, float>();

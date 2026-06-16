@@ -180,7 +180,7 @@ These messages are expected in a headless `-nographics` run because no Direct3D 
 | Area | Audio mix |
 | Symptom | Menu music remained at full configured volume during combat |
 | Root cause | One volume formula was used for every flow state |
-| Fix | Apply a 0.70 gameplay multiplier after a run starts; restore menu volume on return |
+| Fix | Apply a 0.60 gameplay multiplier after a run starts; restore menu volume on return |
 | Special handling | Pause, upgrade, and result states retain the gameplay mix to prevent volume jumps |
 | Status | Code reviewed; manual listening test planned |
 
@@ -303,7 +303,7 @@ The following matrix is designed for repeatable manual regression. Items marked 
 | ID | Test | Expected result | State |
 | --- | --- | --- | --- |
 | AUD-001 | Application startup | Background music begins and loops | Code reviewed |
-| AUD-002 | Gameplay transition | Music changes to 70% of the configured menu level | Code reviewed |
+| AUD-002 | Gameplay transition | Music changes to 60% of the configured menu level | Code reviewed |
 | AUD-003 | Pause/upgrade/results | Music does not jump back to full menu level | Code reviewed |
 | AUD-004 | Return to menu | Music restores to the configured menu level | Code reviewed |
 | AUD-005 | Settings sliders | Master, music, and SFX values persist through PlayerPrefs | Code reviewed |
