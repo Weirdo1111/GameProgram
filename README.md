@@ -2,6 +2,37 @@
 
 Zombie Storm is a Unity 2D survival action game inspired by horde survival games, built around readable auto-casting skills, fast upgrade choices, and escalating boss waves.
 
+## Playable Build
+
+A Windows x64 playable build has been prepared as:
+
+- Local release package: `Builds/ZombieStorm-v1.0-windows-x64.zip`
+- GitHub release page: `https://github.com/Weirdo1111/GameProgram/releases/tag/v1.0`
+
+To play the build, download the zip, extract it, and run `ZombieStorm.exe`.
+
+If submitting through GitHub, publish the `v1.0` release or upload the zip as a release asset so reviewers can download the playable build directly. Do not submit only the Unity project folder as the playable game.
+
+## Opening The Unity Project
+
+This project uses Unity `2022.3.62f3c1`.
+
+To open and run the project from source:
+
+1. Open Unity Hub.
+2. Add this repository folder as an existing project.
+3. Open it with Unity `2022.3.62f3c1`.
+4. Open `Assets/Scenes/ZombieStorm.unity`.
+5. Press Play in the Unity Editor.
+
+The game also auto-creates its bootstrap controller at runtime, so the scene can remain lightweight.
+
+## Submission Contents
+
+Submit either a playable build zip or a clear download link to a playable build. If the Unity project or GitHub repository is also submitted, keep the README with these build and editor instructions.
+
+Do not include unnecessary Unity-generated folders such as `Library/`, `Temp/`, `Obj/`, `Logs/`, `UserSettings/`, or large build-cache folders. These are already excluded by `.gitignore`. The `Builds/` folder is also ignored for normal source control; publish final builds through a release asset or submit the build zip separately.
+
 ## Screenshots
 
 | Main Menu | Story |

@@ -70,6 +70,11 @@ local path, source or source record, project use, and attribution note. This
 makes it easier to explain where assets came from and how they are used in the
 game.
 
+The project also explicitly discloses ChatGPT-assisted visual assets. The
+player movement, attack-related presentation, hurt animation frames, opening
+story images, Fire Spirit image, and all upgrade skill-card images are recorded
+in the asset reference as AI-assisted project-specific art.
+
 ### Ethical and Social Considerations
 
 Zombie Storm is a fantasy survival game with cartoon zombie combat. The design

@@ -12,10 +12,10 @@ directory unless a more specific entry overrides it.
 | Category | Main location | Contents |
 | --- | --- | --- |
 | External art packs | `Assets/ExternalArt` | Kenney environment/character art and Mikodrak spell effects |
-| Game-specific art | `Assets/ZombieStormArt` | Enemies, bosses, player animation, map, menu, story, UI, and effects |
+| Game-specific art | `Assets/ZombieStormArt` | Enemies, bosses, player animation, map, menu, story, UI, and effects, including the ChatGPT-assisted project-specific art listed below |
 | Audio | `Assets/Resources/Audio` | Background music and gameplay sound effects |
 | Fonts and text assets | `Assets/TextMesh Pro` | Liberation Sans, EmojiOne sample sprites, and TextMesh Pro resources |
-| Source archives | `Assets/ExternalDownloads` | Original Kenney and Mikodrak download archives |
+| Source archives | `Assets/ExternalDownloads` | Local development copies of original download archives; this folder is not included in the Git repository |
 | Player fallback frames | `Assets/screen_selected` | Four legacy player hurt frames |
 | Repository screenshots | `Docs/Screenshots` | Main menu, story, combat, and upgrade-selection captures |
 | Art and UI drafts | `Docs/ArtDrafts` | Photographs of hand-drawn HUD, menu, character, story, and upgrade layout sketches |
@@ -29,7 +29,7 @@ directory unless a more specific entry overrides it.
 - Source: [OpenGameArt - Topdown Shooter](https://opengameart.org/content/topdown-shooter)
 - License: Creative Commons Zero (CC0)
 - Local files: `Assets/ExternalArt/KenneyTopdownShooter`
-- Original archive: `Assets/ExternalDownloads/kenney_topdown_shooter.zip`
+- Local archive reference: `Assets/ExternalDownloads/kenney_topdown_shooter.zip` in the development copy only; not included in the Git repository
 - License file: `Assets/ExternalArt/KenneyTopdownShooter/License.txt`
 - Project use: fallback city tiles, debris, props, zombie sprites, character sprites, and weapon sprites.
 
@@ -42,7 +42,7 @@ The included license states that credit is appreciated but not mandatory.
 - Source: [OpenGameArt - 2D Spell Effects](https://opengameart.org/content/2d-spell-effects)
 - License: Creative Commons Zero (CC0)
 - Local files: `Assets/ExternalArt/MikodrakSpellEffects`
-- Original archive: `Assets/ExternalDownloads/Mikodrak_FX.zip`
+- Local archive reference: `Assets/ExternalDownloads/Mikodrak_FX.zip` in the development copy only; not included in the Git repository
 - Included notice: `Assets/ExternalArt/MikodrakSpellEffects/YoudBetterReadMe.txt`
 - Project use: sparks, fire, energy bursts, lightning, projectiles, and explosion animation frames.
 
@@ -110,7 +110,8 @@ The local pack contains the `Earth_Spike`, `Explosion`, `Fire_Ball`,
 ### Dark VFX 01-02
 
 - Pack: Dark VFX 01-02
-- Source record: free public asset package supplied by the project owner
+- Distributor/source site: [Pixlab24](https://pixlab24.com/)
+- Source record: free public asset package downloaded from Pixlab24 and supplied by the project owner for this course project
 - Local files:
   - `Assets/ZombieStormArt/Effects/DarkVFX1`
   - `Assets/ZombieStormArt/Effects/DarkVFX2`
@@ -120,9 +121,9 @@ The local pack contains the `Earth_Spike`, `Explosion`, `Fire_Ball`,
 
 | Local path | Project use | Source record |
 | --- | --- | --- |
-| `Assets/ZombieStormArt/Effects/CraftpixPoisonExplosion10` | Mossbound Colossus poison blast | CraftPix effect sequence supplied by the project owner; exact product page is not stored in the repository |
-| `Assets/ZombieStormArt/Effects/EmberBossMeteorSelected` | Ember Tyrant meteor animation | Selected and prepared frames supplied by the project owner |
-| `Assets/ZombieStormArt/Effects/IceBossOrb` | Crystal Colossus ice projectile | Prepared animation frames supplied by the project owner |
+| `Assets/ZombieStormArt/Effects/CraftpixPoisonExplosion10` | Mossbound Colossus poison blast | Effect sequence downloaded from Pixlab24 and supplied by the project owner for this course project |
+| `Assets/ZombieStormArt/Effects/EmberBossMeteorSelected` | Ember Tyrant meteor animation | Selected and prepared frames from Pixlab24 effect resources supplied by the project owner |
+| `Assets/ZombieStormArt/Effects/IceBossOrb` | Crystal Colossus ice projectile | Prepared frames from Pixlab24 effect resources supplied by the project owner |
 
 Additional effect-to-gameplay mappings are documented in
 `Assets/ZombieStormArt/Effects/README.md`.
@@ -133,29 +134,41 @@ The following images were supplied, selected, edited, cropped, or prepared for
 Zombie Storm by the project owner. They do not rely on a separate third-party
 credit file in the current repository.
 
-| Local path | Contents and use |
-| --- | --- |
-| `Assets/ZombieStormArt/Enemies/chibi_zombie` | Base chibi zombie walk animation |
-| `Assets/ZombieStormArt/Maps/graveyard_arena.png` | Main combat arena background |
-| `Assets/ZombieStormArt/Menu/main_menu_cover.png` | Main menu cover and visual button layout |
-| `Assets/ZombieStormArt/Story` | Eight-page opening story sequence |
-| `Assets/ZombieStormArt/Player/chibi_pyromancer_idle` | Player idle animation |
-| `Assets/ZombieStormArt/Player/chibi_pyromancer_walk_right` | Player movement animation |
-| `Assets/ZombieStormArt/Player/hurt` | Player damage animation |
-| `Assets/ZombieStormArt/Player/FireSpirit.png` | Fire Spirit summon art |
-| `Assets/screen_selected` | Legacy fallback player hurt frames |
-| `Assets/ZombieStormArt/UI/health_potion.png` | Health potion pickup |
-| `Assets/ZombieStormArt/UI/player_status_card.png` | Source player HUD frame |
-| `Assets/ZombieStormArt/UI/player_status_card_cropped.png` | Runtime-ready player HUD frame |
-| `Assets/ZombieStormArt/UI/skill_card_chibi_fire_template.png` | Default/Fire Spirit upgrade card |
-| `Assets/ZombieStormArt/UI/skill_card_magic_bolt_template.png` | Magic Bolt upgrade card |
-| `Assets/ZombieStormArt/UI/skill_card_fire_blades_template.png` | Fire Blades upgrade card |
-| `Assets/ZombieStormArt/UI/skill_card_fire_zone_template.png` | Fire Zone upgrade card |
-| `Assets/ZombieStormArt/UI/skill_card_regeneration_template.png` | Regeneration upgrade card |
-| `Assets/ZombieStormArt/UI/skill_card_storm_template.png` | Ultimate Storm upgrade card |
-| `Assets/ZombieStormArt/UI/skill_card_damage_template.png` | Damage/critical upgrade card |
-| `Assets/ZombieStormArt/UI/skill_card_cooldown_template.png` | Cooldown upgrade card |
-| `Assets/ZombieStormArt/UI/skill_card_xp_template.png` | Experience/pickup-range upgrade card |
+### AI-Assisted Project-Specific Art
+
+The following project-specific visual assets were generated with assistance from
+ChatGPT image generation, then selected, cropped, edited, exported, or integrated
+by the project owner for this course project:
+
+| Local path | Contents and use | Source note |
+| --- | --- | --- |
+| `Assets/ZombieStormArt/Player` | Project-specific player presentation, including movement, attack-related presentation, and hurt feedback art | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/Story` | Eight-page opening story sequence | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/Player/chibi_pyromancer_idle` | Player idle animation frames | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/Player/chibi_pyromancer_walk_right` | Player movement animation frames | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/Player/hurt` | Player damage / hurt animation frames | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/Player/FireSpirit.png` | Fire Spirit summon art | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/UI/skill_card_chibi_fire_template.png` | Default / Fire Spirit upgrade card image | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/UI/skill_card_magic_bolt_template.png` | Magic Bolt upgrade card image | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/UI/skill_card_fire_blades_template.png` | Fire Blades upgrade card image | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/UI/skill_card_fire_zone_template.png` | Fire Zone upgrade card image | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/UI/skill_card_regeneration_template.png` | Regeneration upgrade card image | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/UI/skill_card_storm_template.png` | Ultimate Storm upgrade card image | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/UI/skill_card_damage_template.png` | Damage / critical upgrade card image | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/UI/skill_card_cooldown_template.png` | Cooldown upgrade card image | ChatGPT-assisted image generation |
+| `Assets/ZombieStormArt/UI/skill_card_xp_template.png` | Experience / pickup-range upgrade card image | ChatGPT-assisted image generation |
+
+### Other Project-Specific Visual Assets
+
+| Local path | Contents and use | Source note |
+| --- | --- | --- |
+| `Assets/ZombieStormArt/Enemies/chibi_zombie` | Base chibi zombie walk animation | Project-specific visual asset supplied by the project owner |
+| `Assets/ZombieStormArt/Maps/graveyard_arena.png` | Main combat arena background | Project-specific visual asset supplied by the project owner |
+| `Assets/ZombieStormArt/Menu/main_menu_cover.png` | Main menu cover and visual button layout | Project-specific visual asset supplied by the project owner |
+| `Assets/screen_selected` | Legacy fallback player hurt frames | Project-specific visual asset supplied by the project owner |
+| `Assets/ZombieStormArt/UI/health_potion.png` | Health potion pickup | Project-specific visual asset supplied by the project owner |
+| `Assets/ZombieStormArt/UI/player_status_card.png` | Source player HUD frame | Project-specific visual asset supplied by the project owner |
+| `Assets/ZombieStormArt/UI/player_status_card_cropped.png` | Runtime-ready player HUD frame | Cropped project-specific visual asset supplied by the project owner |
 
 Enemy animation roles and frame-set details are documented in
 `Assets/ZombieStormArt/Enemies/README.md` and the README inside each CraftPix
@@ -165,8 +178,8 @@ enemy directory.
 
 All imported MP3 files in `Assets/Resources/Audio` were downloaded from
 [GamerSounds](https://gamersounds.com/) and supplied for this course project.
-The source service describes these resources as available for personal
-learning and communication.
+They are used only for personal learning, course demonstration, and
+communication purposes in this student project.
 
 | Local file | Original file name | Project use |
 | --- | --- | --- |
@@ -231,9 +244,10 @@ See `Docs/ArtDrafts/README.md` for previews and the original source filenames.
 
 ### Imported Archives
 
-`Assets/ExternalDownloads` stores the original Kenney and Mikodrak archives.
-Their extracted files, creator credits, and notices are covered by the matching
-entries above.
+`Assets/ExternalDownloads` is used only as a local development folder for
+original download archives. It is excluded from Git and is not part of the
+submitted repository. Extracted files, creator credits, and included notices are
+covered by the matching entries above.
 
 ### Runtime-Generated Fallback Art
 
